@@ -78,11 +78,8 @@ class Settings(argparse.ArgumentParser):
 
         return self._settings
 
-    def __getattr__(self, name) -> str | list[str]:
-        result = self.settings().get(name)
-        if result is None:
-            raise AttributeError(f'No such setting: {name}')
-        return result
+    def __getattr__(self, name) -> str | list[str] | None:
+        return self.settings().get(name)
 
     def __repr__(self) -> str:
         return super().__repr__()
