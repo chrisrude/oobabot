@@ -79,6 +79,6 @@ def main():
     else:
         logger.debug('Connecting to Discord... ')
         bot = DiscordBot(ooba_client, wakewords=settings.wakewords)
-        coroutine = bot.start(settings.DISCORD_TOKEN_ENV_VAR)
+        coroutine = bot.start(settings.DISCORD_TOKEN)
 
     asyncio.run(coroutine)
