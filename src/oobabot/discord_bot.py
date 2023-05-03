@@ -72,33 +72,14 @@ class PromptGenerator:
         Below is a transcript of recent messages in the conversation.
         Write the next message that you would send in this conversation,
         from the point of view of the participant named "{self.ai_name}".
-
         Here is some background information about "{self.ai_name}":
         {self.ai_persona}
-
         All responses you write must be from the point of view of
         {self.ai_name}, and plausible for {self.ai_name} to say in
         this conversation.  Do not continue the conversation as
         anyone other than {self.ai_name}.
-
         ### Transcript:
-
         ''')
-
-        # message_history should be newer messages first,
-        # so we reverse it to get older messages first
-        history_lines = []
-        async for raw_message in message_history:
-            clean_message = sanitize_message(raw_message)
-
-            author = clean_message["author"]
-            if raw_message.author.id == ai_user_id:
-                author = self.ai_name
-
-            if clean_message["message_text"]:
-                message_line = f'{author} says:\n' + \
-                    f'{clean_message["message_text"]}\n\n'
-                history_lines.append(message_line)
 
         # put this at the very end to tell the UI what it
         # should complete.  But generate this now so we
@@ -114,17 +95,38 @@ class PromptGenerator:
         prompt_len_remaining = self.MAX_PROMPT_LEN - \
             len(prompt) - len(prompt_footer)
 
+        # history_lines is newest first, so figure out
+        # how many we can take, then append them in
+        # reverse order
         added_history = 0
-        for next_line in history_lines.pop():
-            if len(next_line) > prompt_len_remaining:
+        history_lines = []
+        async for raw_message in message_history:
+            clean_message = sanitize_message(raw_message)
+
+            author = clean_message["author"]
+            if raw_message.author.id == ai_user_id:
+                author = self.ai_name
+
+            if clean_message["message_text"] is None:
+                continue
+
+            line = f'{author} says:\n' + \
+                f'{clean_message["message_text"]}\n\n'
+
+            if len(line) > prompt_len_remaining:
                 get_logger().warn(
                     'prompt too long, truncating history.  ' +
                     f'added {added_history} lines, dropped ' +
                     f'{len(history_lines)} lines'
                 )
                 break
+
+            prompt_len_remaining -= len(line)
+            history_lines.append(line)
             added_history += 1
-            prompt += next_line
+
+        history_lines.reverse()
+        prompt += ''.join(history_lines)
 
         prompt += prompt_footer
 
@@ -227,13 +229,15 @@ class DiscordBot(discord.Client):
         get_logger().debug(
             f'Request from {author} in server [{server}]')
 
-        recent_messages = (raw_message.channel.history(limit=self.HIST_SIZE))
+        recent_messages = raw_message.channel.history(limit=self.HIST_SIZE)
 
         prompt = await self.prompt_generator.generate_prompt(
             self.ai_user_id, recent_messages)
 
         response_stats = self.average_stats.log_request_arrived(prompt)
-
+        # print('Prompt:\n----------\n')
+        # print(prompt)
+        # print('Response:\n----------\n')
         try:
             async for sentence in self.ooba_client.request_by_sentence(
                 prompt
