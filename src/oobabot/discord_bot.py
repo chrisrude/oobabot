@@ -16,6 +16,13 @@ class DiscordBot(discord.Client):
         self.stats = ResponseStats(ooba_client)
         self.wakewords = wakewords
 
+        # match messages that include any `wakeword`, but not as part of
+        # another word
+        self.wakeword_patterns = [
+            re.compile(f'\\b{wakeword}\\b', re.IGNORECASE)
+            for wakeword in wakewords
+        ]
+
         intents = discord.Intents.default()
         intents.message_content = True
 
@@ -51,10 +58,9 @@ class DiscordBot(discord.Client):
         if discord.ChannelType.private == message.channel.type:
             return True
 
-        # reply to messages that include any `wakeword``, but not as part of
-        # another word
-        for wakeword in self.wakewords:
-            if re.search(f'\\b{wakeword}\\b', message.content, re.IGNORECASE):
+        # reply to all messages that include a wakeword
+        for wakeword_pattern in self.wakeword_patterns:
+            if wakeword_pattern.search(message.content):
                 return True
 
         # reply to all messages in which we're @-mentioned
