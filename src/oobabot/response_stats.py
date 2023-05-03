@@ -5,118 +5,165 @@ from oobabot.fancy_logging import get_logger
 
 
 class ResponseStats:
-    # Purpose: collects timing and rate statistics for responses
+    '''
+    Purpose: collects timing and rate statistics for a single response
+    '''
 
     def __init__(self, ooba_client: OobaClient):
         self.ooba_client = ooba_client
-        self.requests = 0
-        self.responses = 0
-        self.errors = 0
-        self.total_response_time = 0
-        self.total_response_latency = 0
-        self.total_tokens = 0
-        self.last_response = None
-
-    class ResponseData:
-        def __init__(self, ooba_client: OobaClient):
-            self.ooba_client = ooba_client
-            self.start_time = time.time()
-            self.start_tokens = ooba_client.total_response_tokens
-            self.duration = 0
-            self.latency = 0
-            self.tokens = 0
-
-        def log_response_part(self) -> None:
-            now = time.time()
-            if not self.latency:
-                self.latency = now - self.start_time
-            self.duration = now - self.start_time
-            self.tokens = self.ooba_client.total_response_tokens - \
-                self.start_tokens
-
-        def tokens_per_second(self) -> float:
-            if not self.duration:
-                return 0
-            return self.tokens / self.duration
-
-        def write_to_log(self, log_prefix: str) -> None:
-            get_logger().debug(
-                log_prefix +
-                f"tokens: {self.tokens}, " +
-                f"time: {self.duration:.2f}s, " +
-                f"latency: {self.latency:.2f}s, " +
-                f"rate: {self.tokens_per_second():.2f} tok/s")
-
-    def log_request_start(self) -> None:
-        self.requests += 1
-        self.last_response = self.ResponseData(self.ooba_client)
+        self.start_time = time.time()
+        self.start_tokens = ooba_client.total_response_tokens
+        self.duration = 0
+        self.latency = 0
+        self.tokens = 0
 
     def log_response_part(self) -> None:
-        if not self.last_response:
-            get_logger().error(
-                'log_response_part() called without a corresponding ' +
-                'log_request_start()'
-            )
-            return
-        self.last_response.log_response_part()
+        '''
+        Call this each time the response is updated by the AI.
+        '''
 
-    def log_response_failure(self, error: Exception) -> None:
-        self.errors += 1
-        get_logger().error(f'Error: {str(error)}')
-        self.last_response = None
+        now = time.time()
+        if not self.latency:
+            self.latency = now - self.start_time
+        self.duration = now - self.start_time
+        self.tokens = self.ooba_client.total_response_tokens - \
+            self.start_tokens
 
-    def log_response_success(self, log_prefix: str) -> None:
-        # make sure this was called at all
-        self.log_response_part()
-        if not self.last_response:
-            get_logger().error(
-                'log_response_success() called without a corresponding ' +
-                'log_request_start()'
-            )
-            return
+    def tokens_per_second(self) -> float:
+        '''
+        Returns the rate at which tokens were generated, in tokens per second.
+        '''
+        if not self.duration:
+            return 0
+        return self.tokens / self.duration
 
-        self.responses += 1
-        self.total_response_time += self.last_response.duration
-        self.total_response_latency += self.last_response.latency
+    def write_to_log(self, log_prefix: str) -> None:
+        '''
+        This writes the statistics for this specific
+        request to the log.
+        '''
+        get_logger().debug(
+            log_prefix +
+            f"tokens: {self.tokens}, " +
+            f"time: {self.duration:.2f}s, " +
+            f"latency: {self.latency:.2f}s, " +
+            f"rate: {self.tokens_per_second():.2f} tok/s")
 
-        self.last_response.write_to_log(log_prefix)
-        self.last_response = None
+
+class AggregateResponseStats:
+    '''
+    Purpose: collects timing and rate statistics for all AggregateResponseStats
+    '''
+
+    def __init__(self, ooba_client: OobaClient):
+        self.ooba_client = ooba_client
+        self.total_requests_received = 0
+        self.total_successful_responses = 0
+        self.total_failed_responses = 0
+        self.total_response_time_seconds = 0
+        self.total_response_latency_seconds = 0
+
+    def log_request_arrived(self) -> ResponseStats:
+        '''
+        Call this when a request has arrived.
+        This must be followed by zero or more calls
+        to log_response_part(), and then exactly one call to
+        either log_response_failure() or log_response_success().
+        '''
+        self.total_requests_received += 1
+        return ResponseStats(self.ooba_client)
+
+    def log_response_failure(self) -> None:
+        '''
+        Track the statistics for a failed response.
+        '''
+        self.total_failed_responses += 1
+
+    def log_response_success(self, response: ResponseStats) -> None:
+        '''
+        Track the statistics for a successful response, and
+        averages them into the overall statistics.
+
+        Parameters:
+         - response: the Response object returned
+              by log_request_arrived()
+        '''
+        self.total_successful_responses += 1
+        self.total_response_time_seconds += response.duration
+        self.total_response_latency_seconds += response.latency
+
+    def error_rate(self) -> float:
+        '''
+        Returns the percentage of requests that failed.
+        '''
+        if 0 == self.total_requests_received:
+            return 0.0
+        return 100 * self.total_failed_responses / self.total_requests_received
+
+    def average_response_time(self) -> float:
+        '''
+        Returns the average response time in seconds.
+        '''
+        if 0 == self.total_successful_responses:
+            return 0.0
+        return self.total_response_time_seconds / \
+            self.total_successful_responses
+
+    def average_response_latency(self) -> float:
+        '''
+        Returns the average response latency in seconds.
+        '''
+        if 0 == self.total_successful_responses:
+            return 0.0
+        return self.total_response_latency_seconds / \
+            self.total_successful_responses
+
+    def average_tokens_per_second(self) -> float:
+        '''
+        Returns the average rate at which tokens were generated,
+        in tokens per second.
+        '''
+        if 0 == self.total_successful_responses:
+            return 0.0
+        return self.ooba_client.total_response_tokens / \
+            self.total_response_time_seconds
 
     def write_stat_summary_to_log(self) -> None:
-        if 0 == self.requests:
+        '''
+        This writes a summary of the statistics to the log.
+        Call this after all AggregateResponseStats have been handled.
+        '''
+        if 0 == self.total_requests_received:
             get_logger().info('No requests handled')
             return
 
         get_logger().info(
-            f'Recevied {self.requests} request(s), ' +
-            f'sent {self.responses} successful responses and ' +
-            f'had {self.errors} error(s)')
+            f'Recevied {self.total_requests_received} request(s), ' +
+            f'sent {self.total_successful_responses} successful responses ' +
+            f'and failed to send one {self.total_failed_responses} times(s)')
 
-        if (self.errors > 0):
+        if (self.total_failed_responses > 0):
             get_logger().error(
                 'Error rate:                  ' +
-                f'{self.errors / self.requests * 100:6.2f}%'
+                f'{self.error_rate()}%'
             )
 
-        if (self.responses > 0):
+        if (self.total_successful_responses > 0):
             get_logger().debug(
                 'Average response time:       ' +
-                f'{self.total_response_time / self.responses:6.2f}s'
+                f'{self.average_response_time():6.2f}s'
             )
             get_logger().debug(
                 'Average response latency:    ' +
-                f'{self.total_response_latency / self.responses:6.2f}s'
+                f'{self.average_response_latency():6.2f}s'
             )
-            total_tokens = self.ooba_client.total_response_tokens
             get_logger().debug(
                 'Average tokens per response: ' +
-                f'{total_tokens / self.responses:6.2f}'
+                f'{self.average_tokens_per_second():6.2f}'
             )
 
-        if self.total_response_time > 0:
-            tokens_per_second = self.ooba_client.total_response_tokens / \
-                self.total_response_time
+        if self.total_response_time_seconds > 0:
             get_logger().debug(
                 'Average tokens per second:   ' +
-                f'{tokens_per_second:6.2f}'
+                f'{self.average_tokens_per_second():6.2f}'
             )

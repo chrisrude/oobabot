@@ -6,15 +6,21 @@ import re
 
 from oobabot.fancy_logging import get_logger
 from oobabot.ooba_client import OobaClient
-from oobabot.response_stats import ResponseStats
+from oobabot.response_stats import AggregateResponseStats
 
 
 class DiscordBot(discord.Client):
 
+    # only accept english keyboard characters in messages
+    # if other ones appear, they will be filtered out
+    FORBIDDEN_CHARACTERS = r'[^a-zA-Z0-9\-\\=\[\];,./~!@#$%^&*()_+{}|:"<>?` ]'
+
     def __init__(self, ooba_client: OobaClient, wakewords: list[str]):
         self.ooba_client = ooba_client
-        self.stats = ResponseStats(ooba_client)
+        self.average_stats = AggregateResponseStats(ooba_client)
         self.wakewords = wakewords
+
+        self.forbidden_characters = re.compile(self.FORBIDDEN_CHARACTERS)
 
         # match messages that include any `wakeword`, but not as part of
         # another word
@@ -71,25 +77,45 @@ class DiscordBot(discord.Client):
         return False
 
     def log_stats(self) -> None:
-        self.stats.write_stat_summary_to_log()
+        self.average_stats.write_stat_summary_to_log()
 
-    async def on_message(self, message: discord.Message) -> None:
-        if not self.should_reply_to_message(message):
+    async def on_message(self, raw_message: discord.Message) -> None:
+        if not self.should_reply_to_message(raw_message):
             return
 
+        # filter out any characters that are not in the english keyboard
+        author = self.forbidden_characters.sub(
+            '', str(raw_message.author))
+
+        author_shortname = author.split('#')[0]
+
+        message = self.forbidden_characters.sub(
+            '', raw_message.content)
+
+        channel = self.forbidden_characters.sub(
+            '', str(raw_message.channel))
+
+        server = self.forbidden_characters.sub(
+            '', str(raw_message.guild))
+
         get_logger().debug(
-            f'Request from {message.author} in {message.channel}')
-        self.stats.log_request_start()
+            f'Request from {author} in [{server}][#{channel}]')
+        response_stats = self.average_stats.log_request_arrived()
+
+        prefix2 = "\nThe following request has been made by a user "
+        prefix2 += f"named {author_shortname}.  "
+        prefix2 += "They are your friend.\n\n"
 
         try:
             async for sentence in self.ooba_client.request_by_sentence(
-                message.content
+                message, prefix2=prefix2
             ):
-                await message.channel.send(sentence)
-                self.stats.log_response_part()
-        except Exception as e:
-            self.stats.log_response_failure(e)
+                await raw_message.channel.send(sentence)
+                response_stats.log_response_part()
+        except Exception as err:
+            get_logger().error(f'Error: {str(err)}')
+            self.average_stats.log_response_failure()
             return
 
-        log_prefix = f"Response to {message.author} done!  "
-        self.stats.log_response_success(log_prefix)
+        response_stats.write_to_log(f"Response to {author} done!  ")
+        self.average_stats.log_response_success(response_stats)

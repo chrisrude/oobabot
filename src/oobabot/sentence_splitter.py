@@ -5,7 +5,9 @@ import typing
 
 
 class SentenceSplitter:
-    # Purpose: Split an English string into sentences.
+    '''
+    Purpose: Split an English string into sentences.
+    '''
 
     # anything that can't be in a real response
     END_OF_INPUT = ''
@@ -18,10 +20,22 @@ class SentenceSplitter:
 
     def by_sentence(self, new_token: str) \
             -> typing.Generator[str, None, None]:
-        # On repeated calls, collects tokens into
-        # a single string, looks for ends of english
-        # sentences, then yields each sentence as
-        # soon as it's found.
+        '''
+        Collects tokens into a single string, looks for ends of english
+        sentences, then yields each sentence as soon as it's found.
+
+        Parameters:
+            new_token: str, the next token to add to the string
+
+        Returns:
+            Generator[str, None, None], yields each sentence
+
+        Note:
+        When there is no longer any input, the caller must pass
+        SentenceSplitter.END_OF_INPUT to this function.  This
+        function will then yield any remaining text, even if it
+        doesn't look like a full sentence.
+        '''
 
         self.full_response += new_token
         unseen = self.full_response[self.printed_idx:]

@@ -59,8 +59,12 @@ class OobaClient:
         """)
 
     async def try_connect(self) -> str:
-        # tries to connect to the server.  Returns an error message
-        # if unsuccessful, empty string on success.
+        '''
+        Attempt to connect to the oobabooga server.
+
+        Returns:
+            str, error message if unsuccessful, empty string on success
+        '''
         try:
             async with websockets.connect(self.api_url) as _:
                 return ''
@@ -70,26 +74,30 @@ class OobaClient:
     def set_request_prefix(self, prefix: str) -> None:
         self.request_prefix = prefix
 
-    async def request_by_sentence(self, user_prompt: str) \
+    async def request_by_sentence(self, user_prompt: str, prefix2: str = '') \
             -> typing.AsyncIterator[str]:
-        # Yields each sentence of the response as it comes in.
-        # Good for the chatbot.
+        '''
+        Yields each complete sentence of the response as it arrives.
+        '''
 
         splitter = SentenceSplitter()
-        async for new_token in self.request_by_token(user_prompt):
+        async for new_token in self.request_by_token(user_prompt, prefix2):
             for sentence in splitter.by_sentence(new_token):
                 yield sentence
 
-    async def request_by_token(self, user_prompt: str) \
+    async def request_by_token(self, user_prompt: str, prefix2: str = '') \
             -> typing.AsyncIterator[str]:
-        # will yield each token as it comes in.  Good for streaming
-        # with as little percieved latency as possible, as in the CLI.
+        '''
+        Yields each token of the response as it arrives.
+        '''
 
         request = {
-            'prompt': f'{self.request_prefix}{self.PROMPT_PREFIX}' +
+            'prompt': f'{self.request_prefix}{prefix2}{self.PROMPT_PREFIX}' +
                       f'{user_prompt}{self.PROMPT_SUFFIX}',
         }
         request.update(self.DEFAULT_REQUEST_PARAMS)
+
+        print(f'Prompt: {request["prompt"]}')
 
         async with websockets.connect(self.api_url) as websocket:
             await websocket.send(json.dumps(request))
