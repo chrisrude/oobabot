@@ -17,19 +17,21 @@ class LocalREPL:
     def __init__(self, ooba_client):
         self.ooba_client = ooba_client
 
-    def show_prompt(self):
+    def show_prompt(self) -> None:
         print("\n>>> ", end='', flush=True)
 
-    async def start(self):
+    async def start(self) -> None:
         self.show_prompt()
         for user_prompt in sys.stdin:
-            async for sentence in self.ooba_client.request_by_token(user_prompt):
-                print(sentence, end='', flush=True)
+            async for token in self.ooba_client.request_by_token(
+                user_prompt
+            ):
+                if token:
+                    print(token, end='', flush=True)
+                else:
+                    # end of response
+                    print('')
             self.show_prompt()
-
-
-def truncate_string(s, max_len=70):
-    return s[:max_len] + (s[max_len:] and '...')
 
 
 def main():
@@ -77,6 +79,6 @@ def main():
     else:
         logger.debug('Connecting to Discord... ')
         bot = DiscordBot(ooba_client, wakewords=settings.wakewords)
-        coroutine = bot.start(settings.DISCORD_TOKEN)
+        coroutine = bot.start(settings.DISCORD_TOKEN_ENV_VAR)
 
     asyncio.run(coroutine)

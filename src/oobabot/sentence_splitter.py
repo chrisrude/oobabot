@@ -1,9 +1,11 @@
 # Purpose: Split a string into sentences, based on a set of terminators.
 #          This is a helper class for ooba_client.py.
 import pysbd
+import typing
 
 
 class SentenceSplitter:
+    # Purpose: Split an English string into sentences.
 
     # anything that can't be in a real response
     END_OF_INPUT = ''
@@ -14,13 +16,19 @@ class SentenceSplitter:
         self.segmenter = pysbd.Segmenter(
             language="en", clean=False, char_span=True)
 
-    def by_sentence(self, additional_response):
-        self.full_response += additional_response
+    def by_sentence(self, new_token: str) \
+            -> typing.Generator[str, None, None]:
+        # On repeated calls, collects tokens into
+        # a single string, looks for ends of english
+        # sentences, then yields each sentence as
+        # soon as it's found.
+
+        self.full_response += new_token
         unseen = self.full_response[self.printed_idx:]
 
         # if we've reached the end of input, yield it all,
         # even if we don't think it's a full sentence.
-        if (self.END_OF_INPUT == additional_response):
+        if (self.END_OF_INPUT == new_token):
             to_print = unseen.strip()
             if (to_print):
                 yield unseen

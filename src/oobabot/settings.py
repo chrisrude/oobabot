@@ -4,7 +4,8 @@ import os
 
 
 class Settings(argparse.ArgumentParser):
-    # reads settings from environment variables and command line arguments
+    # Purpose: reads settings from environment variables and command line
+    #          arguments
 
     DISCORD_TOKEN_ENV_VAR = 'DISCORD_TOKEN'
     DISCORD_TOKEN = os.environ.get(DISCORD_TOKEN_ENV_VAR, None)
@@ -29,9 +30,10 @@ class Settings(argparse.ArgumentParser):
             type=str,
             default=self.DEFAULT_URL,
             help='Base URL for the oobabooga instance.  ' +
-            'This should be ws://hostname[:port] for plain websocket connections, ' +
-            'or wss://hostname[:port] for websocket connections using TLS'
-        ),
+            'This should be ws://hostname[:port] for plain websocket ' +
+            'connections, or wss://hostname[:port] for websocket ' +
+            'connections over TLS.'
+        )
         self.add_argument(
             '--wakewords',
             type=str,
@@ -47,19 +49,19 @@ class Settings(argparse.ArgumentParser):
             '--request-prefix',
             type=str,
             default=self.REQUEST_PREFIX_ENV,
-            help='This prefix will be added in front of every user-supplied request.  ' +
-            "This is useful for setting up a 'character' for the bot to play.  " +
-            f'Alternatively, this can be set with the {self.REQUEST_PREFIX_ENV_VAR} ' +
-            'environment variable.'
+            help='This prefix will be added in front of every user-supplied ' +
+            "request.  This is useful for setting up a 'character' for the " +
+            'bot to play.  Alternatively, this can be set with the ' +
+            f'{self.REQUEST_PREFIX_ENV_VAR} environment variable.'
         )
         self.add_argument(
             '--local-repl',
             default=False,
-            help='rather than connecting to Discord, instead start a local REPL',
+            help='start a local REPL, instead of connecting to Discord',
             action='store_true'
         )
 
-    def settings(self):
+    def settings(self) -> dict[str, list[str] | str | None]:
         if self._settings is None:
             self._settings = {
                 self.DISCORD_TOKEN_ENV_VAR: self.DISCORD_TOKEN,
@@ -76,8 +78,11 @@ class Settings(argparse.ArgumentParser):
 
         return self._settings
 
-    def __getattr__(self, name):
-        return self.settings()[name]
+    def __getattr__(self, name) -> str | list[str]:
+        result = self.settings().get(name)
+        if result is None:
+            raise AttributeError(f'No such setting: {name}')
+        return result
 
     def __repr__(self) -> str:
         return super().__repr__()

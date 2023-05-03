@@ -13,7 +13,7 @@ FOREGROUND_COLORS = {
 }
 
 
-def apply_color(color, text='%(message)s'):
+def apply_color(color, text: str = '%(message)s') -> str:
     return f"\033[{FOREGROUND_COLORS[color]}m{text}\033[0m"
 
 
@@ -29,10 +29,19 @@ FORMATS = {
 
 
 class ColorfulLoggingFormatter(logging.Formatter):
-    def format(self, record):
-        log_fmt = FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
+    def __init__(self) -> None:
+        super().__init__()
+        self.formatters = {}
+        for logging_level in FORMATS.keys():
+            self.formatters[logging_level] = logging.Formatter(
+                FORMATS.get(logging_level))
+
+    def format(self, record: logging.LogRecord) -> str:
+        formatter = self.formatters.get(record.levelno)
+        if formatter:
+            return formatter.format(record)
+        else:
+            return record.getMessage()
 
 
 def get_logger(name: str = "oobabot") -> logging.Logger:

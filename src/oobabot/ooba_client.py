@@ -4,6 +4,7 @@
 
 import json
 import textwrap
+import typing
 import websockets
 
 from oobabot.sentence_splitter import SentenceSplitter
@@ -11,6 +12,11 @@ from urllib.parse import urljoin
 
 
 class OobaClient:
+    # Purpose: Streaming client for the Ooba API.
+    # Can provide the response by token or by sentence.
+
+    END_OF_INPUT = ''
+
     def __init__(self, base_url: str, request_prefix: str):
         self.api_url = urljoin(base_url, self.STREAMING_URI_PATH)
         self.request_prefix = request_prefix
@@ -41,8 +47,9 @@ class OobaClient:
     STREAMING_URI_PATH = './api/v1/stream'
 
     PROMPT_PREFIX = textwrap.dedent(
-        f"""
-        Below is an instruction that describes a task.  Write a response that appropriately completes the request.
+        """
+        Below is an instruction that describes a task.  Write a response that
+        appropriately completes the request.
         ### Instruction:
         """)
 
@@ -53,33 +60,34 @@ class OobaClient:
 
     async def try_connect(self) -> str:
         # tries to connect to the server.  Returns an error message
-        # if unsuccessful, None on success.
+        # if unsuccessful, empty string on success.
         try:
             async with websockets.connect(self.api_url) as _:
-                return None
+                return ''
         except Exception as e:
             return str(e)
 
-    def set_request_prefix(self, prefix: str):
+    def set_request_prefix(self, prefix: str) -> None:
         self.request_prefix = prefix
 
-    async def request_by_sentence(self, user_prompt):
+    async def request_by_sentence(self, user_prompt: str) \
+            -> typing.AsyncIterator[str]:
         # Yields each sentence of the response as it comes in.
         # Good for the chatbot.
 
         splitter = SentenceSplitter()
-        async for new_token in self.request_by_token(user_prompt, end_token=True):
-            if new_token is None:
-                new_token = splitter.END_OF_INPUT
+        async for new_token in self.request_by_token(user_prompt):
             for sentence in splitter.by_sentence(new_token):
                 yield sentence
 
-    async def request_by_token(self, user_prompt, end_token=False):
+    async def request_by_token(self, user_prompt: str) \
+            -> typing.AsyncIterator[str]:
         # will yield each token as it comes in.  Good for streaming
         # with as little percieved latency as possible, as in the CLI.
 
         request = {
-            'prompt': f'{self.request_prefix}{self.PROMPT_PREFIX}{user_prompt}{self.PROMPT_SUFFIX}',
+            'prompt': f'{self.request_prefix}{self.PROMPT_PREFIX}' +
+                      f'{user_prompt}{self.PROMPT_SUFFIX}',
         }
         request.update(self.DEFAULT_REQUEST_PARAMS)
 
@@ -90,13 +98,12 @@ class OobaClient:
                 incoming_data = await websocket.recv()
                 incoming_data = json.loads(incoming_data)
 
-                match incoming_data['event']:
-                    case 'text_stream':
-                        if (incoming_data['text']):
-                            self.total_response_tokens += 1
-                            yield incoming_data['text']
-                    case 'stream_end':
-                        if (end_token):
-                            # Make sure any unprinted text is flushed.
-                            yield None
-                        return
+                if 'text_stream' == incoming_data['event']:
+                    if (incoming_data['text']):
+                        self.total_response_tokens += 1
+                        yield incoming_data['text']
+
+                elif 'stream_end' == incoming_data['event']:
+                    # Make sure any unprinted text is flushed.
+                    yield self.END_OF_INPUT
+                    return
