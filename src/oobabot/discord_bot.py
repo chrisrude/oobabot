@@ -43,15 +43,24 @@ def sanitize_message(raw_message: discord.Message) -> dict[str, str]:
 
 
 class PromptGenerator:
+    '''
+    Purpose: generate a prompt for the AI to use, given
+    the message history and persona.
+    '''
+
+    # this is set by the AI, and is the maximum length
+    # it will understand before it starts to ignore
+    # the rest of the prompt
+    MAX_PROMPT_LEN = 2048
+
     def __init__(self, ai_name: str,
-                 ai_persona: str,
-                 ai_user_id: int):
+                 ai_persona: str):
         self.ai_name = ai_name
         self.ai_persona = ai_persona
-        self.ai_user_id = ai_user_id
 
     async def generate_prompt(
             self,
+            ai_user_id: int,
             message_history: typing.AsyncIterator[discord.Message]) \
             -> str:
         '''
@@ -83,7 +92,7 @@ class PromptGenerator:
             clean_message = sanitize_message(raw_message)
 
             author = clean_message["author"]
-            if raw_message.author.id == self.ai_user_id:
+            if raw_message.author.id == ai_user_id:
                 author = self.ai_name
 
             if clean_message["message_text"]:
@@ -91,8 +100,33 @@ class PromptGenerator:
                     f'{clean_message["message_text"]}\n\n'
                 history_lines.append(message_line)
 
-        prompt += '\n'.join(reversed(history_lines))
-        prompt += f'{self.ai_name} says:\n'
+        # put this at the very end to tell the UI what it
+        # should complete.  But generate this now so we
+        # know how long it is.
+        prompt_footer = f'{self.ai_name} says:\n'
+
+        # add on more history, but only if we have room
+        # if we don't have room, we'll just truncate the history
+        # by discarding the oldest messages first
+        # this is s
+        # it will understand before ignore
+        #
+        prompt_len_remaining = self.MAX_PROMPT_LEN - \
+            len(prompt) - len(prompt_footer)
+
+        added_history = 0
+        for next_line in history_lines.pop():
+            if len(next_line) > prompt_len_remaining:
+                get_logger().warn(
+                    'prompt too long, truncating history.  ' +
+                    f'added {added_history} lines, dropped ' +
+                    f'{len(history_lines)} lines'
+                )
+                break
+            added_history += 1
+            prompt += next_line
+
+        prompt += prompt_footer
 
         return prompt
 
@@ -110,6 +144,7 @@ class DiscordBot(discord.Client):
         self.wakewords = wakewords
 
         self.average_stats = AggregateResponseStats(ooba_client)
+        self.prompt_generator = PromptGenerator(ai_name, ai_persona)
 
         # match messages that include any `wakeword`, but not as part of
         # another word
@@ -179,20 +214,25 @@ class DiscordBot(discord.Client):
     async def on_message(self, raw_message: discord.Message) -> None:
         if not self.should_reply_to_message(raw_message):
             return
+        try:
+            await self.send_response(raw_message)
+        except Exception as e:
+            get_logger().error(
+                f'Exception while sending response: {e}', exc_info=True)
 
+    async def send_response(self, raw_message: discord.Message) -> None:
         clean_message = sanitize_message(raw_message)
         author = clean_message['author']
         server = clean_message['server']
-
         get_logger().debug(
             f'Request from {author} in server [{server}]')
-        response_stats = self.average_stats.log_request_arrived()
 
         recent_messages = (raw_message.channel.history(limit=self.HIST_SIZE))
 
-        generator = PromptGenerator(
-            self.ai_name, self.ai_persona, self.ai_user_id)
-        prompt = await generator.generate_prompt(recent_messages)
+        prompt = await self.prompt_generator.generate_prompt(
+            self.ai_user_id, recent_messages)
+
+        response_stats = self.average_stats.log_request_arrived(prompt)
 
         try:
             async for sentence in self.ooba_client.request_by_sentence(
@@ -200,9 +240,21 @@ class DiscordBot(discord.Client):
             ):
                 # print(sentence)
 
-                # hack: filter out "oobabot says:" messages
+                # if the AI gives itself a second line, just ignore
+                # the line instruction and continue
                 if f'{self.ai_name} says:' == sentence:
+                    get_logger().warning(
+                        f'Filtered out "{sentence}" from response, continuing'
+                    )
                     continue
+
+                # hack: abort response if it looks like the AI is
+                # continuing the conversation as someone else
+                if sentence.endswith(' says:'):
+                    get_logger().warning(
+                        f'Filtered out "{sentence}" from response, aborting'
+                    )
+                    break
 
                 await raw_message.channel.send(sentence)
                 response_stats.log_response_part()
