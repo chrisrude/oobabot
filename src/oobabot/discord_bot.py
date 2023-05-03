@@ -235,14 +235,14 @@ class DiscordBot(discord.Client):
             self.ai_user_id, recent_messages)
 
         response_stats = self.average_stats.log_request_arrived(prompt)
-        # print('Prompt:\n----------\n')
-        # print(prompt)
-        # print('Response:\n----------\n')
+        print('Prompt:\n----------\n')
+        print(prompt)
+        print('Response:\n----------\n')
         try:
             async for sentence in self.ooba_client.request_by_sentence(
                 prompt
             ):
-                # print(sentence)
+                print(sentence)
 
                 # if the AI gives itself a second line, just ignore
                 # the line instruction and continue
@@ -262,6 +262,7 @@ class DiscordBot(discord.Client):
 
                 await raw_message.channel.send(sentence)
                 response_stats.log_response_part()
+
         except Exception as err:
             get_logger().error(f'Error: {str(err)}')
             self.average_stats.log_response_failure()
