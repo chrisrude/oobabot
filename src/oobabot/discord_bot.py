@@ -193,7 +193,7 @@ class DiscordBot(discord.Client):
             async for sentence in self.ooba_client.request_by_sentence(
                 prompt
             ):
-                print(sentence)
+                # print(sentence)
                 await raw_message.channel.send(sentence)
                 response_stats.log_response_part()
         except Exception as err:

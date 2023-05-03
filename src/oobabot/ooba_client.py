@@ -79,7 +79,7 @@ class OobaClient:
         }
         request.update(self.DEFAULT_REQUEST_PARAMS)
 
-        print(f'Prompt: {request["prompt"]}')
+        # print(f'Prompt: {request["prompt"]}')
 
         async with websockets.connect(self.api_url) as websocket:
             await websocket.send(json.dumps(request))
