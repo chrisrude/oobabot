@@ -41,14 +41,13 @@ def main():
 
     bot = None
 
-    def handler(_signum, _frame):
+    def sigint_handler(_signum, _frame):
         logger.info('Received SIGINT, exiting...')
         if bot:
-            # todo: await bot.close()
             bot.log_stats()
         exit(1)
 
-    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGINT, sigint_handler)
 
     ooba_client = OobaClient(settings.base_url)
 

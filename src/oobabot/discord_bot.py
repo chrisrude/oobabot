@@ -67,6 +67,11 @@ class PromptGenerator:
         Here is some background information about "{self.ai_name}":
         {self.ai_persona}
 
+        All responses you write must be from the point of view of
+        {self.ai_name}, and plausible for {self.ai_name} to say in
+        this conversation.  Do not continue the conversation as
+        anyone other than {self.ai_name}.
+
         ### Transcript:
 
         ''')
@@ -194,6 +199,11 @@ class DiscordBot(discord.Client):
                 prompt
             ):
                 # print(sentence)
+
+                # hack: filter out "oobabot says:" messages
+                if f'{self.ai_name} says:' == sentence:
+                    continue
+
                 await raw_message.channel.send(sentence)
                 response_stats.log_response_part()
         except Exception as err:

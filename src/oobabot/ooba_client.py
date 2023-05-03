@@ -4,7 +4,7 @@
 
 import json
 import typing
-import websockets
+import websockets as ws  # weird, but needed to avoid long lines later
 
 from oobabot.sentence_splitter import SentenceSplitter
 from urllib.parse import urljoin
@@ -52,7 +52,7 @@ class OobaClient:
             str, error message if unsuccessful, empty string on success
         '''
         try:
-            async with websockets.connect(self.api_url) as _:
+            async with ws.connect(self.api_url) as _:  # type: ignore
                 return ''
         except Exception as e:
             return str(e)
@@ -81,7 +81,7 @@ class OobaClient:
 
         # print(f'Prompt: {request["prompt"]}')
 
-        async with websockets.connect(self.api_url) as websocket:
+        async with ws.connect(self.api_url) as websocket:  # type: ignore
             await websocket.send(json.dumps(request))
 
             while True:

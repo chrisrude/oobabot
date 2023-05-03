@@ -8,7 +8,7 @@ class Settings(argparse.ArgumentParser):
     #          arguments
 
     DISCORD_TOKEN_ENV_VAR = 'DISCORD_TOKEN'
-    DISCORD_TOKEN = os.environ.get(DISCORD_TOKEN_ENV_VAR, None)
+    DISCORD_TOKEN = os.environ.get(DISCORD_TOKEN_ENV_VAR, '')
 
     OOBABOT_PERSONA_ENV_VAR = 'OOBABOT_PERSONA'
     OOBABOT_PERSONA = os.environ.get(OOBABOT_PERSONA_ENV_VAR, '')
@@ -18,6 +18,7 @@ class Settings(argparse.ArgumentParser):
 
     def __init__(self):
         self._settings = None
+        self.wakewords = []
 
         super().__init__(
             description="Discord bot for oobabooga's text-generation-webui",
@@ -69,12 +70,14 @@ class Settings(argparse.ArgumentParser):
             action='store_true'
         )
 
-    def settings(self) -> dict[str, list[str] | str | None]:
+    def settings(self) -> dict[str, str]:
         if self._settings is None:
-            self._settings = {
-                self.DISCORD_TOKEN_ENV_VAR: self.DISCORD_TOKEN,
-            }
-            self._settings.update(self.parse_args().__dict__)
+            self._settings = self.parse_args().__dict__
+
+            # this is a bit of a hack, but it's the only setting
+            # that's not a string, so with this we can be more
+            # strict with the type hints later
+            self.wakewords = self._settings.pop('wakewords')
 
             # either we're using a local REPL, or we're connecting to Discord.
             # assume the user wants to connect to Discord
@@ -86,8 +89,8 @@ class Settings(argparse.ArgumentParser):
 
         return self._settings
 
-    def __getattr__(self, name) -> str | list[str] | None:
-        return self.settings().get(name)
+    def __getattr__(self, name) -> str:
+        return self.settings().get(name, '')
 
     def __repr__(self) -> str:
         return super().__repr__()
