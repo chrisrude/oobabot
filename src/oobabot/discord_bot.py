@@ -13,7 +13,7 @@ from oobabot.response_stats import AggregateResponseStats
 
 # only accept english keyboard characters in messages
 # if other ones appear, they will be filtered out
-FORBIDDEN_CHARACTERS = r'[^a-zA-Z0-9\-\\=\[\];,./~!@#$%^&*()_+{}|:"<>?` ]'
+FORBIDDEN_CHARACTERS = r'[^a-zA-Z0-9\-\\=\[\];,./~!@#$%^&*()_+{}|:"<>?`\' ]'
 FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
 
 
