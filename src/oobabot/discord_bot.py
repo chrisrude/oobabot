@@ -3,24 +3,108 @@
 
 import discord
 import re
+import textwrap
+import typing
 
 from oobabot.fancy_logging import get_logger
 from oobabot.ooba_client import OobaClient
 from oobabot.response_stats import AggregateResponseStats
 
 
+# only accept english keyboard characters in messages
+# if other ones appear, they will be filtered out
+FORBIDDEN_CHARACTERS = r'[^a-zA-Z0-9\-\\=\[\];,./~!@#$%^&*()_+{}|:"<>?` ]'
+FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
+
+
+def sanitize_string(raw_string: str) -> str:
+    '''
+    Filter out any characters that are not commonly on a
+    US-English keyboard
+    '''
+    return FORBIDDEN_CHARACTERS_PATTERN.sub('', raw_string)
+
+
+def sanitize_message(raw_message: discord.Message) -> dict[str, str]:
+    author = sanitize_string(raw_message.author.name)
+
+    raw_guild = raw_message.guild
+    if raw_guild:
+        raw_guild_name = raw_guild.name
+    else:
+        raw_guild_name = 'DM'
+
+    return {
+        'author': author,
+        'author_shortname': author.split('#')[0],
+        'message_text': sanitize_string(raw_message.content).strip(),
+        'server': sanitize_string(raw_guild_name),
+    }
+
+
+class PromptGenerator:
+    def __init__(self, ai_name: str,
+                 ai_persona: str,
+                 ai_user_id: int):
+        self.ai_name = ai_name
+        self.ai_persona = ai_persona
+        self.ai_user_id = ai_user_id
+
+    async def generate_prompt(
+            self,
+            message_history: typing.AsyncIterator[discord.Message]) \
+            -> str:
+        '''
+        Generates a prompt for the AI to use based on the message.
+        '''
+
+        prompt = textwrap.dedent(f'''
+        You are in a chat room with multiple participants.
+        Below is a transcript of recent messages in the conversation.
+        Write the next message that you would send in this conversation,
+        from the point of view of the participant named "{self.ai_name}".
+
+        Here is some background information about "{self.ai_name}":
+        {self.ai_persona}
+
+        ### Transcript:
+
+        ''')
+
+        # message_history should be newer messages first,
+        # so we reverse it to get older messages first
+        history_lines = []
+        async for raw_message in message_history:
+            clean_message = sanitize_message(raw_message)
+
+            author = clean_message["author"]
+            if raw_message.author.id == self.ai_user_id:
+                author = self.ai_name
+
+            if clean_message["message_text"]:
+                message_line = f'{author} says:\n' + \
+                    f'{clean_message["message_text"]}\n\n'
+                history_lines.append(message_line)
+
+        prompt += '\n'.join(reversed(history_lines))
+        prompt += f'{self.ai_name} says:\n'
+
+        return prompt
+
+
 class DiscordBot(discord.Client):
+    HIST_SIZE = 10
 
-    # only accept english keyboard characters in messages
-    # if other ones appear, they will be filtered out
-    FORBIDDEN_CHARACTERS = r'[^a-zA-Z0-9\-\\=\[\];,./~!@#$%^&*()_+{}|:"<>?` ]'
-
-    def __init__(self, ooba_client: OobaClient, wakewords: list[str]):
+    def __init__(self, ooba_client: OobaClient, ai_name: str,
+                 ai_persona: str, wakewords: list[str]):
         self.ooba_client = ooba_client
-        self.average_stats = AggregateResponseStats(ooba_client)
+
+        self.ai_name = ai_name
+        self.ai_persona = ai_persona
+        self.ai_user_id = -1
         self.wakewords = wakewords
 
-        self.forbidden_characters = re.compile(self.FORBIDDEN_CHARACTERS)
+        self.average_stats = AggregateResponseStats(ooba_client)
 
         # match messages that include any `wakeword`, but not as part of
         # another word
@@ -39,12 +123,20 @@ class DiscordBot(discord.Client):
         num_guilds = len(guilds)
         num_channels = sum([len(guild.channels) for guild in guilds])
 
-        user_id = self.user.id if self.user else "<unknown>"
+        if self.user:
+            self.ai_user_id = self.user.id
+            user_id_str = str(self.ai_user_id)
+        else:
+            user_id_str = '<unknown>'
+
         get_logger().info(
-            f'Connected to discord as {self.user} (ID: {user_id})')
+            f'Connected to discord as {self.user} (ID: {user_id_str})')
         get_logger().debug(
             f'monitoring DMs, plus {num_channels} channels across ' +
             f'{num_guilds} server(s)')
+
+        get_logger().debug(f'AI name: {self.ai_name}')
+        get_logger().debug(f'AI persona: {self.ai_persona}')
 
         str_wakewords = ", ".join(
             self.wakewords) if self.wakewords else "<none>"
@@ -83,33 +175,25 @@ class DiscordBot(discord.Client):
         if not self.should_reply_to_message(raw_message):
             return
 
-        # filter out any characters that are not in the english keyboard
-        author = self.forbidden_characters.sub(
-            '', str(raw_message.author))
-
-        author_shortname = author.split('#')[0]
-
-        message = self.forbidden_characters.sub(
-            '', raw_message.content)
-
-        channel = self.forbidden_characters.sub(
-            '', str(raw_message.channel))
-
-        server = self.forbidden_characters.sub(
-            '', str(raw_message.guild))
+        clean_message = sanitize_message(raw_message)
+        author = clean_message['author']
+        server = clean_message['server']
 
         get_logger().debug(
-            f'Request from {author} in [{server}][#{channel}]')
+            f'Request from {author} in server [{server}]')
         response_stats = self.average_stats.log_request_arrived()
 
-        prefix2 = "\nThe following request has been made by a user "
-        prefix2 += f"named {author_shortname}.  "
-        prefix2 += "They are your friend.\n\n"
+        recent_messages = (raw_message.channel.history(limit=self.HIST_SIZE))
+
+        generator = PromptGenerator(
+            self.ai_name, self.ai_persona, self.ai_user_id)
+        prompt = await generator.generate_prompt(recent_messages)
 
         try:
             async for sentence in self.ooba_client.request_by_sentence(
-                message, prefix2=prefix2
+                prompt
             ):
+                print(sentence)
                 await raw_message.channel.send(sentence)
                 response_stats.log_response_part()
         except Exception as err:

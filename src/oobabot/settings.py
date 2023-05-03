@@ -10,8 +10,8 @@ class Settings(argparse.ArgumentParser):
     DISCORD_TOKEN_ENV_VAR = 'DISCORD_TOKEN'
     DISCORD_TOKEN = os.environ.get(DISCORD_TOKEN_ENV_VAR, None)
 
-    REQUEST_PREFIX_ENV_VAR = 'OOBABOT_REQUEST_PREFIX'
-    REQUEST_PREFIX_ENV = os.environ.get(REQUEST_PREFIX_ENV_VAR, None)
+    OOBABOT_PERSONA_ENV_VAR = 'OOBABOT_PERSONA'
+    OOBABOT_PERSONA = os.environ.get(OOBABOT_PERSONA_ENV_VAR, '')
 
     DEFAULT_WAKEWORDS = ['oobabot']
     DEFAULT_URL = 'ws://localhost:5005'
@@ -35,6 +35,14 @@ class Settings(argparse.ArgumentParser):
             'connections over TLS.'
         )
         self.add_argument(
+            '--ai-name',
+            type=str,
+            default='oobabot',
+            help='Name of the AI to use for requests.  ' +
+            'This can be whatever you want, but might make sense ' +
+            'to be the name of the bot in Discord.'
+        )
+        self.add_argument(
             '--wakewords',
             type=str,
             nargs='*',
@@ -46,13 +54,13 @@ class Settings(argparse.ArgumentParser):
             'The bot will always reply to @-mentions and ' +
             'direct messages, even if no wakewords are supplied.')
         self.add_argument(
-            '--request-prefix',
+            '--persona',
             type=str,
-            default=self.REQUEST_PREFIX_ENV,
+            default=self.OOBABOT_PERSONA,
             help='This prefix will be added in front of every user-supplied ' +
             "request.  This is useful for setting up a 'character' for the " +
             'bot to play.  Alternatively, this can be set with the ' +
-            f'{self.REQUEST_PREFIX_ENV_VAR} environment variable.'
+            f'{self.OOBABOT_PERSONA_ENV_VAR} environment variable.'
         )
         self.add_argument(
             '--local-repl',

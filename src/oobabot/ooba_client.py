@@ -3,7 +3,6 @@
 #
 
 import json
-import textwrap
 import typing
 import websockets
 
@@ -17,9 +16,8 @@ class OobaClient:
 
     END_OF_INPUT = ''
 
-    def __init__(self, base_url: str, request_prefix: str):
+    def __init__(self, base_url: str):
         self.api_url = urljoin(base_url, self.STREAMING_URI_PATH)
-        self.request_prefix = request_prefix
         self.total_response_tokens = 0
 
     DEFAULT_REQUEST_PARAMS = {
@@ -46,18 +44,6 @@ class OobaClient:
 
     STREAMING_URI_PATH = './api/v1/stream'
 
-    PROMPT_PREFIX = textwrap.dedent(
-        """
-        Below is an instruction that describes a task.  Write a response that
-        appropriately completes the request.
-        ### Instruction:
-        """)
-
-    PROMPT_SUFFIX = textwrap.dedent(
-        """
-        ### Response:
-        """)
-
     async def try_connect(self) -> str:
         '''
         Attempt to connect to the oobabooga server.
@@ -71,29 +57,25 @@ class OobaClient:
         except Exception as e:
             return str(e)
 
-    def set_request_prefix(self, prefix: str) -> None:
-        self.request_prefix = prefix
-
-    async def request_by_sentence(self, user_prompt: str, prefix2: str = '') \
+    async def request_by_sentence(self, prompt: str) \
             -> typing.AsyncIterator[str]:
         '''
         Yields each complete sentence of the response as it arrives.
         '''
 
         splitter = SentenceSplitter()
-        async for new_token in self.request_by_token(user_prompt, prefix2):
+        async for new_token in self.request_by_token(prompt):
             for sentence in splitter.by_sentence(new_token):
                 yield sentence
 
-    async def request_by_token(self, user_prompt: str, prefix2: str = '') \
+    async def request_by_token(self, prompt: str) \
             -> typing.AsyncIterator[str]:
         '''
         Yields each token of the response as it arrives.
         '''
 
         request = {
-            'prompt': f'{self.request_prefix}{prefix2}{self.PROMPT_PREFIX}' +
-                      f'{user_prompt}{self.PROMPT_SUFFIX}',
+            'prompt': prompt,
         }
         request.update(self.DEFAULT_REQUEST_PARAMS)
 

@@ -50,9 +50,7 @@ def main():
 
     signal.signal(signal.SIGINT, handler)
 
-    ooba_client = OobaClient(
-        settings.base_url,
-        request_prefix=settings.request_prefix)
+    ooba_client = OobaClient(settings.base_url)
 
     logger.debug(f'Oobabooga base URL: {settings.base_url}')
     connect_error_msg = asyncio.run(ooba_client.try_connect())
@@ -65,20 +63,16 @@ def main():
 
     logger.info('Connected to Oobabooga!')
 
-    if ooba_client.request_prefix:
-        logger.debug('Request prefix')
-        logger.debug('--------------')
-        for line in ooba_client.request_prefix.split('\n'):
-            logger.debug(f'\t{line}')
-    else:
-        logger.debug('No request prefix supplied, using defaults')
-
     if settings.local_repl:
         logger.debug('Using local REPL, not connecting to Discord')
         coroutine = LocalREPL(ooba_client).start()
     else:
         logger.debug('Connecting to Discord... ')
-        bot = DiscordBot(ooba_client, wakewords=settings.wakewords)
+        bot = DiscordBot(
+            ooba_client,
+            ai_name=settings.ai_name,
+            ai_persona=settings.persona,
+            wakewords=settings.wakewords)
         coroutine = bot.start(settings.DISCORD_TOKEN)
 
     asyncio.run(coroutine)
