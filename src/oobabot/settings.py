@@ -74,6 +74,7 @@ class Settings(argparse.ArgumentParser):
             default=False,
             help='prints all oobabooga requests and responses in their ' +
             'entirety to STDOUT',
+            action='store_true'
         )
 
     def settings(self) -> dict[str, str]:

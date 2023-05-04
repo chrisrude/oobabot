@@ -222,7 +222,8 @@ class DiscordBot(discord.Client):
         if not self.should_reply_to_message(raw_message):
             return
         try:
-            await self.send_response(raw_message)
+            async with raw_message.channel.typing():
+                await self.send_response(raw_message)
         except Exception as e:
             get_logger().error(
                 f'Exception while sending response: {e}', exc_info=True)
