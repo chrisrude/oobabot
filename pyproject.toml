@@ -22,3 +22,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.1"
+# todo: add...
+# black: code formatting
+# isort: import sorting
+# pre-commit: run all the above when doing "git push"

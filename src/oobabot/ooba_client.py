@@ -51,14 +51,15 @@ class OobaClient:
         Returns:
             str, error message if unsuccessful, empty string on success
         '''
+        # todo: make less stupid
         try:
             async with ws.connect(self.api_url) as _:  # type: ignore
                 return ''
         except Exception as e:
             return str(e)
 
-    async def request_by_sentence(self, prompt: str) \
-            -> typing.AsyncIterator[str]:
+    async def request_by_sentence(
+            self, prompt: str) -> typing.AsyncIterator[str]:
         '''
         Yields each complete sentence of the response as it arrives.
         '''
@@ -68,8 +69,8 @@ class OobaClient:
             for sentence in splitter.by_sentence(new_token):
                 yield sentence
 
-    async def request_by_token(self, prompt: str) \
-            -> typing.AsyncIterator[str]:
+    async def request_by_token(
+            self, prompt: str) -> typing.AsyncIterator[str]:
         '''
         Yields each token of the response as it arrives.
         '''
@@ -87,7 +88,7 @@ class OobaClient:
                 incoming_data = json.loads(incoming_data)
 
                 if 'text_stream' == incoming_data['event']:
-                    if (incoming_data['text']):
+                    if incoming_data['text']:
                         self.total_response_tokens += 1
                         yield incoming_data['text']
 

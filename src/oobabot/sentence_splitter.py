@@ -18,8 +18,8 @@ class SentenceSplitter:
         self.segmenter = pysbd.Segmenter(
             language="en", clean=False, char_span=True)
 
-    def by_sentence(self, new_token: str) \
-            -> typing.Generator[str, None, None]:
+    def by_sentence(
+            self, new_token: str) -> typing.Generator[str, None, None]:
         '''
         Collects tokens into a single string, looks for ends of english
         sentences, then yields each sentence as soon as it's found.
@@ -44,7 +44,7 @@ class SentenceSplitter:
         # even if we don't think it's a full sentence.
         if (self.END_OF_INPUT == new_token):
             to_print = unseen.strip()
-            if (to_print):
+            if to_print:
                 yield unseen
             self.printed_idx += len(unseen)
             return
@@ -65,7 +65,7 @@ class SentenceSplitter:
             # we do want to include any other whitespace, though.
 
             to_print = sentence_w_char_spans.sent  # type: ignore
-            if (to_print.endswith('\n')):
+            if to_print.endswith('\n'):
                 to_print = to_print[:-1]
 
             yield to_print
@@ -73,5 +73,5 @@ class SentenceSplitter:
         # since we've printed all the previous segments,
         # the start of the last segment becomes the starting
         # point for the next roud.
-        if (len(segments) > 0):
+        if len(segments) > 0:
             self.printed_idx += segments[-1].start  # type: ignore

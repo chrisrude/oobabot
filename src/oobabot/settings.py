@@ -81,10 +81,10 @@ class Settings(argparse.ArgumentParser):
         if self._settings is None:
             self._settings = self.parse_args().__dict__
 
-            # this is a bit of a hack, but it's the only setting
-            # that's not a string, so with this we can be more
-            # strict with the type hints later
+            # this is a bit of a hack, but by doing this with
+            # non-str settings, we can add stronger type hints
             self.wakewords = self._settings.pop('wakewords')
+            self.log_all_the_things = self._settings.pop('log_all_the_things')
 
             # either we're using a local REPL, or we're connecting to Discord.
             # assume the user wants to connect to Discord

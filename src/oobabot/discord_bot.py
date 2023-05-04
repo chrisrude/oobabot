@@ -11,9 +11,11 @@ from oobabot.ooba_client import OobaClient
 from oobabot.response_stats import AggregateResponseStats
 
 
-# only accept english keyboard characters in messages
-# if other ones appear, they will be filtered out
-FORBIDDEN_CHARACTERS = r'[^a-zA-Z0-9\-\\=\[\];,./~!@#$%^&*()_+{}|:"<>?`\' ]'
+# strip newlines and replace them with spaces, to make
+# it harder for users to trick the UI into injecting
+# other instructions, or data that appears to be from
+# a different user
+FORBIDDEN_CHARACTERS = r'[\n\r\t]'
 FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
 
 
@@ -22,7 +24,7 @@ def sanitize_string(raw_string: str) -> str:
     Filter out any characters that are not commonly on a
     US-English keyboard
     '''
-    return FORBIDDEN_CHARACTERS_PATTERN.sub('', raw_string)
+    return FORBIDDEN_CHARACTERS_PATTERN.sub(' ', raw_string)
 
 
 def sanitize_message(raw_message: discord.Message) -> dict[str, str]:
@@ -107,7 +109,7 @@ class PromptGenerator:
             if raw_message.author.id == ai_user_id:
                 author = self.ai_name
 
-            if clean_message["message_text"] is None:
+            if not clean_message["message_text"]:
                 continue
 
             line = f'{author} says:\n' + \
@@ -156,7 +158,7 @@ class DiscordBot(discord.Client):
         # match messages that include any `wakeword`, but not as part of
         # another word
         self.wakeword_patterns = [
-            re.compile(f'\\b{wakeword}\\b', re.IGNORECASE)
+            re.compile(fr'\b{wakeword}\b', re.IGNORECASE)
             for wakeword in wakewords
         ]
 

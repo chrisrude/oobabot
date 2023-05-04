@@ -72,7 +72,7 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 ~: oobabot --base-url ws://oobabooga-hostname:5005/ --ai-name YourBotsName --persona "You are a cat named YourBotsName"
 ```
 
-You should now be able to run oobabot from whenever pip installed it.
+You should now be able to run oobabot from wherever pip installed it.
 
 ```none
 usage: oobabot [-h] [--base-url BASE_URL] [--ai-name AI_NAME] [--wakewords [WAKEWORDS ...]]
@@ -191,6 +191,6 @@ By default, **`oobabot`** will listen for three types of messages in the servers
 
 ## Known Issues
 
-- ooba's text generation can errs with OOM when more than one request comes in at once.
+- ooba's text generation can error with OOM when more than one request comes in at once.
 - sometimes the bot wants to continue conversations on behalf of other members of the chatroom.  I have some hacks in place to notice and truncate this behavior, but it can lead to terse responses on occasion.
 - found one not listed here?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!
