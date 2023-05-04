@@ -71,7 +71,8 @@ def main():
             ooba_client,
             ai_name=settings.ai_name,
             ai_persona=settings.persona,
-            wakewords=settings.wakewords)
+            wakewords=settings.wakewords,
+            log_all_the_things=settings.log_all_the_things)
         coroutine = bot.start(settings.DISCORD_TOKEN)
 
     asyncio.run(coroutine)

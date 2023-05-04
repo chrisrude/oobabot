@@ -69,6 +69,12 @@ class Settings(argparse.ArgumentParser):
             help='start a local REPL, instead of connecting to Discord',
             action='store_true'
         )
+        self.add_argument(
+            '--log-all-the-things',
+            default=False,
+            help='prints all oobabooga requests and responses in their ' +
+            'entirety to STDOUT',
+        )
 
     def settings(self) -> dict[str, str]:
         if self._settings is None:

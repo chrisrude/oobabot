@@ -136,14 +136,19 @@ class PromptGenerator:
 class DiscordBot(discord.Client):
     HIST_SIZE = 10
 
-    def __init__(self, ooba_client: OobaClient, ai_name: str,
-                 ai_persona: str, wakewords: list[str]):
+    def __init__(self,
+                 ooba_client: OobaClient,
+                 ai_name: str,
+                 ai_persona: str,
+                 wakewords: list[str],
+                 log_all_the_things: bool):
         self.ooba_client = ooba_client
 
         self.ai_name = ai_name
         self.ai_persona = ai_persona
         self.ai_user_id = -1
         self.wakewords = wakewords
+        self.log_all_the_things = log_all_the_things
 
         self.average_stats = AggregateResponseStats(ooba_client)
         self.prompt_generator = PromptGenerator(ai_name, ai_persona)
@@ -235,14 +240,17 @@ class DiscordBot(discord.Client):
             self.ai_user_id, recent_messages)
 
         response_stats = self.average_stats.log_request_arrived(prompt)
-        print('Prompt:\n----------\n')
-        print(prompt)
-        print('Response:\n----------\n')
+        if self.log_all_the_things:
+            print('Prompt:\n----------\n')
+            print(prompt)
+            print('Response:\n----------\n')
+
         try:
             async for sentence in self.ooba_client.request_by_sentence(
                 prompt
             ):
-                print(sentence)
+                if self.log_all_the_things:
+                    print(sentence)
 
                 # if the AI gives itself a second line, just ignore
                 # the line instruction and continue
