@@ -8,7 +8,7 @@ import sys
 
 from oobabot.discord_bot import DiscordBot
 from oobabot.fancy_logging import init_logging
-from oobabot.ooba_client import OobaClient
+from oobabot.ooba_client import OobaClient, OobaClientError
 from oobabot.settings import Settings
 
 
@@ -52,12 +52,13 @@ def main():
     ooba_client = OobaClient(settings.base_url)
 
     logger.debug(f'Oobabooga base URL: {settings.base_url}')
-    connect_error_msg = asyncio.run(ooba_client.try_connect())
-    if connect_error_msg:
+    try:
+        asyncio.run(ooba_client.try_connect())
+    except (OobaClientError) as e:
         logger.error(
             f'Could not connect to ooba server: [{ooba_client.api_url}]')
         logger.error('Please check the URL and try again.')
-        logger.error(f'Reason: {connect_error_msg}')
+        logger.error(f'Reason: {e}')
         sys.exit(1)
 
     logger.info('Connected to Oobabooga!')

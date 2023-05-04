@@ -6,8 +6,15 @@ import json
 import typing
 import websockets as ws  # weird, but needed to avoid long lines later
 
+from asyncio.exceptions import TimeoutError
 from oobabot.sentence_splitter import SentenceSplitter
+from socket import gaierror
 from urllib.parse import urljoin
+from websockets.exceptions import WebSocketException
+
+
+class OobaClientError(Exception):
+    pass
 
 
 class OobaClient:
@@ -44,19 +51,25 @@ class OobaClient:
 
     STREAMING_URI_PATH = './api/v1/stream'
 
-    async def try_connect(self) -> str:
+    async def try_connect(self):
         '''
         Attempt to connect to the oobabooga server.
 
         Returns:
-            str, error message if unsuccessful, empty string on success
+            nothing, if the connection test was successful
+
+        Raises:
+            OobaClientError, if the connection fails
         '''
-        # todo: make less stupid
         try:
-            async with ws.connect(self.api_url) as _:  # type: ignore
-                return ''
-        except Exception as e:
-            return str(e)
+            async with ws.connect(self.api_url):  # type: ignore
+                return
+        except (ConnectionRefusedError,
+                gaierror,
+                TimeoutError,
+                WebSocketException) as e:
+            raise OobaClientError(
+                f'Failed to connect to {self.api_url}: {e}', e)
 
     async def request_by_sentence(
             self, prompt: str) -> typing.AsyncIterator[str]:
