@@ -1,34 +1,41 @@
-# OobaDiscordBot
-A Discord bot which talks to a Large Language Models AI (like LLaMA, llama.cpp, GPT-J, Pythia, OPT, and GALACTICA), running on [oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui).
+# `oobabot`
+
+**`oobabot`** is a Discord bot which talks to a Large Language Model AIs (like LLaMA, llama.cpp, etc...), running on [oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui).
 
 [![python lint and test with poetry](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml/badge.svg)](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml)
 
+## Motivation
+
 ![oobabot in action!](./docs/oobabot.png "discord action shot")
 
-# Motivation
 Text-generative UIs are cool to run at home, and Discord is fun to mess with your friends.  Why not combine the two and have something awesome!
 
 Real motivation: I wanted a chatbot in my discord that would act like my cat.  A "catbot" if you will.
 
-# Features
- - user-supplied persona! -- you supply the persona on how would like the bot to behave
- - multiple converations at once -- can track multiple conversational threads, and reply to each in a contextually appropriate way
- - watchwords -- can monitor all channels in a server for one or more wakewords or @-mentions
- - private conversations -- can chat with you 1:1 in a DM
- - good discord hygiene -- splits messages into independent sentences, pings the author in the first one
- - low-latency -- streams the reply live, sentence by sentence.  Provides lower latency, especially on longer responses.
- - stats -- track token generation speed, latency, failures and usage
- - easy networking -- connects to discord from your machine using websockets, so no need to expose a server to the internet
+## Features
 
-# Getting Started with Oobabot
+| **`oobabot`**  | how that's awesome |
+|---------------|------------------|
+| **user-supplied persona** | you supply the persona on how would like the bot to behave |
+| **multiple converations** | can track multiple conversational threads, and reply to each in a contextually appropriate way |
+| **watchwords** | can monitor all channels in a server for one or more wakewords or @-mentions |
+| **private conversations** | can chat with you 1:1 in a DM |
+| **good Discord hygiene** | splits messages into independent sentences, pings the author in the first one |
+| **low-latency** | streams the reply live, sentence by sentence.  Provides lower latency, especially on longer responses. |
+| **stats** | track token generation speed, latency, failures and usage |
+| **easy networking** | connects to discord from your machine using websockets, so no need to expose a server to the internet |
 
-### See the [Installation Guide](./docs/INSTALL.md) for step-by-step instructions.
+## Getting Started with **`oobabot`**
 
-## Installation tl;dr:
+### See the [Installation Guide](./docs/INSTALL.md) for step-by-step instructions
+
+## Installation tl;dr
+
 1. Install [oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui) and enable its API module
 1. Create [a Discord bot account](https://discordpy.readthedocs.io/en/stable/discord.html), invite it to your server, and note its authentication token.
-1. [Install oobabot (see INSTALL.md)](./docs/INSTALL.md)
-```
+1. [Install **`oobabot`** (see INSTALL.md)](./docs/INSTALL.md)
+
+```bash
 ~: pip install oobabot
 
 ~: export DISCORD_TOKEN = __your_bots_discord_token__
@@ -38,7 +45,7 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 
 You should now be able to run oobabot from whenever pip installed it.
 
-```
+```none
 usage: oobabot [-h] [--base-url BASE_URL] [--ai-name AI_NAME] [--wakewords [WAKEWORDS ...]]
                [--persona PERSONA] [--local-repl] [--log-all-the-things LOG_ALL_THE_THINGS]
 
@@ -67,51 +74,60 @@ Also, to authenticate to Discord, you must set the environment variable: DISCORD
 discord token>
 ```
 
----
-## Required settings:
- - **`DISCORD_TOKEN`** environment variable
+## Required settings
+
+- **`DISCORD_TOKEN`** environment variable
 
    Set your shell environment's **`DISCORD_TOKEN`** to token Discord provided when you set up the bot account.  It should be something like a 72-character-long random-looking string.
 
-    #### Bash shell
-        export DISCORD_TOKEN=___YOUR_TOKEN___
+    **bash example**
 
-    #### Fish shell
-        set -Ux DISCORD_TOKEN ___YOUR_TOKEN___
+    ``` bash
+    export DISCORD_TOKEN=___YOUR_TOKEN___
+    ```
 
- - **`--base-url`**
+    **fish example**
+
+    ``` fish
+    set -Ux DISCORD_TOKEN ___YOUR_TOKEN___
+    ```
+
+- **`--base-url`**
 
     The base URL of oobabooga's streaming web API.  This is
-    required if the oobabooga machine is different than where you're running oobabot.
+    required if the oobabooga machine is different than where you're running **`oobabot`**.
 
     By default, this will be port 5005 (even though the HTML UI runs on a different port).  The protocol should typically be ws://.
-    
+
     All together, this should look something like:
 
-        `--base-url ws://localhost:5005`
+    ```bash
+    --base-url ws://localhost:5005
+    ```
 
    This is also the default value, but any other setting should follow the same form.
 
-## Optional settings:
- - **`--ai-name`**
+## Optional settings
+
+- **`--ai-name`**
 
    the name the AI will be instructed to call itself.  Note that this technically doesn't need to be the same as the bot in your discord, but it would likely make sense to your users if they are at least similar.
 
- - **`--wakewords`**
+- **`--wakewords`**
 
    one or more words that the bot will look for.  It will reply to any message which contains one of these words, in any channel.
 
- - **`--local-repl`**
+- **`--local-repl`**
 
     instead of connecting to discord, just start up a local REPL and send these prompts directly to the oobabooga server.  Useful if you want to test if that part is working in isolation.  Note that in this mode you will be sending the oobabooga server raw input, and so the persona or AI name settings will be ignored.
 
-## Persona: the fun setting!
+## Persona: the fun setting
 
 - **`--persona`**
 
     is a short few sentences describing the role your bot should act as.  For instance, this is the setting I'm using for my cat-bot, whose name is "Rosie".
 
-```
+```console
 Here is some background information about Rosie:
 - You are Rosie
 - You are a cat
@@ -123,11 +139,12 @@ Here is some background information about Rosie:
 - Your personality is both witty and profane
 - The people in this chat room are your friends
 ```
+
 Persona may be set from the command line with the **`--persona`** argument.
 
 Alternatively, it can be set through the environment variable **`OOBABOT_PERSONA`**.
 
-## Then, run it!
+## Then, run it
 
 You should see something like this if everything worked:
 
@@ -135,17 +152,16 @@ You should see something like this if everything worked:
 
 ---
 
-# Interacting with oobabot
+## Interacting with **`oobabot`**
 
-By default, oobabot will listen for three types of messages in the servers it's connected to:
+By default, **`oobabot`** will listen for three types of messages in the servers it's connected to:
 
- 1. any message in which oobabot's account is @-mentioned
- 2. any direct message
- 3. any message containing a provided wakeword (see Optional Settings)
+ 1. any message in which **`oobabot`**'s account is @-mentioned
+ 1. any direct message
+ 1. any message containing a provided wakeword (see Optional Settings)
 
+## Known Issues
 
- # Known Issues
- - ooba's text generation can errs with OOM when more than one request comes in at once.
- - sometimes the bot wants to continue conversations on behalf of other members of the chatroom.  I have some hacks in place to notice and truncate this behavior, but it can lead to terse responses on occasion.
- - found one not listed here?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!
-
+- ooba's text generation can errs with OOM when more than one request comes in at once.
+- sometimes the bot wants to continue conversations on behalf of other members of the chatroom.  I have some hacks in place to notice and truncate this behavior, but it can lead to terse responses on occasion.
+- found one not listed here?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!
