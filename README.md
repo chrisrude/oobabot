@@ -4,6 +4,35 @@
 
 [![python lint and test with poetry](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml/badge.svg)](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml)
 
+## Installation
+
+```bash
+  $ pip install oobabot
+
+Collecting oobabot
+  Downloading oobabot-0.1.2-py3-none-any.whl (16 kB)
+  ...
+Installing collected packages: websockets, pysbd, discord.py, oobabot
+Successfully installed discord.py-2.2.3 oobabot-0.1.2 pysbd-0.3.4 websockets-11.0.2
+```
+
+## Usage
+
+```bash
+$ oobabot --wakewords rosie cat --ai-name Rosie --persona "you are a cat named Rosie"
+
+2023-05-04 00:24:10,968 DEBUG Oobabooga base URL: ws://localhost:5005
+2023-05-04 00:24:11,133 INFO Connected to Oobabooga!
+2023-05-04 00:24:11,133 DEBUG Connecting to Discord...
+2023-05-04 00:24:13,807 INFO Connected to discord as RosieAI#0000 (ID: 1100100011101010101)
+2023-05-04 00:24:13,807 DEBUG monitoring DMs, plus 24 channels across 1 server(s)
+2023-05-04 00:24:13,807 DEBUG AI name: Rosie
+2023-05-04 00:24:13,807 DEBUG AI persona: you are a cat named Rosie
+2023-05-04 00:24:13,807 DEBUG wakewords: rosie, cat
+```
+
+See below for more details on the command line options.
+
 ## Motivation
 
 ![oobabot in action!](./docs/oobabot.png "discord action shot")
