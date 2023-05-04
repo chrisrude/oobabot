@@ -10,6 +10,8 @@
   pip install oobabot
 ```
 
+requires python 3.8+
+
 ## Usage
 
 ```bash
