@@ -7,13 +7,7 @@
 ## Installation
 
 ```bash
-  $ pip install oobabot
-
-Collecting oobabot
-  Downloading oobabot-0.1.2-py3-none-any.whl (16 kB)
-  ...
-Installing collected packages: websockets, pysbd, discord.py, oobabot
-Successfully installed discord.py-2.2.3 oobabot-0.1.2 pysbd-0.3.4 websockets-11.0.2
+  pip install oobabot
 ```
 
 ## Usage
