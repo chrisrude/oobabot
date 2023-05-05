@@ -286,6 +286,11 @@ class DiscordBot(discord.Client):
         if message.channel.id not in self.channel_last_response_time:
             return False
 
+        # if message is empty, don't reply.  This can happen if someone
+        # posts an image or an attachment without a comment.
+        if not message.content.strip():
+            return False
+
         if message.created_at.timestamp() - \
                 self.channel_last_response_time[message.channel.id] > \
                 self.RELEVANT_TIME_SECONDS:
