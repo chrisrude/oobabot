@@ -193,9 +193,20 @@ class DiscordBot(discord.Client):
     # some non-zero chance of responding to a message,  even if
     # it wasn't addressed directly to the bot.  We'll only do this
     # if we have posted to the same channel within the last
-    # RELEVANT_TIME_SECONDS
-    RELEVANT_TIME_SECONDS = 120
-    UNPROMPTED_RESPONSE_CHANCE = 0.2
+    TIME_VS_RESPONSE_CHANCE = [
+        # (seconds, base % chance of an unsolicited response)
+        (10.0, 100.0),
+        (60.0, 40.0),
+        (120.0, 20.0),
+    ]
+
+    # seconds after which we'll lazily purge a channel
+    # from channel_last_response_time
+    PURGE_LAST_RESPONSE_TIME_AFTER = 60.0 * 5.0
+
+    # increased chance of responding to a message if it ends with
+    # a question mark or exclamation point
+    INTERROBANG_BONUS = 0.4
 
     def __init__(
         self,
@@ -274,10 +285,8 @@ class DiscordBot(discord.Client):
         if self.user and self.user.id in [m.id for m in message.mentions]:
             return True
 
-        # if we've posted recently in this channel, there are a few
-        # other reasons we may respond.  But if we haven't, just
-        # ignore the message.
-        if message.channel.id not in self.channel_last_response_time:
+        # if we're not at-mentioned but others are, don't reply
+        if message.mentions:
             return False
 
         # if message is empty, don't reply.  This can happen if someone
@@ -285,27 +294,54 @@ class DiscordBot(discord.Client):
         if not message.content.strip():
             return False
 
-        if (
-            message.created_at.timestamp()
-            - self.channel_last_response_time[message.channel.id]
-            > self.RELEVANT_TIME_SECONDS
-        ):
+        # if we've posted recently in this channel, there are a few
+        # other reasons we may respond.  But if we haven't, just
+        # ignore the message.
+
+        # purge any channels that we haven't posted to in a while
+        self.purge_outdated_response_times()
+
+        # if we haven't posted to this channel recently, don't reply
+        if message.channel.id not in self.channel_last_response_time:
             return False
+
+        # we're now in the set of spaces where we have a chance of
+        # responding to a message that wasn't directly addressed to us
+        response_chance = self.unsolicited_response_chance(message)
 
         # if the new message ends with a question mark, we'll respond
         if message.content.endswith("?"):
-            return True
+            response_chance += self.INTERROBANG_BONUS
 
         # if the new message ends with an exclamation point, we'll respond
         if message.content.endswith("!"):
-            return True
+            response_chance += self.INTERROBANG_BONUS
 
-        # otherwise we'll respond randomly
-        if random.random() < self.UNPROMPTED_RESPONSE_CHANCE:
+        if random.random() < response_chance:
             return True
 
         # ignore anything else
         return False
+
+    def unsolicited_response_chance(self, message: discord.Message) -> float:
+        time_since_last_send = (
+            message.created_at.timestamp()
+            - self.channel_last_response_time[message.channel.id]
+        )
+
+        # return a base chance that we'll respond to a message that wasn't
+        # addressed to us, based on the table in TIME_VS_RESPONSE_CHANCE.
+        # other factors might increase this chance.
+        for duration, chance in self.TIME_VS_RESPONSE_CHANCE:
+            if time_since_last_send < duration:
+                return chance
+        return 0.0
+
+    def purge_outdated_response_times(self) -> None:
+        oldest_time_to_keep = time.time() - self.PURGE_LAST_RESPONSE_TIME_AFTER
+        for channel_id, last_response_time in self.channel_last_response_time.items():
+            if last_response_time < oldest_time_to_keep:
+                del self.channel_last_response_time[channel_id]
 
     def log_stats(self) -> None:
         self.average_stats.write_stat_summary_to_log()
@@ -367,7 +403,8 @@ class DiscordBot(discord.Client):
             return
 
         # store the timestamp of this response in channel_last_response_time
-        self.channel_last_response_time[raw_message.channel.id] = time.time()
+        if raw_message.channel.id:
+            self.channel_last_response_time[raw_message.channel.id] = time.time()
 
         response_stats.write_to_log(f"Response to {author} done!  ")
         self.average_stats.log_response_success(response_stats)
