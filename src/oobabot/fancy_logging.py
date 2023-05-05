@@ -1,4 +1,3 @@
-
 import logging
 
 FOREGROUND_COLORS = {
@@ -13,18 +12,18 @@ FOREGROUND_COLORS = {
 }
 
 
-def apply_color(color, text: str = '%(message)s') -> str:
+def apply_color(color, text: str = "%(message)s") -> str:
     return f"\033[{FOREGROUND_COLORS[color]}m{text}\033[0m"
 
 
 PREFIX = f'{apply_color("yellow", "%(asctime)s")} %(levelname)s '
 
 FORMATS = {
-    logging.DEBUG: PREFIX + apply_color('cyan'),
-    logging.INFO: PREFIX + apply_color('white'),
-    logging.WARNING: PREFIX + apply_color('yellow'),
-    logging.ERROR: PREFIX + apply_color('red'),
-    logging.CRITICAL: PREFIX + apply_color('red'),
+    logging.DEBUG: PREFIX + apply_color("cyan"),
+    logging.INFO: PREFIX + apply_color("white"),
+    logging.WARNING: PREFIX + apply_color("yellow"),
+    logging.ERROR: PREFIX + apply_color("red"),
+    logging.CRITICAL: PREFIX + apply_color("red"),
 }
 
 
@@ -34,7 +33,8 @@ class ColorfulLoggingFormatter(logging.Formatter):
         self.formatters = {}
         for logging_level in FORMATS.keys():
             self.formatters[logging_level] = logging.Formatter(
-                FORMATS.get(logging_level))
+                FORMATS.get(logging_level)
+            )
 
     def format(self, record: logging.LogRecord) -> str:
         formatter = self.formatters.get(record.levelno)

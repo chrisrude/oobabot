@@ -20,9 +20,22 @@ oobabot = 'oobabot.oobabot:main'
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.flakeheaven]
+format = "grouped"
+max-line-length = 88
+show_source = true
+
+[tool.flakeheaven.exceptions]
+pycodestyle = ["-E203", "-W503", "-W504"]
+
 [tool.poetry.group.test.dependencies]
 pytest = "^7.1"
-# todo: add...
-# black: code formatting
-# isort: import sorting
-# pre-commit: run all the above when doing "git push"
+black = "^23.1.0"
+isort = "^5.12.0"
+pre-commit = "^3.1.1"
+
+[tool.isort]
+profile = "black"
+force_single_line = true
+force_sort_within_sections = true
+single_line_exclusions = ["typing", "typing_extensions"]

@@ -1,4 +1,3 @@
-
 # import pytest
 
 from oobabot.sentence_splitter import SentenceSplitter
@@ -20,7 +19,7 @@ def test_split_text_to_sentences():
     s1 = SentenceSplitter()
     for token in tokens:
         for sent in s1.by_sentence(token):
-            print(f'^{sent}$')
+            print(f"^{sent}$")
 
     splitter = SentenceSplitter()
     actual = [list(splitter.by_sentence(token)) for token in tokens]
