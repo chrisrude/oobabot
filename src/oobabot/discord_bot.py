@@ -1,6 +1,9 @@
 # Purpose: Discord client for Rosie
 #
 
+import datetime
+import random
+import time
 import discord
 import re
 import textwrap
@@ -38,7 +41,6 @@ def sanitize_message(raw_message: discord.Message) -> dict[str, str]:
 
     return {
         'author': author,
-        'author_shortname': author.split('#')[0],
         'message_text': sanitize_string(raw_message.content).strip(),
         'server': sanitize_string(raw_guild_name),
     }
@@ -66,7 +68,7 @@ class PromptGenerator:
 
     HIST_SIZE = 10
     EST_CHARS_PER_HISTORY_LINE = 40
-    EXPECTED_HISTORY_SIZE = HIST_SIZE * EST_CHARS_PER_HISTORY_LINE
+    REQUIRED_HISTORY_SIZE = HIST_SIZE * EST_CHARS_PER_HISTORY_LINE
 
     # this is the number of tokens we reserve for the AI
     # to respond with.
@@ -76,27 +78,58 @@ class PromptGenerator:
                  ai_persona: str):
         self.ai_name = ai_name
         self.ai_persona = ai_persona
+
         self.prompt_prefix = textwrap.dedent(f'''
         You are in a chat room with multiple participants.
         Below is a transcript of recent messages in the conversation.
-        Write the next message that you would send in this conversation,
-        from the point of view of the participant named "{self.ai_name}".
-        Here is some background information about "{self.ai_name}":
-        {self.ai_persona}
+        Write the next one to three messages that you would send in this
+        conversation, from the point of view of the participant named
+        "{self.ai_name}".
+        ''')
+
+        self.prompt_prefix += self.ai_persona + '\n'
+        self.prompt_prefix += self.get_todays_topic() + '\n'
+
+        self.prompt_prefix += textwrap.dedent(f'''
         All responses you write must be from the point of view of
         {self.ai_name}.
         ### Transcript:
         ''')
-        prompt_prefix_len = len(self.prompt_prefix)
-        prompt_prefix_len += self.EXPECTED_HISTORY_SIZE
-        free_for_ai_response = self.MAX_AI_TOKEN_SPACE - prompt_prefix_len
-        if free_for_ai_response < self.RESERVED_FOR_AI_RESPONSE:
+
+        available_for_history = self.MAX_AI_TOKEN_SPACE
+        available_for_history -= len(self.prompt_prefix)
+        available_for_history -= self.RESERVED_FOR_AI_RESPONSE
+        available_for_history -= len(self.make_prompt_footer())
+
+        if available_for_history < self.REQUIRED_HISTORY_SIZE:
             raise ValueError(
                 'AI token space is too small for prompt_prefix and history. ' +
                 'Please shorten your persona by ' +
-                f'{self.RESERVED_FOR_AI_RESPONSE - free_for_ai_response} ' +
+                f'{self.REQUIRED_HISTORY_SIZE - available_for_history} ' +
                 'characters.'
             )
+        self.available_for_history = available_for_history
+
+    def get_todays_topic(self, topics_file='topics.txt') -> str:
+        now = datetime.datetime.now()
+        timestr = now.strftime(
+            'Today is %A, %B %-d.  The time is %-I:%M %p.')
+        try:
+            file = open(topics_file, 'r')
+            get_logger().debug(f'using topics file {topics_file}')
+        except FileNotFoundError:
+            return timestr
+
+        # read all lines and remove empty lines
+        topics = [line.strip().lower()
+                  for line in file.readlines() if line.strip()]
+        random.seed(now.year + now.month + now.day)
+        topic = random.choice(topics)
+        get_logger().debug(f"Today's surprise topic is: {topic}")
+        return timestr + f'  Today you would like to {topic}'
+
+    def make_prompt_footer(self) -> str:
+        return f'{self.ai_name} says:\n'
 
     async def generate(
             self,
@@ -110,7 +143,7 @@ class PromptGenerator:
         # put this at the very end to tell the UI what it
         # should complete.  But generate this now so we
         # know how long it is.
-        prompt_prefix_footer = f'{self.ai_name} says:\n'
+        prompt_prefix_footer = self.make_prompt_footer()
 
         # add on more history, but only if we have room
         # if we don't have room, we'll just truncate the history
@@ -118,15 +151,13 @@ class PromptGenerator:
         # this is s
         # it will understand before ignore
         #
-        prompt_len_remaining = self.MAX_AI_TOKEN_SPACE
-        prompt_len_remaining -= len(self.prompt_prefix)
-        prompt_len_remaining -= len(prompt_prefix_footer)
-        prompt_len_remaining -= self.RESERVED_FOR_AI_RESPONSE
+        prompt_len_remaining = self.available_for_history
 
         # history_lines is newest first, so figure out
         # how many we can take, then append them in
         # reverse order
         history_lines = []
+
         async for raw_message in message_history:
             clean_message = sanitize_message(raw_message)
 
@@ -142,8 +173,9 @@ class PromptGenerator:
 
             if len(line) > prompt_len_remaining:
                 get_logger().warn(
-                    'ran out of space, only including ' +
-                    f'{len(history_lines)} history lines'
+                    'ran out of prompt space, discarding ' +
+                    f'{self.HIST_SIZE - len(history_lines)} lines ' +
+                    'of chat history'
                 )
                 break
 
@@ -161,6 +193,13 @@ class PromptGenerator:
 
 class DiscordBot(discord.Client):
 
+    # some non-zero chance of responding to a message,  even if
+    # it wasn't addressed directly to the bot.  We'll only do this
+    # if we have posted to the same channel within the last
+    # RELEVANT_TIME_SECONDS
+    RELEVANT_TIME_SECONDS = 120
+    UNPROMPTED_RESPONSE_CHANCE = 0.2
+
     def __init__(self,
                  ooba_client: OobaClient,
                  ai_name: str,
@@ -174,6 +213,9 @@ class DiscordBot(discord.Client):
         self.ai_user_id = -1
         self.wakewords = wakewords
         self.log_all_the_things = log_all_the_things
+
+        # a list of timestamps in which we last posted to a channel
+        self.channel_last_response_time = {}
 
         self.average_stats = AggregateResponseStats(ooba_client)
         self.prompt_prefix_generator = PromptGenerator(
@@ -236,6 +278,29 @@ class DiscordBot(discord.Client):
 
         # reply to all messages in which we're @-mentioned
         if self.user and self.user.id in [m.id for m in message.mentions]:
+            return True
+
+        # if we've posted recently in this channel, there are a few
+        # other reasons we may respond.  But if we haven't, just
+        # ignore the message.
+        if message.channel.id not in self.channel_last_response_time:
+            return False
+
+        if message.created_at.timestamp() - \
+                self.channel_last_response_time[message.channel.id] > \
+                self.RELEVANT_TIME_SECONDS:
+            return False
+
+        # if the new message ends with a question mark, we'll respond
+        if message.content.endswith('?'):
+            return True
+
+        # if the new message ends with an exclamation point, we'll respond
+        if message.content.endswith('!'):
+            return True
+
+        # otherwise we'll respond randomly
+        if random.random() < self.UNPROMPTED_RESPONSE_CHANCE:
             return True
 
         # ignore anything else
@@ -303,6 +368,9 @@ class DiscordBot(discord.Client):
             get_logger().error(f'Error: {str(err)}')
             self.average_stats.log_response_failure()
             return
+
+        # store the timestamp of this response in channel_last_response_time
+        self.channel_last_response_time[raw_message.channel.id] = time.time()
 
         response_stats.write_to_log(f"Response to {author} done!  ")
         self.average_stats.log_response_success(response_stats)
