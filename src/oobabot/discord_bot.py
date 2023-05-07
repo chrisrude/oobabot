@@ -1,7 +1,6 @@
 # Purpose: Discord client for Rosie
 #
 
-import datetime
 import random
 import re
 import textwrap
@@ -89,8 +88,6 @@ class PromptGenerator:
         )
 
         self.prompt_prefix += self.ai_persona + "\n"
-        self.prompt_prefix += self.get_todays_topic() + "\n"
-
         self.prompt_prefix += textwrap.dedent(
             f"""
         All responses you write must be from the point of view of
@@ -112,22 +109,6 @@ class PromptGenerator:
                 + "characters."
             )
         self.available_for_history = available_for_history
-
-    def get_todays_topic(self, topics_file="topics.txt") -> str:
-        now = datetime.datetime.now()
-        timestr = now.strftime("Today is %A, %B %-d.  The time is %-I:%M %p.")
-        try:
-            file = open(topics_file, "r")
-            get_logger().debug(f"using topics file {topics_file}")
-        except FileNotFoundError:
-            return timestr
-
-        # read all lines and remove empty lines
-        topics = [line.strip().lower() for line in file.readlines() if line.strip()]
-        random.seed(now.year + now.month + now.day)
-        topic = random.choice(topics)
-        get_logger().debug(f"Today's surprise topic is: {topic}")
-        return timestr + f"  Today you would like to {topic}"
 
     def make_prompt_footer(self) -> str:
         return f"{self.ai_name} says:\n"

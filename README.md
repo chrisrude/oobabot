@@ -185,6 +185,11 @@ By default, **`oobabot`** will listen for three types of messages in the servers
  1. any direct message
  1. any message containing a provided wakeword (see Optional Settings)
 
+Also, the bot has a random chance of sending follow-up messages within the
+same channel if others reply within 120 seconds of its last post.  The exact
+parameters for this are in flux, but is meant to simulate a natural conversation
+flow, without forcing others to always post a wakeword.
+
 ## Known Issues
 
 - ooba's text generation can error with OOM when more than one request comes in at once.
