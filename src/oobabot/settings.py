@@ -76,6 +76,12 @@ class Settings(argparse.ArgumentParser):
             + "entirety to STDOUT",
             action="store_true",
         )
+        self.add_argument(
+            "--stable-diffusion-url",
+            type=str,
+            default=None,
+            help="URL for an AUTOMATIC1111 Stable Diffusion server",
+        )
 
     def settings(self) -> dict[str, str]:
         if self._settings is None:
@@ -85,6 +91,7 @@ class Settings(argparse.ArgumentParser):
             # non-str settings, we can add stronger type hints
             self.wakewords = self._settings.pop("wakewords")
             self.log_all_the_things = self._settings.pop("log_all_the_things")
+            self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")
 
             # either we're using a local REPL, or we're connecting to Discord.
             # assume the user wants to connect to Discord

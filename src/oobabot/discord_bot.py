@@ -1,6 +1,8 @@
 # Purpose: Discord client for Rosie
 #
 
+import asyncio
+import io
 import random
 import re
 import textwrap
@@ -12,6 +14,7 @@ import discord
 from oobabot.fancy_logging import get_logger
 from oobabot.ooba_client import OobaClient
 from oobabot.response_stats import AggregateResponseStats
+from oobabot.sd_client import StableDiffusionClient
 
 # strip newlines and replace them with spaces, to make
 # it harder for users to trick the UI into injecting
@@ -196,6 +199,7 @@ class DiscordBot(discord.Client):
         ai_persona: str,
         wakewords: list[str],
         log_all_the_things: bool,
+        stable_diffusion_client: StableDiffusionClient | None = None,
     ):
         self.ooba_client = ooba_client
 
@@ -216,6 +220,18 @@ class DiscordBot(discord.Client):
         self.wakeword_patterns = [
             re.compile(rf"\b{wakeword}\b", re.IGNORECASE) for wakeword in wakewords
         ]
+
+        photowords = [
+            r"^.*\bphoto\b(.*)$",
+            r"^.*\bpicture\b(.*)$",
+            r"^.*\bimage\b(.*)$",
+            r"^.*\bpic\b(.*)$",
+        ]
+        self.photo_patterns = [
+            re.compile(photoword, re.IGNORECASE) for photoword in photowords
+        ]
+
+        self.stable_diffusion_client = stable_diffusion_client
 
         intents = discord.Intents.default()
         intents.message_content = True
@@ -245,7 +261,18 @@ class DiscordBot(discord.Client):
         str_wakewords = ", ".join(self.wakewords) if self.wakewords else "<none>"
         get_logger().debug(f"wakewords: {str_wakewords}")
 
-    def run(self, token: str) -> None:
+        if self.stable_diffusion_client is not None:
+            get_logger().info("using stable diffusion client")
+            await self.stable_diffusion_client.start()
+            get_logger().info("stable diffusion client started")
+
+    async def start(self, token: str) -> None:
+        if self.stable_diffusion_client is not None:
+            async with self.stable_diffusion_client:
+                await super().start(token)
+                return
+
+        await super().start(token)
         super().run(token)
 
     def should_reply_to_message(self, message: discord.Message) -> bool:
@@ -327,11 +354,49 @@ class DiscordBot(discord.Client):
     def log_stats(self) -> None:
         self.average_stats.write_stat_summary_to_log()
 
+    def make_photo_prompt_from_message(
+        self, raw_message: discord.Message
+    ) -> str | None:
+        for photo_pattern in self.photo_patterns:
+            match = photo_pattern.search(raw_message.content)
+            if match:
+                return match.group(1)
+
+    async def generate_picture(
+        self, photo_prompt: str, raw_message: discord.Message
+    ) -> None:
+        async def send_image(stable_diffusion_client: StableDiffusionClient) -> None:
+            image_task = stable_diffusion_client.generate_image(photo_prompt)
+            await image_task
+            img_bytes = image_task.result()
+            file_of_bytes = io.BytesIO(img_bytes)
+            file = discord.File(file_of_bytes)
+            file.filename = "image.png"
+            file.description = f"image generated from '{photo_prompt}'"
+            await raw_message.channel.send(
+                reference=raw_message,
+                file=file,
+            )
+
+        if self.stable_diffusion_client is None:
+            return
+        get_logger().info(f"generating image from '{photo_prompt}'")
+        asyncio.create_task(send_image(self.stable_diffusion_client))
+        # await raw_message.channel.send(
+        #     f"creating an image of '{photo_prompt}' for you.  "
+        #     + "It will take several minutes, so keep your pants on.",
+        # )
+
     async def on_message(self, raw_message: discord.Message) -> None:
         if not self.should_reply_to_message(raw_message):
             return
         try:
             async with raw_message.channel.typing():
+                if self.stable_diffusion_client is not None:
+                    photo_prompt = self.make_photo_prompt_from_message(raw_message)
+                    if photo_prompt is not None:
+                        await self.generate_picture(photo_prompt, raw_message)
+
                 await self.send_response(raw_message)
         except Exception as e:
             get_logger().error(f"Exception while sending response: {e}", exc_info=True)

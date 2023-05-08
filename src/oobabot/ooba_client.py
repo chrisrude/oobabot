@@ -8,6 +8,7 @@ from socket import gaierror
 import typing
 from urllib.parse import urljoin
 
+# todo: move to aiohttp to reduce dependencies
 import websockets as ws  # weird, but needed to avoid long lines later
 from websockets.exceptions import WebSocketException
 
@@ -25,6 +26,8 @@ class OobaClient:
     END_OF_INPUT = ""
 
     def __init__(self, base_url: str):
+        # connector = aiohttp.TCPConnector(limit_per_host=1)
+
         self.api_url = urljoin(base_url, self.STREAMING_URI_PATH)
         self.total_response_tokens = 0
 
