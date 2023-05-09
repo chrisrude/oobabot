@@ -47,12 +47,16 @@ class StableDiffusionImageView(discord.ui.View):
         is_channel_nsfw: bool,
         photo_prompt: str,
         requesting_user_id: int,
+        requesting_user_name: str,
     ):
         super().__init__(timeout=120.0)
 
         # only the user who requested generation of the image
         # can have it replaced
         self.requesting_user_id = requesting_user_id
+        self.requesting_user_name = requesting_user_name
+        self.photo_prompt = photo_prompt
+        self.photo_accepted = False
 
         #####################################################
         # "Try Again" button
@@ -65,11 +69,16 @@ class StableDiffusionImageView(discord.ui.View):
         self.image_message = None
 
         async def on_try_again(interaction: discord.Interaction):
+            result = await self.diy_interaction_check(interaction)
+            if not result:
+                # unauthorized user
+                return
+
             # generate a new image
             regen_task = sd_client.generate_image(photo_prompt, is_channel_nsfw)
-
             regen_file = await image_task_to_file(regen_task, photo_prompt)
             await interaction.response.defer()
+
             await self.get_image_message().edit(attachments=[regen_file])
 
         btn_try_again.callback = on_try_again
@@ -84,8 +93,12 @@ class StableDiffusionImageView(discord.ui.View):
         )
 
         async def on_lock_in(interaction: discord.Interaction):
+            result = await self.diy_interaction_check(interaction)
+            if not result:
+                # unauthorized user
+                return
             await interaction.response.defer()
-            await self.detach_view()
+            await self.detach_view_keep_img()
 
         btn_lock_in.callback = on_lock_in
 
@@ -99,8 +112,12 @@ class StableDiffusionImageView(discord.ui.View):
         )
 
         async def on_delete(interaction: discord.Interaction):
+            result = await self.diy_interaction_check(interaction)
+            if not result:
+                # unauthorized user
+                return
             await interaction.response.defer()
-            await self.delete_message()
+            await self.delete_image()
 
         btn_delete.callback = on_delete
 
@@ -114,24 +131,43 @@ class StableDiffusionImageView(discord.ui.View):
             raise ValueError("image_message is None")
         return self.image_message
 
-    async def delete_message(self):
-        await self.detach_view()
-        await self.get_image_message().delete()
+    async def delete_image(self):
+        detach_msg = (
+            f"{self.requesting_user_name} tried to make an image "
+            + f"with the prompt:\n\t'{self.photo_prompt}'\n...but couldn't find "
+            + "a suitable one."
+        )
+        await self.detach_view_delete_img(detach_msg)
 
-    async def detach_view(self):
+    async def detach_view_delete_img(self, detach_msg: str):
+        await self.get_image_message().edit(
+            content=detach_msg,
+            view=None,
+            attachments=[],
+        )
+
+    async def detach_view_keep_img(self):
+        self.photo_accepted = True
         await self.get_image_message().edit(
             content=None,
             view=None,
         )
 
     async def on_timeout(self):
-        await self.delete_message()
+        if not self.photo_accepted:
+            await self.delete_image()
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def diy_interaction_check(self, interaction: discord.Interaction) -> bool:
         """
         Only allow the requesting user to interact with this view.
         """
-        return interaction.user.id == self.requesting_user_id
+        if interaction.user.id == self.requesting_user_id:
+            return True
+        await interaction.response.send_message(
+            f"Sorry, only {self.requesting_user_name} can press the buttons.",
+            ephemeral=True,
+        )
+        return False
 
 
 def sanitize_string(raw_string: str) -> str:
@@ -518,6 +554,7 @@ class DiscordBot(discord.Client):
                 is_channel_nsfw,
                 photo_prompt=photo_prompt,
                 requesting_user_id=raw_message.author.id,
+                requesting_user_name=raw_message.author.name,
             )
 
             image_message = await raw_message.channel.send(
