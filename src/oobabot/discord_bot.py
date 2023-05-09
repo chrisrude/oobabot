@@ -46,10 +46,9 @@ class StableDiffusionImageView(discord.ui.View):
         sd_client: StableDiffusionClient,
         is_channel_nsfw: bool,
         photo_prompt: str,
-        image_message: discord.Message,
         requesting_user_id: int,
     ):
-        super().__init__()
+        super().__init__(timeout=120.0)
 
         # only the user who requested generation of the image
         # can have it replaced
@@ -63,37 +62,70 @@ class StableDiffusionImageView(discord.ui.View):
             style=discord.ButtonStyle.blurple,
             row=1,
         )
+        self.image_message = None
 
         async def on_try_again(interaction: discord.Interaction):
             # generate a new image
             regen_task = sd_client.generate_image(photo_prompt, is_channel_nsfw)
 
             regen_file = await image_task_to_file(regen_task, photo_prompt)
-            await interaction.response.defer(thinking=False, ephemeral=True)
-
-            await image_message.edit(attachments=[regen_file])
-
-            interaction.response.is_done()
+            await interaction.response.defer()
+            await self.get_image_message().edit(attachments=[regen_file])
 
         btn_try_again.callback = on_try_again
 
         #####################################################
-        # "Lock In" button
+        # "Accept" button
         #
         btn_lock_in = discord.ui.Button(
-            label="Lock In",
+            label="Accept",
             style=discord.ButtonStyle.success,
             row=1,
         )
 
         async def on_lock_in(interaction: discord.Interaction):
             await interaction.response.defer()
-            await interaction.delete_original_response()
-            interaction.response.is_done()
+            await self.detach_view()
 
         btn_lock_in.callback = on_lock_in
 
-        super().add_item(btn_try_again).add_item(btn_lock_in)
+        #####################################################
+        # "Delete" button
+        #
+        btn_delete = discord.ui.Button(
+            label="Delete",
+            style=discord.ButtonStyle.danger,
+            row=1,
+        )
+
+        async def on_delete(interaction: discord.Interaction):
+            await interaction.response.defer()
+            await self.delete_message()
+
+        btn_delete.callback = on_delete
+
+        super().add_item(btn_try_again).add_item(btn_lock_in).add_item(btn_delete)
+
+    def set_image_message(self, image_message: discord.Message):
+        self.image_message = image_message
+
+    def get_image_message(self) -> discord.Message:
+        if self.image_message is None:
+            raise ValueError("image_message is None")
+        return self.image_message
+
+    async def delete_message(self):
+        await self.detach_view()
+        await self.get_image_message().delete()
+
+    async def detach_view(self):
+        await self.get_image_message().edit(
+            content=None,
+            view=None,
+        )
+
+    async def on_timeout(self):
+        await self.delete_message()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """
@@ -480,25 +512,23 @@ class DiscordBot(discord.Client):
                 photo_prompt, is_channel_nsfw=is_channel_nsfw
             )
             file = await image_task_to_file(image_task, photo_prompt)
-            image_message = await raw_message.channel.send(
-                reference=raw_message,
-                file=file,
-            )
 
-            # create another message which will have special buttons
-            # for interacting with the image.  Specifcally, the user
-            # who requested the image will be able to regenerate it
-            # with a new seed.
             regen_view = StableDiffusionImageView(
                 stable_diffusion_client,
                 is_channel_nsfw,
                 photo_prompt=photo_prompt,
-                image_message=image_message,
                 requesting_user_id=raw_message.author.id,
             )
-            await raw_message.channel.send(
+
+            image_message = await raw_message.channel.send(
+                content=f"{raw_message.author}, is this what you wanted?\n\n"
+                + "If no choice is made, this message will 💣 self-destuct "
+                + " 💣 in 3 minutes.",
+                reference=raw_message,
+                file=file,
                 view=regen_view,
             )
+            regen_view.image_message = image_message
 
         async def wrapped_send_image(
             stable_diffusion_client: StableDiffusionClient,
