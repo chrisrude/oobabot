@@ -3,15 +3,12 @@
 #
 
 from asyncio.exceptions import TimeoutError
-import json
 from socket import gaierror
 import typing
-from urllib.parse import urljoin
 
-# todo: move to aiohttp to reduce dependencies
-import websockets as ws  # weird, but needed to avoid long lines later
-from websockets.exceptions import WebSocketException
+import aiohttp
 
+from oobabot.fancy_logging import get_logger
 from oobabot.sentence_splitter import SentenceSplitter
 
 
@@ -26,10 +23,9 @@ class OobaClient:
     END_OF_INPUT = ""
 
     def __init__(self, base_url: str):
-        # connector = aiohttp.TCPConnector(limit_per_host=1)
-
-        self.api_url = urljoin(base_url, self.STREAMING_URI_PATH)
+        self.base_url = base_url
         self.total_response_tokens = 0
+        self._session = None
 
     DEFAULT_REQUEST_PARAMS = {
         "max_new_tokens": 250,
@@ -53,9 +49,9 @@ class OobaClient:
         "stopping_strings": [],
     }
 
-    STREAMING_URI_PATH = "./api/v1/stream"
+    STREAMING_URI_PATH = "/api/v1/stream"
 
-    async def try_connect(self):
+    async def setup(self):
         """
         Attempt to connect to the oobabooga server.
 
@@ -66,15 +62,14 @@ class OobaClient:
             OobaClientError, if the connection fails
         """
         try:
-            async with ws.connect(self.api_url):  # type: ignore
+            async with self.get_session().ws_connect(self.STREAMING_URI_PATH):
                 return
         except (
             ConnectionRefusedError,
             gaierror,
             TimeoutError,
-            WebSocketException,
         ) as e:
-            raise OobaClientError(f"Failed to connect to {self.api_url}: {e}", e)
+            raise OobaClientError(f"Failed to connect to {self.base_url}: {e}", e)
 
     async def request_by_sentence(self, prompt: str) -> typing.AsyncIterator[str]:
         """
@@ -96,19 +91,59 @@ class OobaClient:
         }
         request.update(self.DEFAULT_REQUEST_PARAMS)
 
-        async with ws.connect(self.api_url) as websocket:  # type: ignore
-            await websocket.send(json.dumps(request))
+        async with self.get_session().ws_connect(self.STREAMING_URI_PATH) as websocket:
+            await websocket.send_json(request)
 
-            while True:
-                incoming_data = await websocket.recv()
-                incoming_data = json.loads(incoming_data)
+            async for msg in websocket:
+                # we expect a series of text messages in JSON encoding,
+                # like this:
+                #
+                # {"event": "text_stream", "message_num": 0, "text": ""}
+                # {"event": "text_stream", "message_num": 1, "text": "Oh"}
+                # {"event": "text_stream", "message_num": 2, "text": ","}
+                # {"event": "text_stream", "message_num": 3, "text": " okay"}
+                # {"event": "text_stream", "message_num": 4, "text": "."}
+                # {"event": "stream_end", "message_num": 5}
+                # get_logger().debug(f"Received message: {msg}")
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    # bdata = typing.cast(bytes, msg.data)
+                    # get_logger().debug(f"Received data: {bdata}")
 
-                if "text_stream" == incoming_data["event"]:
-                    if incoming_data["text"]:
+                    incoming_data = msg.json()
+                    if "text_stream" == incoming_data["event"]:
                         self.total_response_tokens += 1
                         yield incoming_data["text"]
 
-                elif "stream_end" == incoming_data["event"]:
-                    # Make sure any unprinted text is flushed.
-                    yield self.END_OF_INPUT
+                    elif "stream_end" == incoming_data["event"]:
+                        # Make sure any unprinted text is flushed.
+                        yield self.END_OF_INPUT
+                        return
+
+                    else:
+                        get_logger().warning(f"Unexpected event: {incoming_data}")
+
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    get_logger().error(f"WebSocket connection closed with error: {msg}")
+                    raise OobaClientError(
+                        f"WebSocket connection closed with error {msg}"
+                    )
+                elif msg.type == aiohttp.WSMsgType.CLOSED:
+                    get_logger().info(f"WebSocket connection closed normally: {msg}")
                     return
+
+    def get_session(self) -> aiohttp.ClientSession:
+        if not self._session:
+            raise OobaClientError("Session not initialized")
+        return self._session
+
+    async def __aenter__(self):
+        connector = aiohttp.TCPConnector(limit_per_host=1)
+        self._session = aiohttp.ClientSession(
+            base_url=self.base_url, connector=connector
+        )
+        return self
+
+    async def __aexit__(self, *_err):
+        if self._session:
+            await self._session.close()
+        self._session = None

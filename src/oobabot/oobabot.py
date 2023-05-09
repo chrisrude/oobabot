@@ -7,6 +7,7 @@ import signal
 import sys
 
 from oobabot.discord_bot import DiscordBot
+from oobabot.fancy_logging import get_logger
 from oobabot.fancy_logging import init_logging
 from oobabot.ooba_client import OobaClient
 from oobabot.ooba_client import OobaClientError
@@ -14,55 +15,22 @@ from oobabot.sd_client import StableDiffusionClient
 from oobabot.settings import Settings
 
 
-async def ainput(string: str) -> str:
-    def prompt():
-        sys.stdout.write(string)
-        sys.stdout.write(" ")
-        sys.stdout.flush()
+def verify_client(client, service_name, url):
+    async def try_setup(client):
+        assert client is not None
+        async with client:
+            await client.setup()
 
-    await asyncio.get_event_loop().run_in_executor(None, prompt)
-    return await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
-
-
-class LocalREPL:
-    # local REPL for testing
-    def __init__(
-        self, ooba_client, stable_diffusion_client: StableDiffusionClient | None = None
-    ):
-        self.ooba_client = ooba_client
-        self.stable_diffusion_client = stable_diffusion_client
-
-    def show_prompt(self) -> None:
-        print("\n>>> ", end="", flush=True)
-
-    async def start(self) -> None:
-        def img_done(img_task):
-            print("got image")
-            print(img_task.result()[:10])
-            bytes = img_task.result()
-            with open("out.png", "wb") as binary_file:
-                binary_file.write(bytes)
-
-        if self.stable_diffusion_client:
-            async with self.stable_diffusion_client:
-                await self.stable_diffusion_client.start()
-                while True:
-                    user_prompt = await ainput(">>> ")
-                    if "" == user_prompt.strip():
-                        break
-                    img_task = self.stable_diffusion_client.generate_image(user_prompt)
-                    img_task.add_done_callback(img_done)
-
-        else:
-            self.show_prompt()
-            for user_prompt in sys.stdin:
-                async for token in self.ooba_client.request_by_token(user_prompt):
-                    if token:
-                        print(token, end="", flush=True)
-                    else:
-                        # end of response
-                        print("")
-                self.show_prompt()
+    logger = get_logger()
+    logger.info(f"{service_name} is at {url}")
+    try:
+        asyncio.run(try_setup(client))
+    except OobaClientError as e:
+        logger.error(f"Could not connect to {service_name} server: [{url}]")
+        logger.error("Please check the URL and try again.")
+        logger.error(f"Reason: {e}")
+        sys.exit(1)
+    logger.info(f"Connected to {service_name}!")
 
 
 def main():
@@ -79,38 +47,33 @@ def main():
 
     signal.signal(signal.SIGINT, sigint_handler)
 
+    ########################################################
+    # Connect to Oobabooga
+
     ooba_client = OobaClient(settings.base_url)
+    verify_client(ooba_client, "Oobabooga", settings.base_url)
 
-    if settings.stable_diffusion_url is not None:
-        if settings.local_repl:
-            logger.info(
-                f"Using Stable Diffusion server at: {settings.stable_diffusion_url}"
-            )
-            stable_diffusion_client = StableDiffusionClient(
-                settings.stable_diffusion_url
-            )
-            coroutine = LocalREPL(
-                ooba_client, stable_diffusion_client=stable_diffusion_client
-            ).start()
-            asyncio.run(coroutine)
-            return
-
-    logger.debug(f"Oobabooga base URL: {settings.base_url}")
-    try:
-        asyncio.run(ooba_client.try_connect())
-    except OobaClientError as e:
-        logger.error(f"Could not connect to ooba server: [{ooba_client.api_url}]")
-        logger.error("Please check the URL and try again.")
-        logger.error(f"Reason: {e}")
-        sys.exit(1)
-
-    logger.info("Connected to Oobabooga!")
+    ########################################################
+    # Connect to Stable Diffusion, if configured
 
     stable_diffusion_client = None
     if settings.stable_diffusion_url:
-        stable_diffusion_client = StableDiffusionClient(settings.stable_diffusion_url)
+        stable_diffusion_client = StableDiffusionClient(
+            settings.stable_diffusion_url,
+            negative_prompt=settings.stable_diffusion_negative_prompt,
+            negative_prompt_nsfw=settings.stable_diffusion_negative_prompt_nsfw,
+            desired_sampler=settings.stable_diffusion_sampler,
+        )
+        verify_client(
+            stable_diffusion_client,
+            "Stable Diffusion",
+            settings.stable_diffusion_url,
+        )
 
-    logger.debug("Connecting to Discord... ")
+    ########################################################
+    # Connect to Discord
+
+    logger.info("Connecting to Discord... ")
     bot = DiscordBot(
         ooba_client,
         ai_name=settings.ai_name,

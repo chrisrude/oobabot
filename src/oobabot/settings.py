@@ -15,6 +15,20 @@ class Settings(argparse.ArgumentParser):
     DEFAULT_WAKEWORDS = ["oobabot"]
     DEFAULT_URL = "ws://localhost:5005"
 
+    # use this prompt for "age_restricted" Dsicord channels
+    #  i.e. channel.nsfw is true
+    DEFAULT_SD_NEGATIVE_PROMPT_NSFW = (
+        "animal harm, "
+        + "suicide, self-harm, "
+        + "excessive violence, "
+        + "naked children, child sexualization, lolicon"
+    )
+
+    # use this prompt for non-age-restricted channels
+    DEFAULT_SD_NEGATIVE_PROMPT = (
+        DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", sexually explicit content"
+    )
+
     def __init__(self):
         self._settings = None
         self.wakewords = []
@@ -25,16 +39,9 @@ class Settings(argparse.ArgumentParser):
             + "environment variable:\n"
             f"\t{self.DISCORD_TOKEN_ENV_VAR} = <your bot's discord token>",
         )
-        self.add_argument(
-            "--base-url",
-            type=str,
-            default=self.DEFAULT_URL,
-            help="Base URL for the oobabooga instance.  "
-            + "This should be ws://hostname[:port] for plain websocket "
-            + "connections, or wss://hostname[:port] for websocket "
-            + "connections over TLS.",
-        )
-        self.add_argument(
+
+        discord_group = self.add_argument_group("Discord Settings")
+        discord_group.add_argument(
             "--ai-name",
             type=str,
             default="oobabot",
@@ -42,7 +49,7 @@ class Settings(argparse.ArgumentParser):
             + "This can be whatever you want, but might make sense "
             + "to be the name of the bot in Discord.",
         )
-        self.add_argument(
+        discord_group.add_argument(
             "--wakewords",
             type=str,
             nargs="*",
@@ -54,7 +61,19 @@ class Settings(argparse.ArgumentParser):
             + "The bot will always reply to @-mentions and "
             + "direct messages, even if no wakewords are supplied.",
         )
-        self.add_argument(
+
+        oobabooga_group = self.add_argument_group("Oobabooga Seetings")
+        oobabooga_group.add_argument(
+            "--base-url",
+            type=str,
+            default=self.DEFAULT_URL,
+            help="Base URL for the oobabooga instance.  "
+            + "This should be ws://hostname[:port] for plain websocket "
+            + "connections, or wss://hostname[:port] for websocket "
+            + "connections over TLS.",
+        )
+
+        oobabooga_group.add_argument(
             "--persona",
             type=str,
             default=self.OOBABOT_PERSONA,
@@ -63,24 +82,44 @@ class Settings(argparse.ArgumentParser):
             + "bot to play.  Alternatively, this can be set with the "
             + f"{self.OOBABOT_PERSONA_ENV_VAR} environment variable.",
         )
-        self.add_argument(
-            "--local-repl",
-            default=False,
-            help="start a local REPL, instead of connecting to Discord",
-            action="store_true",
-        )
-        self.add_argument(
+
+        oobabooga_group.add_argument(
             "--log-all-the-things",
             default=False,
-            help="prints all oobabooga requests and responses in their "
+            help="Prints all oobabooga requests and responses in their "
             + "entirety to STDOUT",
             action="store_true",
         )
-        self.add_argument(
+
+        stable_diffusion_group = self.add_argument_group("Stable Diffusion Settings")
+        stable_diffusion_group.add_argument(
             "--stable-diffusion-url",
             type=str,
             default=None,
             help="URL for an AUTOMATIC1111 Stable Diffusion server",
+        )
+        stable_diffusion_group.add_argument(
+            "--stable-diffusion-sampler",
+            type=str,
+            default=None,
+            help="Sampler to use when generating images.  If not specified, the one "
+            + "set on the AUTOMATIC1111 server will be used.",
+        )
+        stable_diffusion_group.add_argument(
+            "--stable-diffusion-negative-prompt",
+            type=str,
+            default=self.DEFAULT_SD_NEGATIVE_PROMPT,
+            help="Negative prompt to use when generating images.  This will discourage"
+            + " Stable Diffusion from generating images with the specified content.  "
+            + "By default, this is set to follow Discord's TOS.",
+        )
+        stable_diffusion_group.add_argument(
+            "--stable-diffusion-negative-prompt-nsfw",
+            type=str,
+            default=self.DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
+            help="Negative prompt to use when generating images in a channel marked as"
+            + "'Age-Restricted'.  By default, this follows the Discord TOS by allowing "
+            + "some sexual content forbidden in non-age-restricted channels.",
         )
 
     def settings(self) -> dict[str, str]:
@@ -92,6 +131,9 @@ class Settings(argparse.ArgumentParser):
             self.wakewords = self._settings.pop("wakewords")
             self.log_all_the_things = self._settings.pop("log_all_the_things")
             self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")
+            self.stable_diffusion_sampler = self._settings.pop(
+                "stable_diffusion_sampler"
+            )
 
             # either we're using a local REPL, or we're connecting to Discord.
             # assume the user wants to connect to Discord

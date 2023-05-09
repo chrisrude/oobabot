@@ -8,10 +8,10 @@ readme = "README.md"
 repository = "https://github.com/chrisrude/oobabot"
 
 [tool.poetry.dependencies]
+aiohttp = "^3.8.4"
 python = "^3.8"
 "discord.py" = "^2.2.2"
 pysbd = "^0.3.4"
-websockets = "^11"
 
 [tool.poetry.scripts]
 oobabot = 'oobabot.oobabot:main'

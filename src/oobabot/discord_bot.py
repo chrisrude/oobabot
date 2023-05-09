@@ -57,6 +57,9 @@ class PromptGenerator:
     # this is set by the AI, and is the maximum length
     # it will understand before it starts to ignore
     # the rest of the prompt_prefix
+    # note: we don't currently measure tokens, we just
+    # count characters. This is a rough estimate.
+    EST_CHARACTERS_PER_TOKEN = 4
     MAX_AI_TOKEN_SPACE = 2048
 
     # our structure will be:
@@ -68,13 +71,15 @@ class PromptGenerator:
     # so that we can be sure to always have at least
     # RESERVED_FOR_AI_RESPONSE tokens for the AI to use
 
-    HIST_SIZE = 10
-    EST_CHARS_PER_HISTORY_LINE = 40
-    REQUIRED_HISTORY_SIZE = HIST_SIZE * EST_CHARS_PER_HISTORY_LINE
+    HIST_LINES_TO_SUPPLY = 20
+    EST_CHARS_PER_HISTORY_LINE = 30
+    REQUIRED_HISTORY_SIZE_CHARS = (
+        HIST_LINES_TO_SUPPLY * EST_CHARS_PER_HISTORY_LINE / EST_CHARACTERS_PER_TOKEN
+    )
 
     # this is the number of tokens we reserve for the AI
     # to respond with.
-    RESERVED_FOR_AI_RESPONSE = 512
+    TOKENS_RESERVED_FOR_AI_RESPONSE = 512
 
     def __init__(self, ai_name: str, ai_persona: str):
         self.ai_name = ai_name
@@ -99,25 +104,45 @@ class PromptGenerator:
         """
         )
 
-        available_for_history = self.MAX_AI_TOKEN_SPACE
-        available_for_history -= len(self.prompt_prefix)
-        available_for_history -= self.RESERVED_FOR_AI_RESPONSE
-        available_for_history -= len(self.make_prompt_footer())
+        chars_free_for_history = self.MAX_AI_TOKEN_SPACE * self.EST_CHARACTERS_PER_TOKEN
+        chars_free_for_history -= len(self.prompt_prefix)
+        chars_free_for_history -= (
+            self.TOKENS_RESERVED_FOR_AI_RESPONSE * self.EST_CHARACTERS_PER_TOKEN
+        )
+        chars_free_for_history -= len(self.make_prompt_footer(True))
 
-        if available_for_history < self.REQUIRED_HISTORY_SIZE:
+        if chars_free_for_history < self.REQUIRED_HISTORY_SIZE_CHARS:
             raise ValueError(
                 "AI token space is too small for prompt_prefix and history. "
                 + "Please shorten your persona by "
-                + f"{self.REQUIRED_HISTORY_SIZE - available_for_history} "
+                + f"{self.REQUIRED_HISTORY_SIZE_CHARS - chars_free_for_history} "
                 + "characters."
             )
-        self.available_for_history = available_for_history
+        self.chars_free_for_history = chars_free_for_history
+        max_persona_len = int(
+            chars_free_for_history
+            - self.REQUIRED_HISTORY_SIZE_CHARS
+            + len(self.ai_persona)
+        )
+        get_logger().debug(
+            f"Maximum persona length: {max_persona_len} characters "
+            + f"({len(self.ai_persona)} currently)"
+        )
 
-    def make_prompt_footer(self) -> str:
-        return f"{self.ai_name} says:\n"
+    def make_prompt_footer(self, photo_requested) -> str:
+        result = ""
+        if photo_requested:
+            result += (
+                f"\n{self.ai_name}: is currently generating a photo, as requested.\n\n"
+            )
+        result += f"{self.ai_name} says:\n"
+        return result
 
     async def generate(
-        self, ai_user_id: int, message_history: typing.AsyncIterator[discord.Message]
+        self,
+        ai_user_id: int,
+        message_history: typing.AsyncIterator[discord.Message],
+        photo_requested: bool,
     ) -> str:
         """
         Generates a prompt_prefix for the AI to use based on the message.
@@ -126,7 +151,7 @@ class PromptGenerator:
         # put this at the very end to tell the UI what it
         # should complete.  But generate this now so we
         # know how long it is.
-        prompt_prefix_footer = self.make_prompt_footer()
+        prompt_prefix_footer = self.make_prompt_footer(photo_requested)
 
         # add on more history, but only if we have room
         # if we don't have room, we'll just truncate the history
@@ -134,7 +159,7 @@ class PromptGenerator:
         # this is s
         # it will understand before ignore
         #
-        prompt_len_remaining = self.available_for_history
+        prompt_len_remaining = self.chars_free_for_history
 
         # history_lines is newest first, so figure out
         # how many we can take, then append them in
@@ -156,7 +181,7 @@ class PromptGenerator:
             if len(line) > prompt_len_remaining:
                 get_logger().warn(
                     "ran out of prompt space, discarding "
-                    + f"{self.HIST_SIZE - len(history_lines)} lines "
+                    + f"{self.HIST_LINES_TO_SUPPLY - len(history_lines)} lines "
                     + "of chat history"
                 )
                 break
@@ -179,7 +204,7 @@ class DiscordBot(discord.Client):
     # if we have posted to the same channel within the last
     TIME_VS_RESPONSE_CHANCE = [
         # (seconds, base % chance of an unsolicited response)
-        (10.0, 100.0),
+        (10.0, 80.0),
         (60.0, 40.0),
         (120.0, 20.0),
     ]
@@ -221,14 +246,12 @@ class DiscordBot(discord.Client):
             re.compile(rf"\b{wakeword}\b", re.IGNORECASE) for wakeword in wakewords
         ]
 
-        photowords = [
-            r"^.*\bphoto\b(.*)$",
-            r"^.*\bpicture\b(.*)$",
-            r"^.*\bimage\b(.*)$",
-            r"^.*\bpic\b(.*)$",
-        ]
+        photowords = ["drawing", "photo", "pic", "picture", "image", "sketch"]
         self.photo_patterns = [
-            re.compile(photoword, re.IGNORECASE) for photoword in photowords
+            re.compile(
+                r"^.*\b" + photoword + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$", re.IGNORECASE
+            )
+            for photoword in photowords
         ]
 
         self.stable_diffusion_client = stable_diffusion_client
@@ -261,22 +284,27 @@ class DiscordBot(discord.Client):
         str_wakewords = ", ".join(self.wakewords) if self.wakewords else "<none>"
         get_logger().debug(f"wakewords: {str_wakewords}")
 
-        if self.stable_diffusion_client is not None:
-            get_logger().info("using stable diffusion client")
-            await self.stable_diffusion_client.start()
-            get_logger().info("stable diffusion client started")
-
     async def start(self, token: str) -> None:
+        # todo: join these at a higher level?
         if self.stable_diffusion_client is not None:
             async with self.stable_diffusion_client:
-                await super().start(token)
-                return
+                async with self.ooba_client:
+                    await super().start(token)
+                    return
 
-        await super().start(token)
-        super().run(token)
+        async with self.ooba_client:
+            await super().start(token)
 
     def should_reply_to_message(self, message: discord.Message) -> bool:
-        # we do not want the bot to reply to itself
+        # ignore messages from other bots, out of fear of infinite loops,
+        # as well as world domination
+        if message.author.bot:
+            return False
+
+        # we do not want the bot to reply to itself.  This is redundant
+        # with the previous check, except it won't be if someone decides
+        # to run this under their own user token, rather than a proper
+        # bot token.
         if self.user and message.author.id == self.user.id:
             return False
 
@@ -358,20 +386,26 @@ class DiscordBot(discord.Client):
         self, raw_message: discord.Message
     ) -> str | None:
         for photo_pattern in self.photo_patterns:
-            match = photo_pattern.search(raw_message.content)
+            sanitized_content = sanitize_string(raw_message.content)
+            match = photo_pattern.search(sanitized_content)
             if match:
-                return match.group(1)
+                return match.group(2)
 
-    async def generate_picture(
+    async def request_picture_generation(
         self, photo_prompt: str, raw_message: discord.Message
-    ) -> None:
+    ) -> bool:
         async def send_image(stable_diffusion_client: StableDiffusionClient) -> None:
-            image_task = stable_diffusion_client.generate_image(photo_prompt)
+            is_channel_nsfw = False
+            if isinstance(raw_message.channel, discord.TextChannel):
+                is_channel_nsfw = raw_message.channel.is_nsfw()
+            image_task = stable_diffusion_client.generate_image(
+                photo_prompt, is_channel_nsfw=is_channel_nsfw
+            )
             await image_task
             img_bytes = image_task.result()
             file_of_bytes = io.BytesIO(img_bytes)
             file = discord.File(file_of_bytes)
-            file.filename = "image.png"
+            file.filename = "photo.png"
             file.description = f"image generated from '{photo_prompt}'"
             await raw_message.channel.send(
                 reference=raw_message,
@@ -379,38 +413,45 @@ class DiscordBot(discord.Client):
             )
 
         if self.stable_diffusion_client is None:
-            return
-        get_logger().info(f"generating image from '{photo_prompt}'")
+            return False
         asyncio.create_task(send_image(self.stable_diffusion_client))
-        # await raw_message.channel.send(
-        #     f"creating an image of '{photo_prompt}' for you.  "
-        #     + "It will take several minutes, so keep your pants on.",
-        # )
+        return True
 
     async def on_message(self, raw_message: discord.Message) -> None:
-        if not self.should_reply_to_message(raw_message):
+        try:
+            if not self.should_reply_to_message(raw_message):
+                return
+        except Exception as e:
+            get_logger().error(f"Exception while checking message: {e}", exc_info=True)
             return
         try:
             async with raw_message.channel.typing():
+                photo_requested = False
                 if self.stable_diffusion_client is not None:
                     photo_prompt = self.make_photo_prompt_from_message(raw_message)
                     if photo_prompt is not None:
-                        await self.generate_picture(photo_prompt, raw_message)
+                        photo_requested = await self.request_picture_generation(
+                            photo_prompt, raw_message
+                        )
 
-                await self.send_response(raw_message)
+                await self.send_response(raw_message, photo_requested)
         except Exception as e:
             get_logger().error(f"Exception while sending response: {e}", exc_info=True)
 
-    async def send_response(self, raw_message: discord.Message) -> None:
+    async def send_response(
+        self, raw_message: discord.Message, photo_requested: bool
+    ) -> None:
         clean_message = sanitize_message(raw_message)
         author = clean_message["author"]
         server = clean_message["server"]
         get_logger().debug(f"Request from {author} in server [{server}]")
 
-        recent_messages = raw_message.channel.history(limit=PromptGenerator.HIST_SIZE)
+        recent_messages = raw_message.channel.history(
+            limit=PromptGenerator.HIST_LINES_TO_SUPPLY
+        )
 
         prompt_prefix = await self.prompt_prefix_generator.generate(
-            self.ai_user_id, recent_messages
+            self.ai_user_id, recent_messages, photo_requested
         )
 
         response_stats = self.average_stats.log_request_arrived(prompt_prefix)

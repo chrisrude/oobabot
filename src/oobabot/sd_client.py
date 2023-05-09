@@ -4,6 +4,7 @@
 
 import asyncio
 import base64
+import time
 from typing import Dict
 
 import aiohttp
@@ -15,34 +16,20 @@ class StableDiffusionClientError(Exception):
     pass
 
 
+# todo: response stats for SD client
+# todo: refactor to share code with ooba_client
+
+
 class StableDiffusionClient:
     # Purpose: Client for a Stable Diffusion API.
 
-    DEFAULT_IMG_WIDTH = 256
+    DEFAULT_IMG_WIDTH = 512
     DEFAULT_IMG_HEIGHT = DEFAULT_IMG_WIDTH
-    DEFAULT_STEPS = 10
-    # DEFAULT_SAMPLER = "DPM++ 2M Karras"
-    # CHECKPOINT = "Deliberate-2.0-15236.safetensors [9aba26abdf]"
-
-    # trying to set the checkpoint is a bit of a pain, see
-    # https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/3703#issuecomment-1368143965
-    # > "to set checkpoint, use options endpoint, pass in key='option name'
-    # >  and value='option value', both taken from options dropdown UI element."
-    #
-    # Name and value turn out to both be the same.
-    #
-    # valid values on my deployment:
-    #  - 'Anything-V3.0.ckpt [812cd9f9d9]'
-    #  - 'AOM3A1.safetensors'
-    #  - 'Deliberate-2.0-15236.safetensors [9aba26abdf]'
-    #  - 'sd-v1-5-inpainting.ckpt'
-    #  - 'v1-5-pruned-emaonly.ckpt'
-    #
-    # since these are going to vary a lot, I'll only set it as a
-    # command-line option, but otherwise just print out what it's
-    # set to and the options.
+    DEFAULT_STEPS = 30
 
     API_URI_PATH = "/sdapi/v1/"
+
+    LOG_PREFIX = "Stable Diffusion: "
 
     API_COMMAND_URLS = {
         "get_samplers": API_URI_PATH + "samplers",
@@ -65,37 +52,30 @@ class StableDiffusionClient:
     def __init__(
         self,
         base_url: str,
-        checkpoint: str | None = None,
-        sampler: str | None = None,
+        negative_prompt: str,
+        negative_prompt_nsfw: str,
+        desired_sampler: str | None = None,
         img_width: int = DEFAULT_IMG_WIDTH,
         img_height: int = DEFAULT_IMG_HEIGHT,
         steps: int = DEFAULT_STEPS,
     ):
         self._base_url = base_url
-        self._checkpoint = checkpoint
-        self._sampler = sampler
+
+        self.negative_prompt = negative_prompt
+        self.negative_prompt_nsfw = negative_prompt_nsfw
+
+        self._sampler = None
+        self.desired_sampler = desired_sampler
+
         self._img_width = img_width
         self._img_height = img_height
+
         self._steps = steps
         self._session = None
 
     # set default negative prompts to make it more difficult
     # to create content against the discord TOS
     # https://discord.com/guidelines
-
-    # use this prompt for "age_restricted" channels
-    #  i.e. channel.nsfw is true
-    DEFAULT_NEGATIVE_PROMPT_NSFW = (
-        "naked children, child sexualization, lolicon, "
-        + "suicide, self-harm, "
-        + "excessive violence, "
-        + "animal harm"
-    )
-
-    # use this prompt for non-age-restricted channels
-    DEFAULT_NEGATIVE_PROMPT = (
-        DEFAULT_NEGATIVE_PROMPT_NSFW + ", sexually explicit content"
-    )
 
     DEFAULT_REQUEST_PARAMS: Dict[str, bool | int | str] = {
         # default values are commented out
@@ -144,17 +124,48 @@ class StableDiffusionClient:
 
     async def set_options(self):
         url = self.API_COMMAND_URLS["options"]
-        options = self.DEFAULT_OPTIONS.copy()
-        if self._checkpoint is not None:
-            options["checkpoint"] = self._checkpoint
 
-        async with (await self._get_session()).post(url, json=options) as response:
+        # first, get the current options.  We do this for two
+        # reasons;
+        #  - show the user exactly what we changed, if anything
+        #  - some versions of the API don't support the
+        #    "do_not_add_watermark" option, so we need to
+        #    check if it's there before we try to set it
+        #
+        current_options = None
+        async with (await self._get_session()).get(url) as response:
             if response.status != 200:
                 raise StableDiffusionClientError(response)
-            response = await response.json()
+            current_options = await response.json()
+
+        # now, set the options
+        options_to_set = {}
+        for k, v in self.DEFAULT_OPTIONS.items():
+            if k not in current_options:
+                continue
+            if v == current_options[k]:
+                continue
+            options_to_set[k] = v
+            get_logger().info(
+                self.LOG_PREFIX
+                + f" changing option '{k}' from to "
+                + f"'{current_options[k]}' to '{v}'"
+            )
+
+        if not options_to_set:
+            get_logger().debug(
+                self.LOG_PREFIX + "Options are already set correctly, no changes made."
+            )
+            return
+
+        async with (await self._get_session()).post(
+            url, json=options_to_set
+        ) as response:
+            if response.status != 200:
+                raise StableDiffusionClientError(response)
+            await response.json()
 
     async def get_samplers(self) -> list[str]:
-        get_logger().debug("listing available samplers from Stable Diffusion")
         url = self.API_COMMAND_URLS["get_samplers"]
         async with (await self._get_session()).get(url) as response:
             if response.status != 200:
@@ -166,8 +177,7 @@ class StableDiffusionClient:
     def generate_image(
         self,
         prompt: str,
-        sampler_name: str | None = None,
-        negative_prompt: str = DEFAULT_NEGATIVE_PROMPT,
+        is_channel_nsfw: bool = False,
         steps: int = DEFAULT_STEPS,
         width: int = DEFAULT_IMG_WIDTH,
         height: int = DEFAULT_IMG_HEIGHT,
@@ -185,6 +195,9 @@ class StableDiffusionClient:
         # Raises:
         #     OobaClientError, if the request fails.
         request = self.DEFAULT_REQUEST_PARAMS.copy()
+        negative_prompt = self.negative_prompt
+        if is_channel_nsfw:
+            negative_prompt = self.negative_prompt_nsfw
         request.update(
             {
                 "prompt": prompt,
@@ -194,11 +207,15 @@ class StableDiffusionClient:
                 "height": height,
             }
         )
-        if sampler_name is not None:
-            request["sampler_name"] = sampler_name
+        if self._sampler is not None:
+            request["sampler_name"] = self._sampler
 
         async def do_post() -> bytes:
-            get_logger().debug(f"posting image request: {request}")
+            get_logger().debug(
+                self.LOG_PREFIX
+                + f"Image request (nsfw: {is_channel_nsfw}): {request['prompt']}"
+            )
+            start_time = time.time()
 
             async with (await self._get_session()).post(
                 self.API_COMMAND_URLS["txt2img"],
@@ -206,11 +223,14 @@ class StableDiffusionClient:
             ) as response:
                 if response.status != 200:
                     raise StableDiffusionClientError(response)
+                duration = time.time() - start_time
                 json_body = await response.json()
-                print("got n images: {}", len(json_body["images"]))
                 bytes = base64.b64decode(json_body["images"][0])
-                print(
-                    "image generated, {} bytes: {}....".format(len(bytes), bytes[:10])
+                get_logger().debug(
+                    self.LOG_PREFIX
+                    + "Image generated, {} bytes in {:.2f} seconds".format(
+                        len(bytes), duration
+                    )
                 )
                 return bytes
 
@@ -226,7 +246,8 @@ class StableDiffusionClient:
                     if tries > 2:
                         raise e
                     get_logger().warning(
-                        f"Connection reset error: {e}, retrying in 1 second"
+                        self.LOG_PREFIX
+                        + f"Connection reset error: {e}, retrying in 1 second"
                     )
                     await asyncio.sleep(1)
                     tries += 1
@@ -250,9 +271,34 @@ class StableDiffusionClient:
             await self._session.close()
         self._session = None
 
-    async def start(self):
-        get_logger().info(f"Connecting to stable diffusion at {self._base_url}")
+    async def set_sampler(self):
+        """Sets the sampler to use, if it is available."""
         samplers = await self.get_samplers()
-        for sampler in samplers:
-            get_logger().debug(f"Sampler available: {sampler}")
+        if self.desired_sampler is not None:
+            if self.desired_sampler in samplers:
+                get_logger().debug(
+                    self.LOG_PREFIX + "Using desired sampler '%s'", self.desired_sampler
+                )
+                self._sampler = self.desired_sampler
+            else:
+                get_logger().warn(
+                    self.LOG_PREFIX + "Desired sampler '%s' not available",
+                    self.desired_sampler,
+                )
+                self._sampler = None
+        if self._sampler is None:
+            get_logger().debug(self.LOG_PREFIX + "Using default sampler on SD server")
+            get_logger().debug(
+                self.LOG_PREFIX + "Available samplers: %s", ", ".join(samplers)
+            )
+            self._sampler = None
+
+    async def setup(self):
+        await self.set_sampler()
         await self.set_options()
+        get_logger().debug(
+            self.LOG_PREFIX
+            + "Using negative prompt: "
+            + self.negative_prompt[:20]
+            + "..."
+        )
