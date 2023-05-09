@@ -24,6 +24,84 @@ FORBIDDEN_CHARACTERS = r"[\n\r\t]"
 FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
 
 
+async def image_task_to_file(image_task: asyncio.Task[bytes], photo_prompt: str):
+    await image_task
+    img_bytes = image_task.result()
+    file_of_bytes = io.BytesIO(img_bytes)
+    file = discord.File(file_of_bytes)
+    file.filename = "photo.png"
+    file.description = f"image generated from '{photo_prompt}'"
+    return file
+
+
+class StableDiffusionImageView(discord.ui.View):
+    """
+    A View that displays buttons to regenerate an image
+    from Stable Diffusion with a new seed, or to lock
+    in the current image.
+    """
+
+    def __init__(
+        self,
+        sd_client: StableDiffusionClient,
+        is_channel_nsfw: bool,
+        photo_prompt: str,
+        image_message: discord.Message,
+        requesting_user_id: int,
+    ):
+        super().__init__()
+
+        # only the user who requested generation of the image
+        # can have it replaced
+        self.requesting_user_id = requesting_user_id
+
+        #####################################################
+        # "Try Again" button
+        #
+        btn_try_again = discord.ui.Button(
+            label="Try Again",
+            style=discord.ButtonStyle.blurple,
+            row=1,
+        )
+
+        async def on_try_again(interaction: discord.Interaction):
+            # generate a new image
+            regen_task = sd_client.generate_image(photo_prompt, is_channel_nsfw)
+
+            regen_file = await image_task_to_file(regen_task, photo_prompt)
+            await interaction.response.defer(thinking=False, ephemeral=True)
+
+            await image_message.edit(attachments=[regen_file])
+
+            interaction.response.is_done()
+
+        btn_try_again.callback = on_try_again
+
+        #####################################################
+        # "Lock In" button
+        #
+        btn_lock_in = discord.ui.Button(
+            label="Lock In",
+            style=discord.ButtonStyle.success,
+            row=1,
+        )
+
+        async def on_lock_in(interaction: discord.Interaction):
+            await interaction.response.defer()
+            await interaction.delete_original_response()
+            interaction.response.is_done()
+
+        btn_lock_in.callback = on_lock_in
+
+        super().add_item(btn_try_again).add_item(btn_lock_in)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """
+        Only allow the requesting user to interact with this view.
+        """
+        return interaction.user.id == self.requesting_user_id
+
+
 def sanitize_string(raw_string: str) -> str:
     """
     Filter out any characters that are not commonly on a
@@ -401,20 +479,38 @@ class DiscordBot(discord.Client):
             image_task = stable_diffusion_client.generate_image(
                 photo_prompt, is_channel_nsfw=is_channel_nsfw
             )
-            await image_task
-            img_bytes = image_task.result()
-            file_of_bytes = io.BytesIO(img_bytes)
-            file = discord.File(file_of_bytes)
-            file.filename = "photo.png"
-            file.description = f"image generated from '{photo_prompt}'"
-            await raw_message.channel.send(
+            file = await image_task_to_file(image_task, photo_prompt)
+            image_message = await raw_message.channel.send(
                 reference=raw_message,
                 file=file,
             )
 
+            # create another message which will have special buttons
+            # for interacting with the image.  Specifcally, the user
+            # who requested the image will be able to regenerate it
+            # with a new seed.
+            regen_view = StableDiffusionImageView(
+                stable_diffusion_client,
+                is_channel_nsfw,
+                photo_prompt=photo_prompt,
+                image_message=image_message,
+                requesting_user_id=raw_message.author.id,
+            )
+            await raw_message.channel.send(
+                view=regen_view,
+            )
+
+        async def wrapped_send_image(
+            stable_diffusion_client: StableDiffusionClient,
+        ) -> None:
+            try:
+                await send_image(stable_diffusion_client)
+            except Exception as e:
+                get_logger().error(f"Exception while sending image: {e}", exc_info=True)
+
         if self.stable_diffusion_client is None:
             return False
-        asyncio.create_task(send_image(self.stable_diffusion_client))
+        asyncio.create_task(wrapped_send_image(self.stable_diffusion_client))
         return True
 
     async def on_message(self, raw_message: discord.Message) -> None:
