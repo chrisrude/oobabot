@@ -515,9 +515,11 @@ class DiscordBot(discord.Client):
 
     def purge_outdated_response_times(self) -> None:
         oldest_time_to_keep = time.time() - self.PURGE_LAST_RESPONSE_TIME_AFTER
-        for channel_id, last_response_time in self.channel_last_direct_response.items():
-            if last_response_time < oldest_time_to_keep:
-                del self.channel_last_direct_response[channel_id]
+        self.channel_last_direct_response = {
+            channel_id: last_response_time
+            for channel_id, last_response_time in self.channel_last_direct_response.items()
+            if last_response_time >= oldest_time_to_keep
+        }
 
     def should_reply_to_message(self, message: discord.Message) -> bool:
         # ignore messages from other bots, out of fear of infinite loops,
