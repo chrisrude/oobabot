@@ -80,6 +80,7 @@ def main():
         ai_persona=settings.persona,
         wakewords=settings.wakewords,
         log_all_the_things=settings.log_all_the_things,
+        ignore_dms=settings.ignore_dms,
         stable_diffusion_client=stable_diffusion_client,
     )
     coroutine = bot.start(settings.DISCORD_TOKEN)

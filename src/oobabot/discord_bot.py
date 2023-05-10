@@ -377,6 +377,7 @@ class DiscordBot(discord.Client):
         ai_persona: str,
         wakewords: list[str],
         log_all_the_things: bool,
+        ignore_dms: bool,
         stable_diffusion_client: StableDiffusionClient | None = None,
     ):
         self.ooba_client = ooba_client
@@ -386,6 +387,7 @@ class DiscordBot(discord.Client):
         self.ai_user_id = -1
         self.wakewords = wakewords
         self.log_all_the_things = log_all_the_things
+        self.ignore_dms = ignore_dms
 
         # a list of timestamps in which we last posted to a channel
         self.channel_last_direct_response = {}
@@ -431,9 +433,13 @@ class DiscordBot(discord.Client):
 
         get_logger().info(f"Connected to discord as {self.user} (ID: {user_id_str})")
         get_logger().debug(
-            f"monitoring DMs, plus {num_channels} channels across "
+            f"monitoring {num_channels} channels across "
             + f"{num_guilds} server(s)"
         )
+        if self.ignore_dms:
+            get_logger().debug("Ignoring DMs")
+        else:
+            get_logger().debug("listening to DMs")
 
         get_logger().debug(f"AI name: {self.ai_name}")
         get_logger().debug(f"AI persona: {self.ai_persona}")
@@ -460,6 +466,8 @@ class DiscordBot(discord.Client):
 
         # reply to all private messages
         if discord.ChannelType.private == message.channel.type:
+            if self.ignore_dms:
+                return False
             return True
 
         # reply to all messages that include a wakeword

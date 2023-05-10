@@ -40,6 +40,9 @@ class Settings(argparse.ArgumentParser):
             f"\t{self.DISCORD_TOKEN_ENV_VAR} = <your bot's discord token>",
         )
 
+        ###########################################################
+        # Discord Settings
+
         discord_group = self.add_argument_group("Discord Settings")
         discord_group.add_argument(
             "--ai-name",
@@ -61,6 +64,15 @@ class Settings(argparse.ArgumentParser):
             + "The bot will always reply to @-mentions and "
             + "direct messages, even if no wakewords are supplied.",
         )
+        discord_group.add_argument(
+            "--ignore-dms",
+            default=False,
+            help="If set, the bot will ignore direct messages.",
+            action="store_true",
+        )
+
+        ###########################################################
+        # Oobabooga Settings
 
         oobabooga_group = self.add_argument_group("Oobabooga Seetings")
         oobabooga_group.add_argument(
@@ -90,6 +102,9 @@ class Settings(argparse.ArgumentParser):
             + "entirety to STDOUT",
             action="store_true",
         )
+
+        ###########################################################
+        # Stable Diffusion Settings
 
         stable_diffusion_group = self.add_argument_group("Stable Diffusion Settings")
         stable_diffusion_group.add_argument(
@@ -134,6 +149,7 @@ class Settings(argparse.ArgumentParser):
             self.stable_diffusion_sampler = self._settings.pop(
                 "stable_diffusion_sampler"
             )
+            self.ignore_dms = self._settings.pop("ignore_dms")
 
             # either we're using a local REPL, or we're connecting to Discord.
             # assume the user wants to connect to Discord
