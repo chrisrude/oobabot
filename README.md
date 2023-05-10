@@ -49,6 +49,7 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 | **low-latency** | streams the reply live, sentence by sentence.  Provides lower latency, especially on longer responses. |
 | **stats** | track token generation speed, latency, failures and usage |
 | **easy networking** | connects to discord from your machine using websockets, so no need to expose a server to the internet |
+| ✨**Stable Diffusion** | new in v0.1.4!  Optional image generation with AUTOMATIC1111 |
 
 ## Getting Started with **`oobabot`**
 
@@ -71,32 +72,54 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 You should now be able to run oobabot from wherever pip installed it.
 
 ```none
-usage: oobabot [-h] [--base-url BASE_URL] [--ai-name AI_NAME] [--wakewords [WAKEWORDS ...]]
-               [--persona PERSONA] [--local-repl] [--log-all-the-things LOG_ALL_THE_THINGS]
+usage: oobabot [-h] [--ai-name AI_NAME] [--wakewords [WAKEWORDS ...]] [--ignore-dms]
+               [--base-url BASE_URL] [--persona PERSONA] [--log-all-the-things]
+               [--stable-diffusion-url STABLE_DIFFUSION_URL]
+               [--stable-diffusion-sampler STABLE_DIFFUSION_SAMPLER]
+               [--stable-diffusion-negative-prompt STABLE_DIFFUSION_NEGATIVE_PROMPT]
+               [--stable-diffusion-negative-prompt-nsfw STABLE_DIFFUSION_NEGATIVE_PROMPT_NSFW]
 
 Discord bot for oobabooga's text-generation-webui
 
 options:
   -h, --help            show this help message and exit
-  --base-url BASE_URL   Base URL for the oobabooga instance. This should be ws://hostname[:port] for
-                        plain websocket connections, or wss://hostname[:port] for websocket
-                        connections over TLS.
-  --ai-name AI_NAME     Name of the AI to use for requests. This can be whatever you want, but might
-                        make sense to be the name of the bot in Discord.
+
+Discord Settings:
+  --ai-name AI_NAME     Name of the AI to use for requests. This can be whatever you want, but
+                        might make sense to be the name of the bot in Discord.
   --wakewords [WAKEWORDS ...]
                         One or more words that the bot will listen for. The bot will listen in all
                         discord channels can access for one of these words to be mentioned, then
-                        reply to any messages it sees with a matching word. The bot will always reply
-                        to @-mentions and direct messages, even if no wakewords are supplied.
-  --persona PERSONA     This prefix will be added in front of every user-supplied request. This is
-                        useful for setting up a 'character' for the bot to play. Alternatively, this
-                        can be set with the OOBABOT_PERSONA environment variable.
-  --local-repl          start a local REPL, instead of connecting to Discord
-  --log-all-the-things LOG_ALL_THE_THINGS
-                        prints all oobabooga requests and responses in their entirety to STDOUT
+                        reply to any messages it sees with a matching word. The bot will always
+                        reply to @-mentions and direct messages, even if no wakewords are supplied.
+  --ignore-dms          If set, the bot will ignore direct messages.
 
-Also, to authenticate to Discord, you must set the environment variable: DISCORD_TOKEN = <your bot's
-discord token>
+Oobabooga Seetings:
+  --base-url BASE_URL   Base URL for the oobabooga instance. This should be ws://hostname[:port]
+                        for plain websocket connections, or wss://hostname[:port] for websocket
+                        connections over TLS.
+  --persona PERSONA     This prefix will be added in front of every user-supplied request. This is
+                        useful for setting up a 'character' for the bot to play. Alternatively,
+                        this can be set with the OOBABOT_PERSONA environment variable.
+  --log-all-the-things  Prints all oobabooga requests and responses in their entirety to STDOUT
+
+Stable Diffusion Settings:
+  --stable-diffusion-url STABLE_DIFFUSION_URL
+                        URL for an AUTOMATIC1111 Stable Diffusion server
+  --stable-diffusion-sampler STABLE_DIFFUSION_SAMPLER
+                        Sampler to use when generating images. If not specified, the one set on the
+                        AUTOMATIC1111 server will be used.
+  --stable-diffusion-negative-prompt STABLE_DIFFUSION_NEGATIVE_PROMPT
+                        Negative prompt to use when generating images. This will discourage Stable
+                        Diffusion from generating images with the specified content. By default,
+                        this is set to follow Discord's TOS.
+  --stable-diffusion-negative-prompt-nsfw STABLE_DIFFUSION_NEGATIVE_PROMPT_NSFW
+                        Negative prompt to use when generating images in a channel marked as'Age-
+                        Restricted'. By default, this follows the Discord TOS by allowing some
+                        sexual content forbidden in non-age-restricted channels.
+
+Also, to authenticate to Discord, you must set the environment variable: DISCORD_TOKEN = <your
+bot's discord token>
 ```
 
 ## Required settings
@@ -142,10 +165,6 @@ discord token>
 
    one or more words that the bot will look for.  It will reply to any message which contains one of these words, in any channel.
 
-- **`--local-repl`**
-
-    instead of connecting to discord, just start up a local REPL and send these prompts directly to the oobabooga server.  Useful if you want to test if that part is working in isolation.  Note that in this mode you will be sending the oobabooga server raw input, and so the persona or AI name settings will be ignored.
-
 ## Persona: the fun setting
 
 - **`--persona`**
@@ -177,6 +196,44 @@ You should see something like this if everything worked:
 
 ---
 
+## Stable Diffusion via AUTOMATIC1111
+
+- **`--stable-diffusion-url`**
+
+  is the URL to a server running [AUTOMATIC1111/stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
+
+  With it, users can ask **`oobabot`** to generate images and post the
+  results to the channel.  The user who made the original request can
+  choose to regenerate the image as they like.  If they either don't
+  find one they like, or don't do anything within 3 minutes, the image
+  will be removed.
+
+  ![oobabot running!](./docs/zombietaytay.png "textually interesting image")
+
+  Currently, detection of photo requests is very crude, and is only looking
+  for messages which match this regex:
+
+  ```python
+        photowords = ["drawing", "photo", "pic", "picture", "image", "sketch"]
+        self.photo_patterns = [
+            re.compile(
+                r"^.*\b" + photoword + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$", re.IGNORECASE
+            )
+            for photoword in photowords
+        ]
+  ```
+
+  Note that depending on the checkpoint loaded in Stable Diffusion, it may not be appropriate
+  for your server's community.  I suggest reviewing [Discord's Terms of Service](https://discord.com/terms) and
+  [Community Guidelines](https://discord.com/guidelines) before deciding what checkpoint to run.
+
+  **`oobabot`** supports two different negative prompts, depending on whether the channel
+  is marked as "Age-Restricted" or not.  This is to allow for more explicit content in
+  channels which are marked as such.  While the negative prompt will discourage Stable
+  Diffusion from generating an image which matches the prompt, but is not foolproof.
+
+---
+
 ## Interacting with **`oobabot`**
 
 By default, **`oobabot`** will listen for three types of messages in the servers it's connected to:
@@ -192,6 +249,8 @@ flow, without forcing others to always post a wakeword.
 
 ## Known Issues
 
-- ooba's text generation can error with OOM when more than one request comes in at once.
+- detection of requests for photos is very crude, and will likely be improved in the future.
+- some of the default settings are very specific to my use case, and will likely be made
+  configurable in the future
 - sometimes the bot wants to continue conversations on behalf of other members of the chatroom.  I have some hacks in place to notice and truncate this behavior, but it can lead to terse responses on occasion.
-- found one not listed here?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!
+- found one not listed here?  Have an idea?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!
