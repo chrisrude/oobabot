@@ -10,6 +10,7 @@ import aiohttp
 
 from oobabot.fancy_logging import get_logger
 from oobabot.sentence_splitter import SentenceSplitter
+from oobabot.settings import Settings
 
 
 class OobaClientError(Exception):
@@ -27,30 +28,6 @@ class OobaClient:
         self.total_response_tokens = 0
         self._session = None
 
-    DEFAULT_REQUEST_PARAMS = {
-        "max_new_tokens": 250,
-        "do_sample": True,
-        "temperature": 1.3,
-        "top_p": 0.1,
-        "typical_p": 1,
-        "repetition_penalty": 1.18,
-        "top_k": 40,
-        "min_length": 0,
-        "no_repeat_ngram_size": 0,
-        "num_beams": 1,
-        "penalty_alpha": 0,
-        "length_penalty": 1,
-        "early_stopping": False,
-        "seed": -1,
-        "add_bos_token": True,
-        "truncation_length": 2048,
-        "ban_eos_token": False,
-        "skip_special_tokens": True,
-        "stopping_strings": [],
-    }
-
-    STREAMING_URI_PATH = "/api/v1/stream"
-
     async def setup(self):
         """
         Attempt to connect to the oobabooga server.
@@ -62,7 +39,9 @@ class OobaClient:
             OobaClientError, if the connection fails
         """
         try:
-            async with self.get_session().ws_connect(self.STREAMING_URI_PATH):
+            async with self.get_session().ws_connect(
+                Settings.OOBABOOGA_STREAMING_URI_PATH
+            ):
                 return
         except (
             ConnectionRefusedError,
@@ -86,12 +65,14 @@ class OobaClient:
         Yields each token of the response as it arrives.
         """
 
-        request = {
+        request: dict[str, bool | float | int | str | typing.List[typing.Any]] = {
             "prompt": prompt,
         }
-        request.update(self.DEFAULT_REQUEST_PARAMS)
+        request.update(Settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS)
 
-        async with self.get_session().ws_connect(self.STREAMING_URI_PATH) as websocket:
+        async with self.get_session().ws_connect(
+            Settings.OOBABOOGA_STREAMING_URI_PATH
+        ) as websocket:
             await websocket.send_json(request)
 
             async for msg in websocket:
@@ -139,7 +120,9 @@ class OobaClient:
     async def __aenter__(self):
         connector = aiohttp.TCPConnector(limit_per_host=1)
         self._session = aiohttp.ClientSession(
-            base_url=self.base_url, connector=connector
+            base_url=self.base_url,
+            connector=connector,
+            timeout=Settings.HTTP_CLIENT_TIMEOUT_SECONDS,
         )
         return self
 

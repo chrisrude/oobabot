@@ -5,7 +5,6 @@ import asyncio
 import io
 import random
 import re
-import textwrap
 import time
 import typing
 
@@ -15,6 +14,7 @@ from oobabot.fancy_logging import get_logger
 from oobabot.ooba_client import OobaClient
 from oobabot.response_stats import AggregateResponseStats
 from oobabot.sd_client import StableDiffusionClient
+from oobabot.settings import Settings
 
 # strip newlines and replace them with spaces, to make
 # it harder for users to trick the UI into injecting
@@ -22,6 +22,10 @@ from oobabot.sd_client import StableDiffusionClient
 # a different user
 FORBIDDEN_CHARACTERS = r"[\n\r\t]"
 FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
+
+
+class DiscordBotError(Exception):
+    pass
 
 
 async def image_task_to_file(image_task: asyncio.Task[bytes], photo_prompt: str):
@@ -48,8 +52,11 @@ class StableDiffusionImageView(discord.ui.View):
         photo_prompt: str,
         requesting_user_id: int,
         requesting_user_name: str,
+        settings: Settings,
     ):
         super().__init__(timeout=120.0)
+
+        self.settings = settings
 
         # only the user who requested generation of the image
         # can have it replaced
@@ -132,12 +139,7 @@ class StableDiffusionImageView(discord.ui.View):
         return self.image_message
 
     async def delete_image(self):
-        detach_msg = (
-            f"{self.requesting_user_name} tried to make an image "
-            + f"with the prompt:\n\t'{self.photo_prompt}'\n...but couldn't find "
-            + "a suitable one."
-        )
-        await self.detach_view_delete_img(detach_msg)
+        await self.detach_view_delete_img(self.get_detach_message())
 
     async def detach_view_delete_img(self, detach_msg: str):
         await self.get_image_message().edit(
@@ -168,6 +170,19 @@ class StableDiffusionImageView(discord.ui.View):
             ephemeral=True,
         )
         return False
+
+    def get_image_message_text(self) -> str:
+        return self._get_message(Settings.TEMPLATE_STABLE_DIFFUSION_IMAGE_MESSAGE)
+
+    def get_detach_message(self) -> str:
+        return self._get_message(Settings.TEMPLATE_STABLE_DIFFUSION_DETACH_MESSAGE)
+
+    def _get_message(self, message_type: str) -> str:
+        return self.settings.template_store.format(
+            message_type,
+            DISCORD_USER_NAME=self.requesting_user_name,
+            PHOTO_PROMPT=self.photo_prompt,
+        )
 
 
 def sanitize_string(raw_string: str) -> str:
@@ -200,89 +215,133 @@ class PromptGenerator:
     the message history and persona.
     """
 
-    # this is set by the AI, and is the maximum length
-    # it will understand before it starts to ignore
-    # the rest of the prompt_prefix
-    # note: we don't currently measure tokens, we just
-    # count characters. This is a rough estimate.
-    EST_CHARACTERS_PER_TOKEN = 4
-    MAX_AI_TOKEN_SPACE = 2048
-
-    # our structure will be:
-    # <prompt_prefix (includes persona)>
-    # <a bunch of history lines>
-    # <ai response>
-    #
-    # figure out our budget for the persona and history
-    # so that we can be sure to always have at least
-    # RESERVED_FOR_AI_RESPONSE tokens for the AI to use
-
-    HIST_LINES_TO_SUPPLY = 20
-    EST_CHARS_PER_HISTORY_LINE = 30
     REQUIRED_HISTORY_SIZE_CHARS = (
-        HIST_LINES_TO_SUPPLY * EST_CHARS_PER_HISTORY_LINE / EST_CHARACTERS_PER_TOKEN
+        Settings.DISCORD_HISTORY_LINES_TO_SUPPLY
+        * Settings.DISCORD_HISTORY_EST_CHARACTERS_PER_LINE
     )
 
-    # this is the number of tokens we reserve for the AI
-    # to respond with.
-    TOKENS_RESERVED_FOR_AI_RESPONSE = 512
-
-    def __init__(self, ai_name: str, ai_persona: str):
+    def __init__(self, ai_name: str, persona: str, settings: Settings):
         self.ai_name = ai_name
-        self.ai_persona = ai_persona
+        self.persona = persona
+        self.settings = settings
 
-        self.prompt_prefix = textwrap.dedent(
-            f"""
-        You are in a chat room with multiple participants.
-        Below is a transcript of recent messages in the conversation.
-        Write the next one to three messages that you would send in this
-        conversation, from the point of view of the participant named
-        "{self.ai_name}".
+        self.init_photo_request()
+        self.init_history_available_chars()
+
+    def init_photo_request(self) -> None:
+        self.photo_request_made = self.settings.template_store.format(
+            Settings.DISCORD_PROMPT_PHOTO_COMING_TEMPLATE,
+            AI_NAME=self.ai_name,
+        )
+
+    async def generate_history(
+        self,
+        ai_user_id: int,
+        message_history: typing.AsyncIterator[discord.Message],
+        stop_before_message_id: int | None,
+    ) -> str:
+        # add on more history, but only if we have room
+        # if we don't have room, we'll just truncate the history
+        # by discarding the oldest messages first
+        # this is s
+        # it will understand before ignore
+        #
+        prompt_len_remaining = self.max_history_chars
+
+        # history_lines is newest first, so figure out
+        # how many we can take, then append them in
+        # reverse order
+        history_lines = []
+
+        async for raw_message in message_history:
+            # if we've hit the throttle message, stop and don't add any
+            # more history
+            if stop_before_message_id and raw_message.id == stop_before_message_id:
+                break
+
+            clean_message = sanitize_message(raw_message)
+
+            author = clean_message["author"]
+            if raw_message.author.id == ai_user_id:
+                author = self.ai_name
+                # hack: if the message includes the text
+                # "tried to make an image with the prompt",
+                # ignore it
+                if (
+                    "tried to make an image with the prompt"
+                    in clean_message["message_text"]
+                ):
+                    continue
+
+            if not clean_message["message_text"]:
+                continue
+
+            line = self.settings.template_store.format(
+                Settings.DISCORD_PROMPT_HISTORY_LINE_TEMPLATE,
+                DISCORD_USER_NAME=author,
+                DISCORD_USER_MESSAGE=clean_message["message_text"],
+            )
+
+            if len(line) > prompt_len_remaining:
+                num_discarded_lines = Settings.DISCORD_HISTORY_LINES_TO_SUPPLY - len(
+                    history_lines
+                )
+                get_logger().warn(
+                    "ran out of prompt space, discarding "
+                    + f"{num_discarded_lines} lines "
+                    + "of chat history"
+                )
+                break
+
+            prompt_len_remaining -= len(line)
+            history_lines.append(line)
+
+        history_lines.reverse()
+        return "".join(history_lines)
+
+    def fill_in_prompt_template(
+        self,
+        message_history: str | None = None,
+        photo_request: str | None = None,
+    ) -> str:
         """
-        )
-
-        self.prompt_prefix += self.ai_persona + "\n"
-        self.prompt_prefix += textwrap.dedent(
-            f"""
-        All responses you write must be from the point of view of
-        {self.ai_name}.
-        ### Transcript:
+        Given a template string, fill in the kwargs
         """
+        return self.settings.template_store.format(
+            Settings.DISCORD_PROMPT_TEMPLATE,
+            AI_NAME=self.ai_name,
+            PERSONA=self.persona,
+            MESSAGE_HISTORY=message_history or "",
+            PHOTO_REQUEST=photo_request or "",
         )
 
-        chars_free_for_history = self.MAX_AI_TOKEN_SPACE * self.EST_CHARACTERS_PER_TOKEN
-        chars_free_for_history -= len(self.prompt_prefix)
-        chars_free_for_history -= (
-            self.TOKENS_RESERVED_FOR_AI_RESPONSE * self.EST_CHARACTERS_PER_TOKEN
+    def init_history_available_chars(self) -> None:
+        # the number of chars we have available for history
+        # is:
+        #   number of chars in token space (estimated)
+        #   minus the number of chars in the prompt
+        #     - without any history
+        #     - but with the photo request
+        #
+        est_chars_in_token_space = (
+            Settings.OOBABOT_MAX_AI_TOKEN_SPACE
+            * Settings.OOBABOT_EST_CHARACTERS_PER_TOKEN
         )
-        chars_free_for_history -= len(self.make_prompt_footer(True))
-
-        if chars_free_for_history < self.REQUIRED_HISTORY_SIZE_CHARS:
+        possible_prompt = self.fill_in_prompt_template(
+            message_history="",
+            photo_request=self.photo_request_made,
+        )
+        max_history_chars = est_chars_in_token_space - len(possible_prompt)
+        if max_history_chars < self.REQUIRED_HISTORY_SIZE_CHARS:
             raise ValueError(
-                "AI token space is too small for prompt_prefix and history. "
-                + "Please shorten your persona by "
-                + f"{self.REQUIRED_HISTORY_SIZE_CHARS - chars_free_for_history} "
-                + "characters."
+                "AI token space is too small for prompt_prefix and history "
+                + "by an estimated "
+                + f"{self.REQUIRED_HISTORY_SIZE_CHARS - self.max_history_chars}"
+                + " characters.  You may lose history context.  You can save space"
+                + " by shortening the persona or reducing the requested number of"
+                + " lines of history."
             )
-        self.chars_free_for_history = chars_free_for_history
-        max_persona_len = int(
-            chars_free_for_history
-            - self.REQUIRED_HISTORY_SIZE_CHARS
-            + len(self.ai_persona)
-        )
-        get_logger().debug(
-            f"Maximum persona length: {max_persona_len} characters "
-            + f"({len(self.ai_persona)} currently)"
-        )
-
-    def make_prompt_footer(self, photo_requested) -> str:
-        result = ""
-        if photo_requested:
-            result += (
-                f"\n{self.ai_name}: is currently generating a photo, as requested.\n\n"
-            )
-        result += f"{self.ai_name} says:\n"
-        return result
+        self.max_history_chars = max_history_chars
 
     async def generate(
         self,
@@ -294,115 +353,55 @@ class PromptGenerator:
         """
         Generates a prompt_prefix for the AI to use based on the message.
         """
-
-        # put this at the very end to tell the UI what it
-        # should complete.  But generate this now so we
-        # know how long it is.
-        prompt_prefix_footer = self.make_prompt_footer(photo_requested)
-
-        # add on more history, but only if we have room
-        # if we don't have room, we'll just truncate the history
-        # by discarding the oldest messages first
-        # this is s
-        # it will understand before ignore
-        #
-        prompt_len_remaining = self.chars_free_for_history
-
-        # history_lines is newest first, so figure out
-        # how many we can take, then append them in
-        # reverse order
-        history_lines = []
-
-        async for raw_message in message_history:
-
-            # if we've hit the throttle message, stop and don't add any
-            # more history
-            if throttle_message_id and raw_message.id == throttle_message_id:
-                break
-
-            clean_message = sanitize_message(raw_message)
-
-            author = clean_message["author"]
-            if raw_message.author.id == ai_user_id:
-                author = self.ai_name
-
-            if not clean_message["message_text"]:
-                continue
-
-            line = f"{author} says:\n" + f'{clean_message["message_text"]}\n\n'
-
-            if len(line) > prompt_len_remaining:
-                get_logger().warn(
-                    "ran out of prompt space, discarding "
-                    + f"{self.HIST_LINES_TO_SUPPLY - len(history_lines)} lines "
-                    + "of chat history"
-                )
-                break
-
-            prompt_len_remaining -= len(line)
-            history_lines.append(line)
-
-        history_lines.reverse()
-
-        prompt = self.prompt_prefix
-        prompt += "".join(history_lines)
-        prompt += prompt_prefix_footer
-
+        prompt = self.fill_in_prompt_template(
+            message_history=await self.generate_history(
+                ai_user_id, message_history, throttle_message_id
+            ),
+            photo_request=self.photo_request_made if photo_requested else "",
+        )
         return prompt
 
 
 class DiscordBot(discord.Client):
-    # some non-zero chance of responding to a message,  even if
-    # it wasn't addressed directly to the bot.  We'll only do this
-    # if we have posted to the same channel within the last
-    TIME_VS_RESPONSE_CHANCE = [
-        # (seconds, base % chance of an unsolicited response)
-        (10.0, 80.0),
-        (60.0, 40.0),
-        (120.0, 20.0),
-    ]
-
     # seconds after which we'll lazily purge a channel
     # from channel_last_direct_response
-    PURGE_LAST_RESPONSE_TIME_AFTER = 60.0 * 5.0
-
-    # increased chance of responding to a message if it ends with
-    # a question mark or exclamation point
-    INTERROBANG_BONUS = 0.4
 
     def __init__(
         self,
         ooba_client: OobaClient,
-        ai_name: str,
-        ai_persona: str,
-        wakewords: list[str],
-        log_all_the_things: bool,
-        ignore_dms: bool,
+        settings: Settings,
         stable_diffusion_client: StableDiffusionClient | None = None,
     ):
         self.ooba_client = ooba_client
 
-        self.ai_name = ai_name
-        self.ai_persona = ai_persona
+        self.ai_name = settings.ai_name
+        self.persona = settings.persona
         self.ai_user_id = -1
-        self.wakewords = wakewords
-        self.log_all_the_things = log_all_the_things
-        self.ignore_dms = ignore_dms
+        self.wakewords = settings.wakewords
+        self.log_all_the_things = settings.log_all_the_things
+        self.ignore_dms = settings.ignore_dms
+        self.settings = settings
 
         # a list of timestamps in which we last posted to a channel
         self.channel_last_direct_response = {}
+
+        self.discard_last_response_after_seconds = max(
+            time for time, _ in Settings.DISCORD_TIME_VS_RESPONSE_CHANCE
+        )
 
         # attempts to detect when the bot is stuck in a loop, and will try to
         # stop it by limiting the history it can see
         self.repetition_tracker = RepetitionTracker()
 
         self.average_stats = AggregateResponseStats(ooba_client)
-        self.prompt_prefix_generator = PromptGenerator(ai_name, ai_persona)
+        self.prompt_prefix_generator = PromptGenerator(
+            self.ai_name, self.persona, settings
+        )
 
         # match messages that include any `wakeword`, but not as part of
         # another word
         self.wakeword_patterns = [
-            re.compile(rf"\b{wakeword}\b", re.IGNORECASE) for wakeword in wakewords
+            re.compile(rf"\b{wakeword}\b", re.IGNORECASE) for wakeword in self.wakewords
         ]
 
         photowords = ["drawing", "photo", "pic", "picture", "image", "sketch"]
@@ -433,8 +432,7 @@ class DiscordBot(discord.Client):
 
         get_logger().info(f"Connected to discord as {self.user} (ID: {user_id_str})")
         get_logger().debug(
-            f"monitoring {num_channels} channels across "
-            + f"{num_guilds} server(s)"
+            f"monitoring {num_channels} channels across " + f"{num_guilds} server(s)"
         )
         if self.ignore_dms:
             get_logger().debug("Ignoring DMs")
@@ -442,27 +440,32 @@ class DiscordBot(discord.Client):
             get_logger().debug("listening to DMs")
 
         get_logger().debug(f"AI name: {self.ai_name}")
-        get_logger().debug(f"AI persona: {self.ai_persona}")
+        get_logger().debug(f"AI persona: {self.persona}")
 
         str_wakewords = ", ".join(self.wakewords) if self.wakewords else "<none>"
         get_logger().debug(f"wakewords: {str_wakewords}")
 
-    async def start(self, token: str) -> None:
+    async def start(self) -> None:
         # todo: join these at a higher level?
         if self.stable_diffusion_client is not None:
             async with self.stable_diffusion_client:
-                async with self.ooba_client:
-                    await super().start(token)
-                    return
+                await self._inner_start()
+        else:
+            await self._inner_start()
 
+    async def _inner_start(self):
         async with self.ooba_client:
-            await super().start(token)
+            try:
+                await super().start(self.settings.DISCORD_TOKEN)
+            except discord.LoginFailure:
+                get_logger().error("Failed to log in to discord.  Check your token?")
+            return
 
     def should_send_direct_response(self, message: discord.Message) -> bool:
-        '''
+        """
         Returns true if the bot was directly addressed in the message,
         and will respond.
-        '''
+        """
 
         # reply to all private messages
         if discord.ChannelType.private == message.channel.type:
@@ -495,18 +498,18 @@ class DiscordBot(discord.Client):
         # addressed to us, based on the table in TIME_VS_RESPONSE_CHANCE.
         # other factors might increase this chance.
         response_chance = 0.0
-        for duration, chance in self.TIME_VS_RESPONSE_CHANCE:
+        for duration, chance in Settings.DISCORD_TIME_VS_RESPONSE_CHANCE:
             if time_since_last_send < duration:
                 response_chance = chance
                 break
 
         # if the new message ends with a question mark, we'll respond
         if message.content.endswith("?"):
-            response_chance += self.INTERROBANG_BONUS
+            response_chance += Settings.DISCORD_INTERROBANG_BONUS
 
         # if the new message ends with an exclamation point, we'll respond
         if message.content.endswith("!"):
-            response_chance += self.INTERROBANG_BONUS
+            response_chance += Settings.DISCORD_INTERROBANG_BONUS
 
         if random.random() < response_chance:
             return True
@@ -514,11 +517,11 @@ class DiscordBot(discord.Client):
         return False
 
     def purge_outdated_response_times(self) -> None:
-        oldest_time_to_keep = time.time() - self.PURGE_LAST_RESPONSE_TIME_AFTER
+        oldest_time_to_keep = time.time() - self.discard_last_response_after_seconds
         self.channel_last_direct_response = {
-            channel_id: last_response_time
-            for channel_id, last_response_time in self.channel_last_direct_response.items()
-            if last_response_time >= oldest_time_to_keep
+            channel_id: response_time
+            for channel_id, response_time in self.channel_last_direct_response.items()
+            if response_time >= oldest_time_to_keep
         }
 
     def should_reply_to_message(self, message: discord.Message) -> bool:
@@ -540,9 +543,10 @@ class DiscordBot(discord.Client):
                 self.channel_last_direct_response[message.channel.id] = time.time()
             return True
 
-        ### end of "solicited" response checks.  From here on out, we're
-        ### only responding to messages that weren't directly addressed
-        ### to us.
+        ################################################################
+        # end of "solicited" response checks.  From here on out, we're
+        # only responding to messages that weren't directly addressed
+        # to us.
 
         # if we're not at-mentioned but others are, don't reply
         if message.mentions:
@@ -599,12 +603,11 @@ class DiscordBot(discord.Client):
                 photo_prompt=photo_prompt,
                 requesting_user_id=raw_message.author.id,
                 requesting_user_name=raw_message.author.name,
+                settings=self.settings,
             )
 
             image_message = await raw_message.channel.send(
-                content=f"{raw_message.author}, is this what you wanted?\n\n"
-                + "If no choice is made, this message will 💣 self-destuct "
-                + " 💣 in 3 minutes.",
+                content=regen_view.get_image_message_text(),
                 reference=raw_message,
                 file=file,
                 view=regen_view,
@@ -654,10 +657,12 @@ class DiscordBot(discord.Client):
         get_logger().debug(f"Request from {author} in server [{server}]")
 
         recent_messages = raw_message.channel.history(
-            limit=PromptGenerator.HIST_LINES_TO_SUPPLY
+            limit=Settings.DISCORD_HISTORY_LINES_TO_SUPPLY
         )
 
-        repeated_id = self.repetition_tracker.get_throttle_message_id(raw_message.channel.id)
+        repeated_id = self.repetition_tracker.get_throttle_message_id(
+            raw_message.channel.id
+        )
 
         prompt_prefix = await self.prompt_prefix_generator.generate(
             self.ai_user_id, recent_messages, photo_requested, repeated_id
@@ -691,7 +696,9 @@ class DiscordBot(discord.Client):
                     break
 
                 response_message = await raw_message.channel.send(sentence)
-                self.repetition_tracker.log_message(raw_message.channel.id, response_message)
+                self.repetition_tracker.log_message(
+                    raw_message.channel.id, response_message
+                )
 
                 response_stats.log_response_part()
 
@@ -703,56 +710,67 @@ class DiscordBot(discord.Client):
         response_stats.write_to_log(f"Response to {author} done!  ")
         self.average_stats.log_response_success(response_stats)
 
-    def track_repetition(self, response_message: discord.Message, sentence: str) -> None:
-        if self.repetition_tracker.is_repetition(sentence):
-            self.repetition_tracker.track_repetition(response_message)
-        else:
-            self.repetition_tracker.track_non_repetition(response_message)
 
 class RepetitionTracker:
     # how many times the bot can repeat the same thing before we
     # throttle history
-    REPETITION_THRESHOLD = 1
 
-    def __init__(self, repetition_threshold: int = REPETITION_THRESHOLD) -> None:
+    def __init__(
+        self, repetition_threshold: int = Settings.DISCORD_REPETITION_THRESHOLD
+    ) -> None:
         self.repetition_threshold = repetition_threshold
 
-        # stores a map of channel_id -> (last_message, throttle_message_id, repetion_count)
-        self.repetition_count: typing.Dict[int, (str, int, int)] = {}
+        # stores a map of channel_id ->
+        #   (last_message, throttle_message_id, repetion_count)
+
+        self.repetition_count: typing.Dict[int, typing.Tuple[str, int, int]] = {}
 
     def get_throttle_message_id(self, channel_id: int) -> int | None:
-        '''
+        """
         Returns the message ID of the last message that should be throttled, or None
         if no throttling is needed
-        '''
-        _, throttle_message_id, _ = self.repetition_count.get(channel_id, (None, None, None))
+        """
+        _, throttle_message_id, _ = self.repetition_count.get(
+            channel_id, (None, None, None)
+        )
         return throttle_message_id
 
     def log_message(self, channel_id: int, response_message: discord.Message) -> None:
-        '''
+        """
         Logs a message sent by the bot, to be used for repetition tracking
-        '''
+        """
         # make string into canonical form
         sentence = self.make_canonical(response_message.content)
 
-        last_message, throttle_message_id, repetition_count = self.repetition_count.get(channel_id, ("", 0, 0))
+        last_message, throttle_message_id, repetition_count = self.repetition_count.get(
+            channel_id, ("", 0, 0)
+        )
         if last_message == sentence:
             repetition_count += 1
         else:
             repetition_count = 0
 
-        get_logger().debug(f"Repetition count for channel {channel_id} is {repetition_count}")
+        get_logger().debug(
+            f"Repetition count for channel {channel_id} is {repetition_count}"
+        )
 
         if self.should_throttle(repetition_count):
-            get_logger().warning(f"Repetition found, will throttle history for channel {channel_id} in next request")
+            get_logger().warning(
+                "Repetition found, will throttle history for channel "
+                + f"{channel_id} in next request"
+            )
             throttle_message_id = response_message.id
 
-        self.repetition_count[channel_id] = (sentence, throttle_message_id, repetition_count)
+        self.repetition_count[channel_id] = (
+            sentence,
+            throttle_message_id,
+            repetition_count,
+        )
 
     def should_throttle(self, repetition_count: int) -> bool:
-        '''
+        """
         Returns whether the bot should throttle history for a given repetition count
-        '''
+        """
         return repetition_count >= self.repetition_threshold
 
     def make_canonical(self, content: str) -> str:

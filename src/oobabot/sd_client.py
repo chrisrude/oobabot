@@ -10,6 +10,7 @@ from typing import Dict
 import aiohttp
 
 from oobabot.fancy_logging import get_logger
+from oobabot.settings import Settings
 
 
 class StableDiffusionClientError(Exception):
@@ -23,28 +24,22 @@ class StableDiffusionClientError(Exception):
 class StableDiffusionClient:
     # Purpose: Client for a Stable Diffusion API.
 
-    DEFAULT_IMG_WIDTH = 512
-    DEFAULT_IMG_HEIGHT = DEFAULT_IMG_WIDTH
-    DEFAULT_STEPS = 30
-
-    API_URI_PATH = "/sdapi/v1/"
-
     LOG_PREFIX = "Stable Diffusion: "
 
     API_COMMAND_URLS = {
-        "get_samplers": API_URI_PATH + "samplers",
+        "get_samplers": Settings.STABLE_DIFFUSION_API_URI_PATH + "samplers",
         # get_samplers: GET only
         #   returns a list of samplers which we can use
         #   in text2img
-        "options": API_URI_PATH + "options",
+        "options": Settings.STABLE_DIFFUSION_API_URI_PATH + "options",
         # options: GET and POST
         #   retrieves (GET) and sets (POST) global options
         #   for the server.  This is how we set the checkpoint
         #   and also a few privacy-related fields.
-        "progress": API_URI_PATH + "progress",
+        "progress": Settings.STABLE_DIFFUSION_API_URI_PATH + "progress",
         # progress: GET only
         #   returns the progress of the current image generation
-        "txt2img": API_URI_PATH + "txt2img",
+        "txt2img": Settings.STABLE_DIFFUSION_API_URI_PATH + "txt2img",
         # txt2img: POST only
         #   takes a prompt, generates an image and returns it
     }
@@ -55,9 +50,9 @@ class StableDiffusionClient:
         negative_prompt: str,
         negative_prompt_nsfw: str,
         desired_sampler: str | None = None,
-        img_width: int = DEFAULT_IMG_WIDTH,
-        img_height: int = DEFAULT_IMG_HEIGHT,
-        steps: int = DEFAULT_STEPS,
+        img_width: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_WIDTH,
+        img_height: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_HEIGHT,
+        steps: int = Settings.STABLE_DIFFUSION_DEFAULT_STEPS,
     ):
         self._base_url = base_url
 
@@ -178,9 +173,9 @@ class StableDiffusionClient:
         self,
         prompt: str,
         is_channel_nsfw: bool = False,
-        steps: int = DEFAULT_STEPS,
-        width: int = DEFAULT_IMG_WIDTH,
-        height: int = DEFAULT_IMG_HEIGHT,
+        steps: int = Settings.STABLE_DIFFUSION_DEFAULT_STEPS,
+        width: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_WIDTH,
+        height: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_HEIGHT,
     ) -> asyncio.Task[bytes]:
         # Purpose: Generate an image from a prompt.
         # Args:
@@ -262,7 +257,9 @@ class StableDiffusionClient:
     async def __aenter__(self):
         connector = aiohttp.TCPConnector(limit_per_host=1)
         self._session = aiohttp.ClientSession(
-            base_url=self._base_url, connector=connector
+            base_url=self._base_url,
+            connector=connector,
+            timeout=Settings.HTTP_CLIENT_TIMEOUT_SECONDS,
         )
         return self
 

@@ -6,6 +6,8 @@ import asyncio
 import signal
 import sys
 
+import aiohttp
+
 from oobabot.discord_bot import DiscordBot
 from oobabot.fancy_logging import get_logger
 from oobabot.fancy_logging import init_logging
@@ -25,7 +27,7 @@ def verify_client(client, service_name, url):
     logger.info(f"{service_name} is at {url}")
     try:
         asyncio.run(try_setup(client))
-    except OobaClientError as e:
+    except (OobaClientError, aiohttp.ClientConnectionError) as e:
         logger.error(f"Could not connect to {service_name} server: [{url}]")
         logger.error("Please check the URL and try again.")
         logger.error(f"Reason: {e}")
@@ -76,13 +78,9 @@ def main():
     logger.info("Connecting to Discord... ")
     bot = DiscordBot(
         ooba_client,
-        ai_name=settings.ai_name,
-        ai_persona=settings.persona,
-        wakewords=settings.wakewords,
-        log_all_the_things=settings.log_all_the_things,
-        ignore_dms=settings.ignore_dms,
+        settings=settings,
         stable_diffusion_client=stable_diffusion_client,
     )
-    coroutine = bot.start(settings.DISCORD_TOKEN)
+    coroutine = bot.start()
 
     asyncio.run(coroutine)
