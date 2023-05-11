@@ -15,8 +15,8 @@ from oobabot.ooba_client import OobaClient
 from oobabot.prompt_generation import PromptGenerator
 from oobabot.response_stats import AggregateResponseStats
 from oobabot.sd_client import StableDiffusionClient
-from oobabot.settings import GenericMessage
 from oobabot.settings import Settings
+from oobabot.types import GenericMessage
 
 FORBIDDEN_CHARACTERS = r"[\n\r\t]"
 FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)

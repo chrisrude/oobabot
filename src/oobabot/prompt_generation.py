@@ -5,10 +5,10 @@
 import typing
 
 from oobabot.fancy_logging import get_logger
-from oobabot.settings import GenericMessage
-from oobabot.settings import MessageTemplate
 from oobabot.settings import Settings
-from oobabot.settings import TemplateToken
+from oobabot.types import GenericMessage
+from oobabot.types import MessageTemplate
+from oobabot.types import TemplateToken
 
 
 class PromptGenerator:

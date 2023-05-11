@@ -1,118 +1,12 @@
 import argparse
-from enum import Enum
 import os
 import textwrap
 import typing
 
 import aiohttp
 
-from oobabot.fancy_logging import get_logger
-
-
-class GenericMessage:
-    def __init__(self, author_id, author_name, message_id, body_text):
-        self.author_id = author_id
-        self.author_name = author_name
-        self.message_id = message_id
-        self.body_text = body_text
-
-
-class MessageTemplate(Enum):
-    IMAGE_DETACH = "image_detach"
-    IMAGE_CONFIRMATION = "image_confirmation"
-
-    PROMPT = "prompt"
-    PROMPT_HISTORY_LINE = "prompt_history_line"
-    PROMPT_IMAGE_COMING = "prompt_image_coming"
-
-
-class TemplateToken(str, Enum):
-    AI_NAME = "AI_NAME"
-    PERSONA = "PERSONA"
-    IMAGE_COMING = "IMAGE_COMING"
-    IMAGE_REQUEST = "IMAGE_REQUEST"
-    MESSAGE_HISTORY = "MESSAGE_HISTORY"
-    USER_MESSAGE = "USER_MESSAGE"
-    USER_NAME = "USER_NAME"
-
-
-class TemplateMessageFormatter:
-    # Purpose: format messages using a template string
-
-    def __init__(
-        self,
-        template_name: MessageTemplate,
-        template: str,
-        allowed_tokens: typing.List[TemplateToken],
-    ):
-        self._validate_format_string(template_name, template, allowed_tokens)
-        self.template_name = template_name
-        self.template = template
-        self.allowed_tokens = allowed_tokens
-
-    def format(self, format_args: dict[TemplateToken, str]) -> str:
-        return self.template.format(**format_args)
-
-    @staticmethod
-    def _validate_format_string(
-        template_name: MessageTemplate,
-        format_str: str,
-        allowed_args: typing.List[TemplateToken],
-    ):
-        def find_all_ch(s: str, ch: str) -> typing.Generator[int, None, None]:
-            # find all indices of ch in s
-            for i, ltr in enumerate(s):
-                if ltr == ch:
-                    yield i
-
-        get_logger().debug(
-            f"validating template {template_name} with allowed args {allowed_args}"
-        )
-        get_logger().debug(f"template: {format_str}")
-
-        # raises if fmt_string contains any args not in allowed_args
-        allowed_close_brace_indices: typing.Set[int] = set()
-
-        for open_brace_idx in find_all_ch(format_str, "{"):
-            for allowed_arg in allowed_args:
-                idx_end = open_brace_idx + len(allowed_arg) + 1
-                next_substr = format_str[open_brace_idx : idx_end + 1]
-                if next_substr == "{" + allowed_arg + "}":
-                    allowed_close_brace_indices.add(idx_end)
-                    break
-            else:
-                raise ValueError(
-                    f"invalid template: {template_name} contains "
-                    + f"an argument not in {allowed_args}"
-                )
-        for close_brace_idx in find_all_ch(format_str, "}"):
-            if close_brace_idx not in allowed_close_brace_indices:
-                raise ValueError(
-                    f"invalid template: {template_name} contains "
-                    + f"an argument not in {allowed_args}"
-                )
-
-
-class TemplateStore:
-    # Purpose: store templates and format messages using them
-
-    def __init__(self):
-        self.templates: typing.Dict[MessageTemplate, TemplateMessageFormatter] = {}
-
-    def add_template(
-        self,
-        template_name: MessageTemplate,
-        format_str: str,
-        allowed_tokens: typing.List[TemplateToken],
-    ):
-        self.templates[template_name] = TemplateMessageFormatter(
-            template_name, format_str, allowed_tokens
-        )
-
-    def format(
-        self, template_name: MessageTemplate, format_args: dict[TemplateToken, str]
-    ) -> str:
-        return self.templates[template_name].format(format_args)
+from oobabot.templates import TemplateStore
+from oobabot.types import MessageTemplate
 
 
 class Settings(argparse.ArgumentParser):
@@ -278,50 +172,37 @@ class Settings(argparse.ArgumentParser):
         DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", sexually explicit content"
     )
 
+    def get_template(self, template_type: MessageTemplate) -> str:
+        if MessageTemplate.IMAGE_DETACH == template_type:
+            return self.IMAGE_DETACH_TEMPLATE_DEFAULT
+
+        if MessageTemplate.IMAGE_CONFIRMATION == template_type:
+            return self.IMAGE_CONFIRMATION_TEMPLATE_DEFAULT
+
+        if MessageTemplate.PROMPT == template_type:
+            return self.PROMPT_TEMPLATE_DEFAULT
+
+        if MessageTemplate.PROMPT_HISTORY_LINE == template_type:
+            return self.PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT
+
+        if MessageTemplate.PROMPT_IMAGE_COMING == template_type:
+            return self.PROMPT_IMAGE_COMING_TEMPLATE_DEFAULT
+
+        raise ValueError(f"unknown template type: {template_type}")
+
     def __init__(self):
         self._settings = None
         self.wakewords = []
-
-        self.template_store = TemplateStore()
-
-        self.template_store.add_template(
-            MessageTemplate.PROMPT,
-            self.PROMPT_TEMPLATE_DEFAULT,
-            [
-                TemplateToken.AI_NAME,
-                TemplateToken.IMAGE_COMING,
-                TemplateToken.MESSAGE_HISTORY,
-                TemplateToken.PERSONA,
-            ],
-        )
-        self.template_store.add_template(
-            MessageTemplate.PROMPT_HISTORY_LINE,
-            self.PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT,
-            [TemplateToken.USER_MESSAGE, TemplateToken.USER_NAME],
-        )
-        self.template_store.add_template(
-            MessageTemplate.PROMPT_IMAGE_COMING,
-            self.PROMPT_IMAGE_COMING_TEMPLATE_DEFAULT,
-            [TemplateToken.AI_NAME],
-        )
-        self.template_store.add_template(
-            MessageTemplate.IMAGE_DETACH,
-            self.IMAGE_DETACH_TEMPLATE_DEFAULT,
-            [TemplateToken.IMAGE_REQUEST, TemplateToken.USER_NAME],
-        )
-
-        self.template_store.add_template(
-            MessageTemplate.IMAGE_CONFIRMATION,
-            self.IMAGE_CONFIRMATION_TEMPLATE_DEFAULT,
-            [TemplateToken.IMAGE_REQUEST, TemplateToken.USER_NAME],
-        )
-
         super().__init__(
             description="Discord bot for oobabooga's text-generation-webui",
             epilog="Also, to authenticate to Discord, you must set the "
             + "environment variable:\n"
             f"\t{self.DISCORD_TOKEN_ENV_VAR} = <your bot's discord token>",
         )
+        self.template_store = TemplateStore()
+        for template, tokens in TemplateStore.TEMPLATES.items():
+            template_fmt = self.get_template(template)
+            self.template_store.add_template(template, template_fmt, tokens)
 
         ###########################################################
         # Discord Settings

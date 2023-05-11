@@ -4,9 +4,9 @@ import io
 import discord
 
 from oobabot.sd_client import StableDiffusionClient
-from oobabot.settings import MessageTemplate
 from oobabot.settings import Settings
-from oobabot.settings import TemplateToken
+from oobabot.types import MessageTemplate
+from oobabot.types import TemplateToken
 
 
 async def image_task_to_file(image_task: asyncio.Task[bytes], image_request: str):
