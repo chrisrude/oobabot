@@ -12,14 +12,12 @@ import discord
 from oobabot.fancy_logging import get_logger
 from oobabot.image_view import send_image
 from oobabot.ooba_client import OobaClient
+from oobabot.prompt_generation import PromptGenerator
 from oobabot.response_stats import AggregateResponseStats
 from oobabot.sd_client import StableDiffusionClient
+from oobabot.settings import GenericMessage
 from oobabot.settings import Settings
 
-# strip newlines and replace them with spaces, to make
-# it harder for users to trick the UI into injecting
-# other instructions, or data that appears to be from
-# a different user
 FORBIDDEN_CHARACTERS = r"[\n\r\t]"
 FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
 
@@ -32,173 +30,24 @@ def sanitize_string(raw_string: str) -> str:
     return FORBIDDEN_CHARACTERS_PATTERN.sub(" ", raw_string)
 
 
-def sanitize_message(raw_message: discord.Message) -> dict[str, str]:
-    author = sanitize_string(raw_message.author.name)
-
-    raw_guild = raw_message.guild
-    if raw_guild:
-        raw_guild_name = raw_guild.name
-    else:
-        raw_guild_name = "DM"
-
-    return {
-        "author": author,
-        "message_text": sanitize_string(raw_message.content).strip(),
-        "server": sanitize_string(raw_guild_name),
-    }
-
-
-class PromptGenerator:
+def discord_message_to_generic_message(raw_message: discord.Message) -> GenericMessage:
     """
-    Purpose: generate a prompt_prefix for the AI to use, given
-    the message history and persona.
+    Convert a discord message to a GenericMessage
     """
-
-    REQUIRED_HISTORY_SIZE_CHARS = (
-        Settings.DISCORD_HISTORY_LINES_TO_SUPPLY
-        * Settings.DISCORD_HISTORY_EST_CHARACTERS_PER_LINE
+    return GenericMessage(
+        raw_message.author.id,
+        sanitize_string(raw_message.author.name),
+        raw_message.id,
+        sanitize_string(raw_message.content),
     )
 
-    def __init__(self, ai_name: str, persona: str, settings: Settings):
-        self.ai_name = ai_name
-        self.persona = persona
-        self.settings = settings
 
-        self.init_photo_request()
-        self.init_history_available_chars()
-
-    def init_photo_request(self) -> None:
-        self.photo_request_made = self.settings.template_store.format(
-            Settings.DISCORD_PROMPT_PHOTO_COMING_TEMPLATE,
-            AI_NAME=self.ai_name,
-        )
-
-    async def generate_history(
-        self,
-        ai_user_id: int,
-        message_history: typing.AsyncIterator[discord.Message],
-        stop_before_message_id: int | None,
-    ) -> str:
-        # add on more history, but only if we have room
-        # if we don't have room, we'll just truncate the history
-        # by discarding the oldest messages first
-        # this is s
-        # it will understand before ignore
-        #
-        prompt_len_remaining = self.max_history_chars
-
-        # history_lines is newest first, so figure out
-        # how many we can take, then append them in
-        # reverse order
-        history_lines = []
-
-        async for raw_message in message_history:
-            # if we've hit the throttle message, stop and don't add any
-            # more history
-            if stop_before_message_id and raw_message.id == stop_before_message_id:
-                break
-
-            clean_message = sanitize_message(raw_message)
-
-            author = clean_message["author"]
-            if raw_message.author.id == ai_user_id:
-                author = self.ai_name
-                # hack: if the message includes the text
-                # "tried to make an image with the prompt",
-                # ignore it
-                if (
-                    "tried to make an image with the prompt"
-                    in clean_message["message_text"]
-                ):
-                    continue
-
-            if not clean_message["message_text"]:
-                continue
-
-            line = self.settings.template_store.format(
-                Settings.DISCORD_PROMPT_HISTORY_LINE_TEMPLATE,
-                DISCORD_USER_NAME=author,
-                DISCORD_USER_MESSAGE=clean_message["message_text"],
-            )
-
-            if len(line) > prompt_len_remaining:
-                num_discarded_lines = Settings.DISCORD_HISTORY_LINES_TO_SUPPLY - len(
-                    history_lines
-                )
-                get_logger().warn(
-                    "ran out of prompt space, discarding "
-                    + f"{num_discarded_lines} lines "
-                    + "of chat history"
-                )
-                break
-
-            prompt_len_remaining -= len(line)
-            history_lines.append(line)
-
-        history_lines.reverse()
-        return "".join(history_lines)
-
-    def fill_in_prompt_template(
-        self,
-        message_history: str | None = None,
-        photo_request: str | None = None,
-    ) -> str:
-        """
-        Given a template string, fill in the kwargs
-        """
-        return self.settings.template_store.format(
-            Settings.DISCORD_PROMPT_TEMPLATE,
-            AI_NAME=self.ai_name,
-            PERSONA=self.persona,
-            MESSAGE_HISTORY=message_history or "",
-            PHOTO_REQUEST=photo_request or "",
-        )
-
-    def init_history_available_chars(self) -> None:
-        # the number of chars we have available for history
-        # is:
-        #   number of chars in token space (estimated)
-        #   minus the number of chars in the prompt
-        #     - without any history
-        #     - but with the photo request
-        #
-        est_chars_in_token_space = (
-            Settings.OOBABOT_MAX_AI_TOKEN_SPACE
-            * Settings.OOBABOT_EST_CHARACTERS_PER_TOKEN
-        )
-        possible_prompt = self.fill_in_prompt_template(
-            message_history="",
-            photo_request=self.photo_request_made,
-        )
-        max_history_chars = est_chars_in_token_space - len(possible_prompt)
-        if max_history_chars < self.REQUIRED_HISTORY_SIZE_CHARS:
-            raise ValueError(
-                "AI token space is too small for prompt_prefix and history "
-                + "by an estimated "
-                + f"{self.REQUIRED_HISTORY_SIZE_CHARS - self.max_history_chars}"
-                + " characters.  You may lose history context.  You can save space"
-                + " by shortening the persona or reducing the requested number of"
-                + " lines of history."
-            )
-        self.max_history_chars = max_history_chars
-
-    async def generate(
-        self,
-        ai_user_id: int,
-        message_history: typing.AsyncIterator[discord.Message],
-        photo_requested: bool,
-        throttle_message_id: int | None,
-    ) -> str:
-        """
-        Generates a prompt_prefix for the AI to use based on the message.
-        """
-        prompt = self.fill_in_prompt_template(
-            message_history=await self.generate_history(
-                ai_user_id, message_history, throttle_message_id
-            ),
-            photo_request=self.photo_request_made if photo_requested else "",
-        )
-        return prompt
+async def discord_to_generic_async(
+    raw_messages: typing.AsyncIterator[discord.Message],
+) -> typing.AsyncIterator[GenericMessage]:
+    async for raw_message in raw_messages:
+        message = discord_message_to_generic_message(raw_message)
+        yield message
 
 
 class DiscordBot(discord.Client):
@@ -467,13 +316,11 @@ class DiscordBot(discord.Client):
     async def send_response(
         self, raw_message: discord.Message, photo_requested: bool
     ) -> None:
-        clean_message = sanitize_message(raw_message)
-        author = clean_message["author"]
-        server = clean_message["server"]
-        get_logger().debug(f"Request from {author} in server [{server}]")
+        message = discord_message_to_generic_message(raw_message)
+        get_logger().debug(f"Request from {message.author_name}")
 
         recent_messages = raw_message.channel.history(
-            limit=Settings.DISCORD_HISTORY_LINES_TO_SUPPLY
+            limit=Settings.HISTORY_LINES_TO_SUPPLY
         )
 
         repeated_id = self.repetition_tracker.get_throttle_message_id(
@@ -481,7 +328,10 @@ class DiscordBot(discord.Client):
         )
 
         prompt_prefix = await self.prompt_prefix_generator.generate(
-            self.ai_user_id, recent_messages, photo_requested, repeated_id
+            self.ai_user_id,
+            discord_to_generic_async(recent_messages),
+            photo_requested,
+            repeated_id,
         )
 
         response_stats = self.average_stats.log_request_arrived(prompt_prefix)
@@ -523,7 +373,7 @@ class DiscordBot(discord.Client):
             self.average_stats.log_response_failure()
             return
 
-        response_stats.write_to_log(f"Response to {author} done!  ")
+        response_stats.write_to_log(f"Response to {message.author_name} done!  ")
         self.average_stats.log_response_success(response_stats)
 
 

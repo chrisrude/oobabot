@@ -4,16 +4,18 @@ import io
 import discord
 
 from oobabot.sd_client import StableDiffusionClient
+from oobabot.settings import MessageTemplate
 from oobabot.settings import Settings
+from oobabot.settings import TemplateToken
 
 
-async def image_task_to_file(image_task: asyncio.Task[bytes], photo_prompt: str):
+async def image_task_to_file(image_task: asyncio.Task[bytes], image_request: str):
     await image_task
     img_bytes = image_task.result()
     file_of_bytes = io.BytesIO(img_bytes)
     file = discord.File(file_of_bytes)
     file.filename = "photo.png"
-    file.description = f"image generated from '{photo_prompt}'"
+    file.description = f"image generated from '{image_request}'"
     return file
 
 
@@ -28,7 +30,7 @@ class StableDiffusionImageView(discord.ui.View):
         self,
         sd_client: StableDiffusionClient,
         is_channel_nsfw: bool,
-        photo_prompt: str,
+        image_request: str,
         requesting_user_id: int,
         requesting_user_name: str,
         settings: Settings,
@@ -41,7 +43,7 @@ class StableDiffusionImageView(discord.ui.View):
         # can have it replaced
         self.requesting_user_id = requesting_user_id
         self.requesting_user_name = requesting_user_name
-        self.photo_prompt = photo_prompt
+        self.image_request = image_request
         self.photo_accepted = False
 
         #####################################################
@@ -61,8 +63,8 @@ class StableDiffusionImageView(discord.ui.View):
                 return
 
             # generate a new image
-            regen_task = sd_client.generate_image(photo_prompt, is_channel_nsfw)
-            regen_file = await image_task_to_file(regen_task, photo_prompt)
+            regen_task = sd_client.generate_image(image_request, is_channel_nsfw)
+            regen_file = await image_task_to_file(regen_task, image_request)
             await interaction.response.defer()
 
             await self.get_image_message().edit(attachments=[regen_file])
@@ -151,37 +153,39 @@ class StableDiffusionImageView(discord.ui.View):
         return False
 
     def get_image_message_text(self) -> str:
-        return self._get_message(self.settings.TEMPLATE_STABLE_DIFFUSION_IMAGE_MESSAGE)
+        return self._get_message(MessageTemplate.IMAGE_CONFIRMATION)
 
     def get_detach_message(self) -> str:
-        return self._get_message(self.settings.TEMPLATE_STABLE_DIFFUSION_DETACH_MESSAGE)
+        return self._get_message(MessageTemplate.IMAGE_DETACH)
 
-    def _get_message(self, message_type: str) -> str:
+    def _get_message(self, message_type: MessageTemplate) -> str:
         return self.settings.template_store.format(
             message_type,
-            DISCORD_USER_NAME=self.requesting_user_name,
-            PHOTO_PROMPT=self.photo_prompt,
+            {
+                TemplateToken.USER_NAME: self.requesting_user_name,
+                TemplateToken.IMAGE_REQUEST: self.image_request,
+            },
         )
 
 
 async def send_image(
     stable_diffusion_client: StableDiffusionClient,
     raw_message: discord.Message,
-    photo_prompt: str,
+    image_request: str,
     settings: Settings,
 ) -> None:
     is_channel_nsfw = False
     if isinstance(raw_message.channel, discord.TextChannel):
         is_channel_nsfw = raw_message.channel.is_nsfw()
     image_task = stable_diffusion_client.generate_image(
-        photo_prompt, is_channel_nsfw=is_channel_nsfw
+        image_request, is_channel_nsfw=is_channel_nsfw
     )
-    file = await image_task_to_file(image_task, photo_prompt)
+    file = await image_task_to_file(image_task, image_request)
 
     regen_view = StableDiffusionImageView(
         stable_diffusion_client,
         is_channel_nsfw,
-        photo_prompt=photo_prompt,
+        image_request=image_request,
         requesting_user_id=raw_message.author.id,
         requesting_user_name=raw_message.author.name,
         settings=settings,

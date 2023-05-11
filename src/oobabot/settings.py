@@ -1,4 +1,5 @@
 import argparse
+from enum import Enum
 import os
 import textwrap
 import typing
@@ -8,29 +9,55 @@ import aiohttp
 from oobabot.fancy_logging import get_logger
 
 
+class GenericMessage:
+    def __init__(self, author_id, author_name, message_id, body_text):
+        self.author_id = author_id
+        self.author_name = author_name
+        self.message_id = message_id
+        self.body_text = body_text
+
+
+class MessageTemplate(Enum):
+    IMAGE_DETACH = "image_detach"
+    IMAGE_CONFIRMATION = "image_confirmation"
+
+    PROMPT = "prompt"
+    PROMPT_HISTORY_LINE = "prompt_history_line"
+    PROMPT_IMAGE_COMING = "prompt_image_coming"
+
+
+class TemplateToken(str, Enum):
+    AI_NAME = "AI_NAME"
+    PERSONA = "PERSONA"
+    IMAGE_COMING = "IMAGE_COMING"
+    IMAGE_REQUEST = "IMAGE_REQUEST"
+    MESSAGE_HISTORY = "MESSAGE_HISTORY"
+    USER_MESSAGE = "USER_MESSAGE"
+    USER_NAME = "USER_NAME"
+
+
 class TemplateMessageFormatter:
     # Purpose: format messages using a template string
 
     def __init__(
-        self, template_name: str, template: str, allowed_tokens: typing.List[str]
+        self,
+        template_name: MessageTemplate,
+        template: str,
+        allowed_tokens: typing.List[TemplateToken],
     ):
         self._validate_format_string(template_name, template, allowed_tokens)
         self.template_name = template_name
         self.template = template
         self.allowed_tokens = allowed_tokens
 
-    def format(self, **kwargs) -> str:
-        # raises if kwargs contains any keys not in allowed_tokens
-        # if not set(kwargs.keys()) == set(self.allowed_tokens):
-        #     raise ValueError(
-        #         f"invalid template: {self.template_name} allowed "
-        #         + "tokens don't match provided values"
-        #     )
-        return self.template.format(**kwargs)
+    def format(self, format_args: dict[TemplateToken, str]) -> str:
+        return self.template.format(**format_args)
 
     @staticmethod
     def _validate_format_string(
-        fmt_string_name: str, fmt_string: str, allowed_args: typing.List[str]
+        template_name: MessageTemplate,
+        format_str: str,
+        allowed_args: typing.List[TemplateToken],
     ):
         def find_all_ch(s: str, ch: str) -> typing.Generator[int, None, None]:
             # find all indices of ch in s
@@ -39,29 +66,29 @@ class TemplateMessageFormatter:
                     yield i
 
         get_logger().debug(
-            f"validating template {fmt_string_name} with allowed args {allowed_args}"
+            f"validating template {template_name} with allowed args {allowed_args}"
         )
-        get_logger().debug(f"template: {fmt_string}")
+        get_logger().debug(f"template: {format_str}")
 
         # raises if fmt_string contains any args not in allowed_args
         allowed_close_brace_indices: typing.Set[int] = set()
 
-        for open_brace_idx in find_all_ch(fmt_string, "{"):
+        for open_brace_idx in find_all_ch(format_str, "{"):
             for allowed_arg in allowed_args:
                 idx_end = open_brace_idx + len(allowed_arg) + 1
-                next_substr = fmt_string[open_brace_idx : idx_end + 1]
+                next_substr = format_str[open_brace_idx : idx_end + 1]
                 if next_substr == "{" + allowed_arg + "}":
                     allowed_close_brace_indices.add(idx_end)
                     break
             else:
                 raise ValueError(
-                    f"invalid template: {fmt_string_name} contains "
+                    f"invalid template: {template_name} contains "
                     + f"an argument not in {allowed_args}"
                 )
-        for close_brace_idx in find_all_ch(fmt_string_name, "}"):
+        for close_brace_idx in find_all_ch(format_str, "}"):
             if close_brace_idx not in allowed_close_brace_indices:
                 raise ValueError(
-                    f"invalid template: {fmt_string_name} contains "
+                    f"invalid template: {template_name} contains "
                     + f"an argument not in {allowed_args}"
                 )
 
@@ -70,17 +97,22 @@ class TemplateStore:
     # Purpose: store templates and format messages using them
 
     def __init__(self):
-        self.templates: typing.Dict[str, TemplateMessageFormatter] = {}
+        self.templates: typing.Dict[MessageTemplate, TemplateMessageFormatter] = {}
 
     def add_template(
-        self, template_name: str, template: str, allowed_tokens: typing.List[str]
+        self,
+        template_name: MessageTemplate,
+        format_str: str,
+        allowed_tokens: typing.List[TemplateToken],
     ):
         self.templates[template_name] = TemplateMessageFormatter(
-            template_name, template, allowed_tokens
+            template_name, format_str, allowed_tokens
         )
 
-    def format(self, template_name: str, **kwargs) -> str:
-        return self.templates[template_name].format(**kwargs)
+    def format(
+        self, template_name: MessageTemplate, format_args: dict[TemplateToken, str]
+    ) -> str:
+        return self.templates[template_name].format(format_args)
 
 
 class Settings(argparse.ArgumentParser):
@@ -106,8 +138,7 @@ class Settings(argparse.ArgumentParser):
     # count characters. This is a rough estimate.
     OOBABOT_EST_CHARACTERS_PER_TOKEN = 4
 
-    DISCORD_PROMPT_TEMPLATE = "DISCORD_PROMPT_TEMPLATE"
-    DISCORD_PROMPT_TEMPLATE_DEFAULT: str = textwrap.dedent(
+    PROMPT_TEMPLATE_DEFAULT: str = textwrap.dedent(
         """
         You are in a chat room with multiple participants.
         Below is a transcript of recent messages in the conversation.
@@ -122,47 +153,43 @@ class Settings(argparse.ArgumentParser):
 
         ### Transcript:
         {MESSAGE_HISTORY}
-        {PHOTO_REQUEST}
+        {IMAGE_COMING}
         {AI_NAME} says:
         """
     )
 
-    DISCORD_PROMPT_HISTORY_LINE_TEMPLATE = "DISCORD_PROMPT_HISTORY_LINE_TEMPLATE"
-    DISCORD_PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT: str = textwrap.dedent(
+    PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT: str = textwrap.dedent(
         """
-        {DISCORD_USER_NAME} says:
-        {DISCORD_USER_MESSAGE}
+        {USER_NAME} says:
+        {USER_MESSAGE}
 
         """
     )
 
-    DISCORD_PROMPT_PHOTO_COMING_TEMPLATE = "DISCORD_PROMPT_PHOTO_COMING_TEMPLATE"
-    DISCORD_PROMPT_PHOTO_COMING_TEMPLATE_DEFAULT: str = textwrap.dedent(
+    PROMPT_IMAGE_COMING_TEMPLATE_DEFAULT: str = textwrap.dedent(
         """
-        {AI_NAME}: is currently generating a photo, as requested.
+        {AI_NAME}: is currently generating an image, as requested.
         """
     )
 
-    TEMPLATE_STABLE_DIFFUSION_DETACH_MESSAGE = "STABLE_DIFFUSION_DETACH_MESSAGE"
-    TEMPLATE_STABLE_DIFFUSION_DETACH_MESSAGE_DEFAULT: str = textwrap.dedent(
+    IMAGE_DETACH_TEMPLATE_DEFAULT: str = textwrap.dedent(
         """
-        {DISCORD_USER_NAME} tried to make an image with the prompt:
-            '{PHOTO_PROMPT}'
+        {USER_NAME} tried to make an image with the prompt:
+            '{IMAGE_REQUEST}'
         ...but couldn't find a suitable one.
         """
     )
 
-    TEMPLATE_STABLE_DIFFUSION_IMAGE_MESSAGE = "STABLE_DIFFUSION_IMAGE_MESSAGE"
-    TEMPLATE_STABLE_DIFFUSION_IMAGE_MESSAGE_DEFAULT: str = textwrap.dedent(
+    IMAGE_CONFIRMATION_TEMPLATE_DEFAULT: str = textwrap.dedent(
         """
-        {DISCORD_USER_NAME}, is this what you wanted?
+        {USER_NAME}, is this what you wanted?
         If no choice is made, this message will 💣 self-destuct 💣 in 3 minutes.
         """
     )
 
-    DISCORD_HISTORY_LINES_TO_SUPPLY = 20  # STAR
+    HISTORY_LINES_TO_SUPPLY = 20  # STAR
 
-    DISCORD_HISTORY_EST_CHARACTERS_PER_LINE = 30
+    HISTORY_EST_CHARACTERS_PER_LINE = 30
 
     # some non-zero chance of responding to a message,  even if
     # it wasn't addressed directly to the bot.  We'll only do this
@@ -258,31 +285,35 @@ class Settings(argparse.ArgumentParser):
         self.template_store = TemplateStore()
 
         self.template_store.add_template(
-            self.DISCORD_PROMPT_TEMPLATE,
-            self.DISCORD_PROMPT_TEMPLATE_DEFAULT,
-            ["AI_NAME", "PERSONA", "MESSAGE_HISTORY", "PHOTO_REQUEST"],
+            MessageTemplate.PROMPT,
+            self.PROMPT_TEMPLATE_DEFAULT,
+            [
+                TemplateToken.AI_NAME,
+                TemplateToken.IMAGE_COMING,
+                TemplateToken.MESSAGE_HISTORY,
+                TemplateToken.PERSONA,
+            ],
+        )
+        self.template_store.add_template(
+            MessageTemplate.PROMPT_HISTORY_LINE,
+            self.PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT,
+            [TemplateToken.USER_MESSAGE, TemplateToken.USER_NAME],
+        )
+        self.template_store.add_template(
+            MessageTemplate.PROMPT_IMAGE_COMING,
+            self.PROMPT_IMAGE_COMING_TEMPLATE_DEFAULT,
+            [TemplateToken.AI_NAME],
+        )
+        self.template_store.add_template(
+            MessageTemplate.IMAGE_DETACH,
+            self.IMAGE_DETACH_TEMPLATE_DEFAULT,
+            [TemplateToken.IMAGE_REQUEST, TemplateToken.USER_NAME],
         )
 
         self.template_store.add_template(
-            self.DISCORD_PROMPT_HISTORY_LINE_TEMPLATE,
-            self.DISCORD_PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT,
-            ["DISCORD_USER_NAME", "DISCORD_USER_MESSAGE"],
-        )
-        self.template_store.add_template(
-            self.DISCORD_PROMPT_PHOTO_COMING_TEMPLATE,
-            self.DISCORD_PROMPT_PHOTO_COMING_TEMPLATE_DEFAULT,
-            ["AI_NAME"],
-        )
-        self.template_store.add_template(
-            self.TEMPLATE_STABLE_DIFFUSION_DETACH_MESSAGE,
-            self.TEMPLATE_STABLE_DIFFUSION_DETACH_MESSAGE_DEFAULT,
-            ["DISCORD_USER_NAME", "PHOTO_PROMPT"],
-        )
-
-        self.template_store.add_template(
-            self.TEMPLATE_STABLE_DIFFUSION_IMAGE_MESSAGE,
-            self.TEMPLATE_STABLE_DIFFUSION_IMAGE_MESSAGE_DEFAULT,
-            ["DISCORD_USER_NAME", "PHOTO_PROMPT"],
+            MessageTemplate.IMAGE_CONFIRMATION,
+            self.IMAGE_CONFIRMATION_TEMPLATE_DEFAULT,
+            [TemplateToken.IMAGE_REQUEST, TemplateToken.USER_NAME],
         )
 
         super().__init__(
