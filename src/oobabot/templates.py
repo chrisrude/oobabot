@@ -1,7 +1,6 @@
 import textwrap
 import typing
 
-from oobabot.fancy_logging import get_logger
 from oobabot.types import TemplateToken
 from oobabot.types import Templates
 
@@ -34,11 +33,6 @@ class TemplateMessageFormatter:
             for i, ltr in enumerate(s):
                 if ltr == ch:
                     yield i
-
-        get_logger().debug(
-            f"validating template {template_name} with allowed args {allowed_args}"
-        )
-        get_logger().debug(f"template: {format_str}")
 
         # raises if fmt_string contains any args not in allowed_args
         allowed_close_brace_indices: typing.Set[int] = set()

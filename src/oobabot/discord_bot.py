@@ -128,12 +128,14 @@ class DiscordBot(discord.Client):
         get_logger().debug(f"AI name: {self.ai_name}")
         get_logger().debug(f"AI persona: {self.persona}")
 
+        get_logger().debug(f"History: {self.prompt_generator.history_lines} lines ")
+
         str_wakewords = (
             ", ".join(self.decide_to_respond.wakewords)
             if self.decide_to_respond.wakewords
             else "<none>"
         )
-        get_logger().debug(f"wakewords: {str_wakewords}")
+        get_logger().debug(f"Wakewords: {str_wakewords}")
 
     async def on_message(self, raw_message: discord.Message) -> None:
         try:
