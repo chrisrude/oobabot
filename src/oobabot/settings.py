@@ -1,26 +1,17 @@
 import argparse
 import os
-import textwrap
 import typing
-
-from oobabot.types import Templates
 
 
 class Settings(argparse.ArgumentParser):
-    # Purpose: reads settings from environment variables and command line
-    #          arguments
+    """
+    User=customizable settings for the bot.  Reads from
+    environment variables and command line arguments.
+    """
 
     ############################################################
-    # TODO: move these to a config file ####
-
-    PHOTOWORDS: typing.List[str] = [
-        "drawing",
-        "photo",
-        "pic",
-        "picture",
-        "image",
-        "sketch",
-    ]
+    # This section is for constants which are not yet
+    # customizable by the user.
 
     # this is the number of tokens we reserve for the AI
     # to respond with.
@@ -29,65 +20,6 @@ class Settings(argparse.ArgumentParser):
     # this is the number of tokens the AI has available
     # across its entire request + response
     OOBABOT_MAX_AI_TOKEN_SPACE: int = 2048
-
-    PROMPT_TEMPLATE_DEFAULT: str = textwrap.dedent(
-        """
-        You are in a chat room with multiple participants.
-        Below is a transcript of recent messages in the conversation.
-        Write the next one to three messages that you would send in this
-        conversation, from the point of view of the participant named
-        {AI_NAME}.
-
-        {PERSONA}
-
-        All responses you write must be from the point of view of
-        {AI_NAME}.
-
-        ### Transcript:
-        {MESSAGE_HISTORY}
-        {IMAGE_COMING}
-        """
-        # note that we don't include the bot's prompt_prefix line here
-        # but it will be included in the prompt we send to the AI
-    )
-
-    PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT: str = textwrap.dedent(
-        """
-        {USER_NAME} says:
-        {USER_MESSAGE}
-
-        """
-    )
-
-    PROMPT_IMAGE_COMING_TEMPLATE_DEFAULT: str = textwrap.dedent(
-        """
-        {AI_NAME}: is currently generating an image, as requested.
-        """
-    )
-
-    IMAGE_DETACH_TEMPLATE_DEFAULT: str = textwrap.dedent(
-        """
-        {USER_NAME} tried to make an image with the prompt:
-            '{IMAGE_PROMPT}'
-        ...but couldn't find a suitable one.
-        """
-    )
-
-    IMAGE_CONFIRMATION_TEMPLATE_DEFAULT: str = textwrap.dedent(
-        """
-        {USER_NAME}, is this what you wanted?
-        If no choice is made, this message will 💣 self-destuct 💣 in 3 minutes.
-        """
-    )
-
-    IMAGE_UNAUTHORIZED_TEMPLATE_DEFAULT: str = textwrap.dedent(
-        """
-        Sorry, only {USER_NAME} can press the buttons.
-        """
-    )
-
-    # number lines back in the message history to include in the prompt
-    HISTORY_LINES_TO_SUPPLY = 20
 
     # This is a table of the probability that the bot will respond
     # in an unsolicited manner (i.e. it isn't specifically pinged)
@@ -134,9 +66,29 @@ class Settings(argparse.ArgumentParser):
         "stopping_strings": [],
     }
 
-    STABLE_DIFFUSION_DEFAULT_IMG_WIDTH: int = 512
-    STABLE_DIFFUSION_DEFAULT_IMG_HEIGHT: int = STABLE_DIFFUSION_DEFAULT_IMG_WIDTH
-    STABLE_DIFFUSION_DEFAULT_STEPS: int = 30
+    ############################################################
+    # These are the default settings for the bot.  They can be
+    # overridden by environment variables or command line arguments.
+
+    # number lines back in the message history to include in the prompt
+    DEFAULT_HISTORY_LINES_TO_SUPPLY = 20
+
+    # words to look for in the prompt to indicate that the user
+    # wants to generate an image
+    DEFAULT_IMAGE_WORDS: typing.List[str] = [
+        "drawing",
+        "photo",
+        "pic",
+        "picture",
+        "image",
+        "sketch",
+    ]
+
+    # square image, 512x512
+    DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE: int = 512
+
+    # 30 steps of diffusion
+    DEFAULT_STABLE_DIFFUSION_STEPS: int = 30
 
     # ENVIRONMENT VARIABLES ####
 
@@ -163,27 +115,6 @@ class Settings(argparse.ArgumentParser):
         DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", sexually explicit content"
     )
 
-    def get_template(self, template_type: Templates) -> str:
-        if Templates.IMAGE_DETACH == template_type:
-            return self.IMAGE_DETACH_TEMPLATE_DEFAULT
-
-        if Templates.IMAGE_CONFIRMATION == template_type:
-            return self.IMAGE_CONFIRMATION_TEMPLATE_DEFAULT
-
-        if Templates.IMAGE_UNAUTHORIZED == template_type:
-            return self.IMAGE_UNAUTHORIZED_TEMPLATE_DEFAULT
-
-        if Templates.PROMPT == template_type:
-            return self.PROMPT_TEMPLATE_DEFAULT
-
-        if Templates.PROMPT_HISTORY_LINE == template_type:
-            return self.PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT
-
-        if Templates.PROMPT_IMAGE_COMING == template_type:
-            return self.PROMPT_IMAGE_COMING_TEMPLATE_DEFAULT
-
-        raise ValueError(f"unknown template type: {template_type}")
-
     def __init__(self):
         self._settings = None
         self.wakewords = []
@@ -199,12 +130,19 @@ class Settings(argparse.ArgumentParser):
 
         discord_group = self.add_argument_group("Discord Settings")
         discord_group.add_argument(
-            "--ai-name",
-            type=str,
-            default="oobabot",
-            help="Name of the AI to use for requests.  "
-            + "This can be whatever you want, but might make sense "
-            + "to be the name of the bot in Discord.",
+            "--history-lines",
+            type=int,
+            default=self.DEFAULT_HISTORY_LINES_TO_SUPPLY,
+            help="Number of lines of history to supply to the AI.  "
+            + "This is the number of lines of history that the AI will "
+            + "see when generating a response.  The default is "
+            + f"{self.DEFAULT_HISTORY_LINES_TO_SUPPLY}.",
+        )
+        discord_group.add_argument(
+            "--ignore-dms",
+            default=False,
+            help="If set, the bot will ignore direct messages.",
+            action="store_true",
         )
         discord_group.add_argument(
             "--wakewords",
@@ -218,17 +156,19 @@ class Settings(argparse.ArgumentParser):
             + "The bot will always reply to @-mentions and "
             + "direct messages, even if no wakewords are supplied.",
         )
-        discord_group.add_argument(
-            "--ignore-dms",
-            default=False,
-            help="If set, the bot will ignore direct messages.",
-            action="store_true",
-        )
 
         ###########################################################
         # Oobabooga Settings
 
         oobabooga_group = self.add_argument_group("Oobabooga Seetings")
+        oobabooga_group.add_argument(
+            "--ai-name",
+            type=str,
+            default="oobabot",
+            help="Name of the AI to use for requests.  "
+            + "This can be whatever you want, but might make sense "
+            + "to be the name of the bot in Discord.",
+        )
         oobabooga_group.add_argument(
             "--base-url",
             type=str,
@@ -238,7 +178,13 @@ class Settings(argparse.ArgumentParser):
             + "connections, or wss://hostname[:port] for websocket "
             + "connections over TLS.",
         )
-
+        oobabooga_group.add_argument(
+            "--log-all-the-things",
+            default=False,
+            help="Prints all oobabooga requests and responses in their "
+            + "entirety to STDOUT",
+            action="store_true",
+        )
         oobabooga_group.add_argument(
             "--persona",
             type=str,
@@ -249,23 +195,40 @@ class Settings(argparse.ArgumentParser):
             + f"{self.OOBABOT_PERSONA_ENV_VAR} environment variable.",
         )
 
-        oobabooga_group.add_argument(
-            "--log-all-the-things",
-            default=False,
-            help="Prints all oobabooga requests and responses in their "
-            + "entirety to STDOUT",
-            action="store_true",
-        )
-
         ###########################################################
         # Stable Diffusion Settings
 
         stable_diffusion_group = self.add_argument_group("Stable Diffusion Settings")
         stable_diffusion_group.add_argument(
-            "--stable-diffusion-url",
+            "--diffusion-steps",
+            type=int,
+            default=self.DEFAULT_STABLE_DIFFUSION_STEPS,
+            help="Number of diffusion steps to take when generating an image.  "
+            + f"The default is {self.DEFAULT_STABLE_DIFFUSION_STEPS}.",
+        )
+        stable_diffusion_group.add_argument(
+            "--image-height",
+            type=int,
+            default=self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
+            help="Size of images to generate.  This is the height of the image "
+            + "in pixels.  The default is "
+            + f"{self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE}.",
+        )
+        stable_diffusion_group.add_argument(
+            "--image-width",
+            type=int,
+            default=self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
+            help="Size of images to generate.  This is the width of the image "
+            + "in pixels.  The default is "
+            + f"{self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE}.",
+        )
+        stable_diffusion_group.add_argument(
+            "--image-words",
             type=str,
-            default=None,
-            help="URL for an AUTOMATIC1111 Stable Diffusion server",
+            nargs="*",
+            default=self.DEFAULT_IMAGE_WORDS,
+            help="One or more words that will indicate the user "
+            + "is requeting an image to be generated.",
         )
         stable_diffusion_group.add_argument(
             "--stable-diffusion-sampler",
@@ -273,6 +236,12 @@ class Settings(argparse.ArgumentParser):
             default=None,
             help="Sampler to use when generating images.  If not specified, the one "
             + "set on the AUTOMATIC1111 server will be used.",
+        )
+        stable_diffusion_group.add_argument(
+            "--stable-diffusion-url",
+            type=str,
+            default=None,
+            help="URL for an AUTOMATIC1111 Stable Diffusion server",
         )
         stable_diffusion_group.add_argument(
             "--stable-diffusion-negative-prompt",
@@ -287,38 +256,37 @@ class Settings(argparse.ArgumentParser):
             type=str,
             default=self.DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
             help="Negative prompt to use when generating images in a channel marked as"
-            + "'Age-Restricted'.  By default, this follows the Discord TOS by allowing "
-            + "some sexual content forbidden in non-age-restricted channels.",
+            + "'Age-Restricted'.",
         )
 
-    def settings(self) -> dict[str, str]:
-        if self._settings is None:
-            self._settings = self.parse_args().__dict__
+    def load(self) -> None:
+        self._settings = self.parse_args().__dict__
 
-            # this is a bit of a hack, but by doing this with
-            # non-str settings, we can add stronger type hints
-            self.wakewords = self._settings.pop("wakewords")
-            self.log_all_the_things = self._settings.pop("log_all_the_things")
-            self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")
-            self.stable_diffusion_sampler = self._settings.pop(
-                "stable_diffusion_sampler"
-            )
-            self.ignore_dms = self._settings.pop("ignore_dms")
+        # Discord Settings
+        self.history_lines = self._settings.pop("history_lines")
+        self.ignore_dms = self._settings.pop("ignore_dms")
+        self.wakewords = self._settings.pop("wakewords")
 
-            # either we're using a local REPL, or we're connecting to Discord.
-            # assume the user wants to connect to Discord
-            if not self.DISCORD_TOKEN:
-                msg = (
-                    f"Please set the '{Settings.DISCORD_TOKEN_ENV_VAR}' "
-                    + "environment variable to your bot's discord token."
-                )
-                # will exit() after printing
-                self.error(msg)
+        # OogaBooga Settings
+        self.ai_name = self._settings.pop("ai_name")
+        self.base_url = self._settings.pop("base_url")
+        print(self.base_url)
+        self.log_all_the_things = self._settings.pop("log_all_the_things")
+        self.persona = self._settings.pop("persona")
 
-        return self._settings
-
-    def __getattr__(self, name) -> str:
-        return self.settings().get(name, "")
+        # Stable Diffusion Settings
+        self.diffusion_steps = self._settings.pop("diffusion_steps")
+        self.image_height = self._settings.pop("image_height")
+        self.image_width = self._settings.pop("image_width")
+        self.image_words = self._settings.pop("image_words")
+        self.stable_diffusion_negative_prompt = self._settings.pop(
+            "stable_diffusion_negative_prompt"
+        )
+        self.stable_diffusion_negative_prompt_nsfw = self._settings.pop(
+            "stable_diffusion_negative_prompt_nsfw"
+        )
+        self.stable_diffusion_sampler = self._settings.pop("stable_diffusion_sampler")
+        self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")
 
     def __repr__(self) -> str:
         return super().__repr__()

@@ -52,7 +52,8 @@ def discord_message_to_generic_message(raw_message: discord.Message) -> GenericM
             **generic_args,
         )
     get_logger().warning(
-        f"Unknown channel type {type(raw_message.channel)}: {raw_message}"
+        f"Unknown channel type {type(raw_message.channel)}, "
+        + f"unsolicited replies disabled.: {raw_message.channel}"
     )
     return GenericMessage(**generic_args)
 

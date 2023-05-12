@@ -110,19 +110,13 @@ class DecideToRespond:
     def provide_unsolicited_reply_in_channel(
         self, our_user_id: int, message: ChannelMessage
     ) -> bool:
-        get_logger().debug(
-            f"Message in channel {message.channel_id} was not addressed to us."
-        )
-
         # if we're not at-mentioned but others are, don't reply
         if message.mentions and not message.is_mentioned(our_user_id):
-            get_logger().debug("and we weren't mentioned")
             return False
 
         # if message is empty, don't reply.  This can happen if someone
         # posts an image or an attachment without a comment.
         if message.is_empty():
-            get_logger().debug("and it is empty")
             return False
 
         # if we've posted recently in this channel, there are a few

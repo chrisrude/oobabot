@@ -1,3 +1,4 @@
+import textwrap
 import typing
 
 from oobabot.fancy_logging import get_logger
@@ -91,8 +92,63 @@ class TemplateStore:
         Templates.IMAGE_UNAUTHORIZED: [TemplateToken.USER_NAME],
     }
 
+    DEFAULT_TEMPLATES: typing.Dict[Templates, str] = {
+        Templates.PROMPT: textwrap.dedent(
+            """
+            You are in a chat room with multiple participants.
+            Below is a transcript of recent messages in the conversation.
+            Write the next one to three messages that you would send in this
+            conversation, from the point of view of the participant named
+            {AI_NAME}.
+
+            {PERSONA}
+
+            All responses you write must be from the point of view of
+            {AI_NAME}.
+            ### Transcript:
+            {MESSAGE_HISTORY}
+            {IMAGE_COMING}
+            """
+        ),
+        Templates.PROMPT_HISTORY_LINE: textwrap.dedent(
+            """
+            {USER_NAME} says:
+            {USER_MESSAGE}
+
+            """
+        ),
+        Templates.PROMPT_IMAGE_COMING: textwrap.dedent(
+            """
+            {AI_NAME}: is currently generating an image, as requested.
+            """
+        ),
+        Templates.IMAGE_DETACH: textwrap.dedent(
+            """
+            {USER_NAME} tried to make an image with the prompt:
+                '{IMAGE_PROMPT}'
+            ...but couldn't find a suitable one.
+            """
+        ),
+        Templates.IMAGE_CONFIRMATION: textwrap.dedent(
+            """
+            {USER_NAME}, is this what you wanted?
+            If no choice is made, this message will 💣 self-destuct 💣 in 3 minutes.
+            """
+        ),
+        Templates.IMAGE_UNAUTHORIZED: textwrap.dedent(
+            """
+            Sorry, only {USER_NAME} can press the buttons.
+            """
+        ),
+    }
+
     def __init__(self):
         self.templates: typing.Dict[Templates, TemplateMessageFormatter] = {}
+        for template, tokens in self.TEMPLATES.items():
+            template_fmt = TemplateStore.DEFAULT_TEMPLATES.get(template)
+            if template_fmt is None:
+                raise ValueError(f"Template {template} has no default format")
+            self.add_template(template, template_fmt, tokens)
 
     def add_template(
         self,

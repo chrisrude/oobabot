@@ -11,7 +11,6 @@ import aiohttp
 
 from oobabot.fancy_logging import get_logger
 from oobabot.http_client import SerializedHttpClient
-from oobabot.settings import Settings
 
 
 class StableDiffusionClientError(Exception):
@@ -53,10 +52,10 @@ class StableDiffusionClient(SerializedHttpClient):
         base_url: str,
         negative_prompt: str,
         negative_prompt_nsfw: str,
+        image_width: int,
+        image_height: int,
+        steps: int,
         desired_sampler: str | None = None,
-        img_width: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_WIDTH,
-        img_height: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_HEIGHT,
-        steps: int = Settings.STABLE_DIFFUSION_DEFAULT_STEPS,
     ):
         super().__init__(base_url)
 
@@ -66,8 +65,8 @@ class StableDiffusionClient(SerializedHttpClient):
         self._sampler = None
         self.desired_sampler = desired_sampler
 
-        self._img_width = img_width
-        self._img_height = img_height
+        self.image_width = image_width
+        self.image_height = image_height
 
         self._steps = steps
 
@@ -174,9 +173,6 @@ class StableDiffusionClient(SerializedHttpClient):
         self,
         prompt: str,
         is_channel_nsfw: bool = False,
-        steps: int = Settings.STABLE_DIFFUSION_DEFAULT_STEPS,
-        width: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_WIDTH,
-        height: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_HEIGHT,
     ) -> asyncio.Task[bytes]:
         # Purpose: Generate an image from a prompt.
         # Args:
@@ -198,9 +194,9 @@ class StableDiffusionClient(SerializedHttpClient):
             {
                 "prompt": prompt,
                 "negative_prompt": negative_prompt,
-                "steps": steps,
-                "width": width,
-                "height": height,
+                "steps": self._steps,
+                "width": self.image_width,
+                "height": self.image_height,
             }
         )
         if self._sampler is not None:

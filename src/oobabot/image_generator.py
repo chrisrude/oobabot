@@ -178,16 +178,17 @@ class ImageGenerator:
     def __init__(
         self,
         stable_diffusion_client: StableDiffusionClient,
-        photowords: List[str],
+        image_words: List[str],
         template_store: TemplateStore,
     ):
         self.stable_diffusion_client = stable_diffusion_client
         self.template_store = template_store
-        self.photo_patterns = [
+        self.image_patterns = [
             re.compile(
-                r"^.*\b" + photoword + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$", re.IGNORECASE
+                r"^.*\b" + image_word + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$",
+                re.IGNORECASE,
             )
-            for photoword in photowords
+            for image_word in image_words
         ]
 
     async def _generate_image(
@@ -231,8 +232,8 @@ class ImageGenerator:
         If the message does not contain a photo word, return None.
         """
         image_prompt = None
-        for photo_pattern in self.photo_patterns:
-            match = photo_pattern.search(raw_message.content)
+        for image_pattern in self.image_patterns:
+            match = image_pattern.search(raw_message.content)
             if match:
                 image_prompt = match.group(2)
                 break

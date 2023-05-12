@@ -43,7 +43,17 @@ def verify_client(client, service_name, url):
 
 def main():
     logger = init_logging()
+
     settings = Settings()
+    settings.load()
+    if not settings.DISCORD_TOKEN:
+        msg = (
+            f"Please set the '{Settings.DISCORD_TOKEN_ENV_VAR}' "
+            + "environment variable to your bot's discord token."
+        )
+        # will exit() after printing
+        settings.error(msg)
+
     aggregate_response_stats = None
 
     def sigint_handler(_signum, _frame):
@@ -69,6 +79,9 @@ def main():
             base_url=settings.stable_diffusion_url,
             negative_prompt=settings.stable_diffusion_negative_prompt,
             negative_prompt_nsfw=settings.stable_diffusion_negative_prompt_nsfw,
+            image_width=settings.image_width,
+            image_height=settings.image_height,
+            steps=settings.diffusion_steps,
             desired_sampler=settings.stable_diffusion_sampler,
         )
         verify_client(
@@ -88,19 +101,16 @@ def main():
         settings.DECIDE_TO_RESPOND_TIME_VS_RESPONSE_CHANCE,
     )
 
-    # templtes used to generate prompts to send to the AI
+    # templates used to generate prompts to send to the AI
     # as well as for some UI elements
     template_store = TemplateStore()
-    for template, tokens in TemplateStore.TEMPLATES.items():
-        template_fmt = settings.get_template(template)
-        template_store.add_template(template, template_fmt, tokens)
 
     # once we decide to respond, this generates a prompt
     # to send to the AI, given a message history
     prompt_generator = PromptGenerator(
         ai_name=settings.ai_name,
         persona=settings.persona,
-        history_lines=settings.HISTORY_LINES_TO_SUPPLY,
+        history_lines=settings.history_lines,
         token_space=settings.OOBABOT_MAX_AI_TOKEN_SPACE,
         template_store=template_store,
     )
@@ -116,7 +126,7 @@ def main():
     if stable_diffusion_client is not None:
         image_generator = ImageGenerator(
             stable_diffusion_client=stable_diffusion_client,
-            photowords=settings.PHOTOWORDS,
+            image_words=settings.image_words,
             template_store=template_store,
         )
 
