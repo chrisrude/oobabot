@@ -24,8 +24,7 @@ FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
 
 def sanitize_string(raw_string: str) -> str:
     """
-    Filter out any characters that are not commonly on a
-    US-English keyboard
+    Filter out any characters that would confuse the AI
     """
     return FORBIDDEN_CHARACTERS_PATTERN.sub(" ", raw_string)
 
