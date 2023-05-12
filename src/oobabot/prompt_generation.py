@@ -46,8 +46,6 @@ class PromptGenerator:
         # add on more history, but only if we have room
         # if we don't have room, we'll just truncate the history
         # by discarding the oldest messages first
-        # this is s
-        # it will understand before ignore
         #
         prompt_len_remaining = self.max_history_chars
 
