@@ -41,9 +41,10 @@ class RepetitionTracker:
         else:
             repetition_count = 0
 
-        get_logger().debug(
-            f"Repetition count for channel {channel_id} is {repetition_count}"
-        )
+        if repetition_count > 0:
+            get_logger().debug(
+                f"Repetition count for channel {channel_id} is {repetition_count}"
+            )
 
         if self.should_throttle(repetition_count):
             get_logger().warning(
