@@ -285,8 +285,8 @@ class Settings(argparse.ArgumentParser):
         self.stable_diffusion_negative_prompt_nsfw = self._settings.pop(
             "sd_negative_prompt_nsfw"
         )
-        self.stable_diffusion_sampler = self._settings.pop("sd_sampler")
-        self.stable_diffusion_url = self._settings.pop("sd_url")
+        self.stable_diffusion_sampler = self._settings.pop("stable_diffusion_sampler")
+        self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")
 
     def __repr__(self) -> str:
         return super().__repr__()
