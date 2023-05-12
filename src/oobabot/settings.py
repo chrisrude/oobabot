@@ -232,6 +232,7 @@ class Settings(argparse.ArgumentParser):
         )
         stable_diffusion_group.add_argument(
             "--stable-diffusion-sampler",
+            "--sd-sampler",
             type=str,
             default=None,
             help="Sampler to use when generating images.  If not specified, the one "
@@ -239,12 +240,13 @@ class Settings(argparse.ArgumentParser):
         )
         stable_diffusion_group.add_argument(
             "--stable-diffusion-url",
+            "--sd-url",
             type=str,
             default=None,
             help="URL for an AUTOMATIC1111 Stable Diffusion server",
         )
         stable_diffusion_group.add_argument(
-            "--stable-diffusion-negative-prompt",
+            "--sd-negative-prompt",
             type=str,
             default=self.DEFAULT_SD_NEGATIVE_PROMPT,
             help="Negative prompt to use when generating images.  This will discourage"
@@ -252,7 +254,7 @@ class Settings(argparse.ArgumentParser):
             + "By default, this is set to follow Discord's TOS.",
         )
         stable_diffusion_group.add_argument(
-            "--stable-diffusion-negative-prompt-nsfw",
+            "--sd-negative-prompt-nsfw",
             type=str,
             default=self.DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
             help="Negative prompt to use when generating images in a channel marked as"
@@ -279,14 +281,12 @@ class Settings(argparse.ArgumentParser):
         self.image_height = self._settings.pop("image_height")
         self.image_width = self._settings.pop("image_width")
         self.image_words = self._settings.pop("image_words")
-        self.stable_diffusion_negative_prompt = self._settings.pop(
-            "stable_diffusion_negative_prompt"
-        )
+        self.stable_diffusion_negative_prompt = self._settings.pop("sd_negative_prompt")
         self.stable_diffusion_negative_prompt_nsfw = self._settings.pop(
-            "stable_diffusion_negative_prompt_nsfw"
+            "sd_negative_prompt_nsfw"
         )
-        self.stable_diffusion_sampler = self._settings.pop("stable_diffusion_sampler")
-        self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")
+        self.stable_diffusion_sampler = self._settings.pop("sd_sampler")
+        self.stable_diffusion_url = self._settings.pop("sd_url")
 
     def __repr__(self) -> str:
         return super().__repr__()
