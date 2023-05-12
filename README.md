@@ -72,7 +72,7 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 You should now be able to run oobabot from wherever pip installed it.
 
 ```none
-usage: oobabot [-h] [--history-lines HISTORY_LINES] [--ignore-dms]
+usage: oobabot [-h] [--history-lines HISTORY_LINES] [--ignore-dms] [--dont-split-responses]
                [--wakewords [WAKEWORDS ...]] [--ai-name AI_NAME] [--base-url BASE_URL]
                [--log-all-the-things] [--persona PERSONA]
                [--diffusion-steps DIFFUSION_STEPS] [--image-height IMAGE_HEIGHT]
@@ -93,6 +93,10 @@ Discord Settings:
                         of lines of history that the AI will see when generating a response.
                         The default is 20.
   --ignore-dms          If set, the bot will ignore direct messages.
+  --dont-split-responses
+                        If set, the bot post the entire bot response into Discord as a
+                        single message, rather than splitting it into seperate messages by
+                        sentence.
   --wakewords [WAKEWORDS ...]
                         One or more words that the bot will listen for. The bot will listen
                         in all discord channels can access for one of these words to be

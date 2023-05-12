@@ -57,6 +57,16 @@ class OobaClient(SerializedHttpClient):
             for sentence in splitter.by_sentence(new_token):
                 yield sentence
 
+    async def request_as_string(self, prompt: str) -> typing.AsyncIterator[str]:
+        """
+        Yields the entire response as a single string.
+        """
+
+        response = ""
+        async for token in self.request_by_token(prompt):
+            response += token
+        yield response
+
     async def request_by_token(self, prompt: str) -> typing.AsyncIterator[str]:
         """
         Yields each token of the response as it arrives.

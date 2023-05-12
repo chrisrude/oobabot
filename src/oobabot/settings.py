@@ -145,6 +145,14 @@ class Settings(argparse.ArgumentParser):
             action="store_true",
         )
         discord_group.add_argument(
+            "--dont-split-responses",
+            default=False,
+            help="If set, the bot post the entire bot response into Discord "
+            + "as a single message, rather than splitting it into seperate "
+            + "messages by sentence.",
+            action="store_true",
+        )
+        discord_group.add_argument(
             "--wakewords",
             type=str,
             nargs="*",
@@ -265,6 +273,7 @@ class Settings(argparse.ArgumentParser):
         self._settings = self.parse_args().__dict__
 
         # Discord Settings
+        self.dont_split_responses = self._settings.pop("dont_split_responses")
         self.history_lines = self._settings.pop("history_lines")
         self.ignore_dms = self._settings.pop("ignore_dms")
         self.wakewords = self._settings.pop("wakewords")

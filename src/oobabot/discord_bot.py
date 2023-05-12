@@ -81,6 +81,7 @@ class DiscordBot(discord.Client):
         ai_name: str,
         persona: str,
         ignore_dms: bool,
+        dont_split_responses: bool,
         log_all_the_things: bool,
     ):
         self.ooba_client = ooba_client
@@ -95,6 +96,7 @@ class DiscordBot(discord.Client):
         self.image_generator = image_generator
 
         self.ignore_dms = ignore_dms
+        self.dont_split_responses = dont_split_responses
         self.log_all_the_things = log_all_the_things
 
         # a list of timestamps in which we last posted to a channel
@@ -124,6 +126,11 @@ class DiscordBot(discord.Client):
             get_logger().debug("Ignoring DMs")
         else:
             get_logger().debug("listening to DMs")
+
+        if self.dont_split_responses:
+            get_logger().debug("Responses: returned as single messages")
+        else:
+            get_logger().debug("Responses: streamed as separate sentences")
 
         get_logger().debug(f"AI name: {self.ai_name}")
         get_logger().debug(f"AI persona: {self.persona}")
@@ -201,7 +208,12 @@ class DiscordBot(discord.Client):
             print("Response:\n----------\n")
 
         try:
-            async for sentence in self.ooba_client.request_by_sentence(prompt_prefix):
+            if self.dont_split_responses:
+                generator = self.ooba_client.request_as_string(prompt_prefix)
+            else:
+                generator = self.ooba_client.request_by_sentence(prompt_prefix)
+
+            async for sentence in generator:
                 if self.log_all_the_things:
                     print(sentence)
 
