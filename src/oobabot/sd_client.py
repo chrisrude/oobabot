@@ -10,6 +10,7 @@ from typing import Dict
 import aiohttp
 
 from oobabot.fancy_logging import get_logger
+from oobabot.http_client import SerializedHttpClient
 from oobabot.settings import Settings
 
 
@@ -18,28 +19,31 @@ class StableDiffusionClientError(Exception):
 
 
 # todo: response stats for SD client
-# todo: refactor to share code with ooba_client
 
 
-class StableDiffusionClient:
-    # Purpose: Client for a Stable Diffusion API.
+class StableDiffusionClient(SerializedHttpClient):
+    """
+    Purpose: Client for generating images using the AUTOMATIC1111
+    API.  Takes a prompt and returns image binary data in PNG format.
+    """
 
     LOG_PREFIX = "Stable Diffusion: "
+    STABLE_DIFFUSION_API_URI_PATH: str = "/sdapi/v1/"
 
     API_COMMAND_URLS = {
-        "get_samplers": Settings.STABLE_DIFFUSION_API_URI_PATH + "samplers",
+        "get_samplers": STABLE_DIFFUSION_API_URI_PATH + "samplers",
         # get_samplers: GET only
         #   returns a list of samplers which we can use
         #   in text2img
-        "options": Settings.STABLE_DIFFUSION_API_URI_PATH + "options",
+        "options": STABLE_DIFFUSION_API_URI_PATH + "options",
         # options: GET and POST
         #   retrieves (GET) and sets (POST) global options
         #   for the server.  This is how we set the checkpoint
         #   and also a few privacy-related fields.
-        "progress": Settings.STABLE_DIFFUSION_API_URI_PATH + "progress",
+        "progress": STABLE_DIFFUSION_API_URI_PATH + "progress",
         # progress: GET only
         #   returns the progress of the current image generation
-        "txt2img": Settings.STABLE_DIFFUSION_API_URI_PATH + "txt2img",
+        "txt2img": STABLE_DIFFUSION_API_URI_PATH + "txt2img",
         # txt2img: POST only
         #   takes a prompt, generates an image and returns it
     }
@@ -54,7 +58,7 @@ class StableDiffusionClient:
         img_height: int = Settings.STABLE_DIFFUSION_DEFAULT_IMG_HEIGHT,
         steps: int = Settings.STABLE_DIFFUSION_DEFAULT_STEPS,
     ):
-        self._base_url = base_url
+        super().__init__(base_url)
 
         self.negative_prompt = negative_prompt
         self.negative_prompt_nsfw = negative_prompt_nsfw
@@ -66,7 +70,6 @@ class StableDiffusionClient:
         self._img_height = img_height
 
         self._steps = steps
-        self._session = None
 
     # set default negative prompts to make it more difficult
     # to create content against the discord TOS
@@ -128,7 +131,7 @@ class StableDiffusionClient:
         #    check if it's there before we try to set it
         #
         current_options = None
-        async with (await self._get_session()).get(url) as response:
+        async with self.get_session().get(url) as response:
             if response.status != 200:
                 raise StableDiffusionClientError(response)
             current_options = await response.json()
@@ -153,16 +156,14 @@ class StableDiffusionClient:
             )
             return
 
-        async with (await self._get_session()).post(
-            url, json=options_to_set
-        ) as response:
+        async with self.get_session().post(url, json=options_to_set) as response:
             if response.status != 200:
                 raise StableDiffusionClientError(response)
             await response.json()
 
     async def get_samplers(self) -> list[str]:
         url = self.API_COMMAND_URLS["get_samplers"]
-        async with (await self._get_session()).get(url) as response:
+        async with self.get_session().get(url) as response:
             if response.status != 200:
                 raise StableDiffusionClientError(response)
             response = await response.json()
@@ -212,7 +213,7 @@ class StableDiffusionClient:
             )
             start_time = time.time()
 
-            async with (await self._get_session()).post(
+            async with self.get_session().post(
                 self.API_COMMAND_URLS["txt2img"],
                 json=request,
             ) as response:
@@ -248,25 +249,6 @@ class StableDiffusionClient:
                     tries += 1
 
         return asyncio.create_task(do_post_with_retry())
-
-    async def _get_session(self) -> aiohttp.ClientSession:
-        if self._session is None:
-            raise RuntimeError("session not initialized")
-        return self._session
-
-    async def __aenter__(self):
-        connector = aiohttp.TCPConnector(limit_per_host=1)
-        self._session = aiohttp.ClientSession(
-            base_url=self._base_url,
-            connector=connector,
-            timeout=Settings.HTTP_CLIENT_TIMEOUT_SECONDS,
-        )
-        return self
-
-    async def __aexit__(self, *_err):
-        if self._session:
-            await self._session.close()
-        self._session = None
 
     async def set_sampler(self):
         """Sets the sampler to use, if it is available."""

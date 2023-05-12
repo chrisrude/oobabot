@@ -3,10 +3,7 @@ import os
 import textwrap
 import typing
 
-import aiohttp
-
-from oobabot.templates import TemplateStore
-from oobabot.types import MessageTemplate
+from oobabot.types import Templates
 
 
 class Settings(argparse.ArgumentParser):
@@ -16,21 +13,22 @@ class Settings(argparse.ArgumentParser):
     ############################################################
     # TODO: move these to a config file ####
 
-    # TODO these strings will be used in .format() calls, so we
-    # need to sanitize them to prevent injection attacks
+    PHOTOWORDS: typing.List[str] = [
+        "drawing",
+        "photo",
+        "pic",
+        "picture",
+        "image",
+        "sketch",
+    ]
 
     # this is the number of tokens we reserve for the AI
     # to respond with.
+    OOBABOT_MAX_NEW_TOKENS: int = 250
 
-    OOBABOT_MAX_NEW_TOKENS = 250  # STAR
-    OOBABOT_MAX_AI_TOKEN_SPACE: int = 2048  # STAR
-
-    # this is set by the AI, and is the maximum length
-    # it will understand before it starts to ignore
-    # the rest of the prompt_prefix
-    # note: we don't currently measure tokens, we just
-    # count characters. This is a rough estimate.
-    OOBABOT_EST_CHARACTERS_PER_TOKEN = 4
+    # this is the number of tokens the AI has available
+    # across its entire request + response
+    OOBABOT_MAX_AI_TOKEN_SPACE: int = 2048
 
     PROMPT_TEMPLATE_DEFAULT: str = textwrap.dedent(
         """
@@ -48,8 +46,9 @@ class Settings(argparse.ArgumentParser):
         ### Transcript:
         {MESSAGE_HISTORY}
         {IMAGE_COMING}
-        {AI_NAME} says:
         """
+        # note that we don't include the bot's prompt_prefix line here
+        # but it will be included in the prompt we send to the AI
     )
 
     PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT: str = textwrap.dedent(
@@ -69,7 +68,7 @@ class Settings(argparse.ArgumentParser):
     IMAGE_DETACH_TEMPLATE_DEFAULT: str = textwrap.dedent(
         """
         {USER_NAME} tried to make an image with the prompt:
-            '{IMAGE_REQUEST}'
+            '{IMAGE_PROMPT}'
         ...but couldn't find a suitable one.
         """
     )
@@ -81,30 +80,36 @@ class Settings(argparse.ArgumentParser):
         """
     )
 
-    HISTORY_LINES_TO_SUPPLY = 20  # STAR
+    IMAGE_UNAUTHORIZED_TEMPLATE_DEFAULT: str = textwrap.dedent(
+        """
+        Sorry, only {USER_NAME} can press the buttons.
+        """
+    )
 
-    HISTORY_EST_CHARACTERS_PER_LINE = 30
+    # number lines back in the message history to include in the prompt
+    HISTORY_LINES_TO_SUPPLY = 20
 
-    # some non-zero chance of responding to a message,  even if
-    # it wasn't addressed directly to the bot.  We'll only do this
-    # if we have posted to the same channel within the last
-
-    DISCORD_TIME_VS_RESPONSE_CHANCE = [
+    # This is a table of the probability that the bot will respond
+    # in an unsolicited manner (i.e. it isn't specifically pinged)
+    # to a message, based on how long ago it was pinged in that
+    # same channel.
+    DECIDE_TO_RESPOND_TIME_VS_RESPONSE_CHANCE: typing.List[
+        typing.Tuple[float, float]
+    ] = [
         # (seconds, base % chance of an unsolicited response)
-        (10.0, 80.0),
-        (60.0, 40.0),
-        (120.0, 20.0),
+        (60.0, 0.90),
+        (120.0, 0.70),
+        (60.0 * 5, 0.50),
     ]
 
     # increased chance of responding to a message if it ends with
     # a question mark or exclamation point
-    DISCORD_INTERROBANG_BONUS = 0.4
+    DECIDE_TO_RESPOND_INTERROBANG_BONUS = 0.3
 
-    DISCORD_REPETITION_THRESHOLD = 1
+    # number of times in a row that the bot will repeat itself
+    # before the repetition tracker will take action
+    REPETITION_TRACKER_THRESHOLD = 1
 
-    OOBABOOGA_STREAMING_URI_PATH: str = "/api/v1/stream"
-
-    # STAR
     OOBABOOGA_DEFAULT_REQUEST_PARAMS: dict[
         str, bool | float | int | str | typing.List[typing.Any]
     ] = {
@@ -129,23 +134,9 @@ class Settings(argparse.ArgumentParser):
         "stopping_strings": [],
     }
 
-    # STAR
     STABLE_DIFFUSION_DEFAULT_IMG_WIDTH: int = 512
-
-    # STAR
     STABLE_DIFFUSION_DEFAULT_IMG_HEIGHT: int = STABLE_DIFFUSION_DEFAULT_IMG_WIDTH
-
-    # STAR
     STABLE_DIFFUSION_DEFAULT_STEPS: int = 30
-
-    STABLE_DIFFUSION_API_URI_PATH: str = "/sdapi/v1/"
-
-    HTTP_CLIENT_TIMEOUT_SECONDS: aiohttp.ClientTimeout = aiohttp.ClientTimeout(
-        total=None,
-        connect=None,
-        sock_connect=5.0,
-        sock_read=5.0,
-    )
 
     # ENVIRONMENT VARIABLES ####
 
@@ -172,20 +163,23 @@ class Settings(argparse.ArgumentParser):
         DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", sexually explicit content"
     )
 
-    def get_template(self, template_type: MessageTemplate) -> str:
-        if MessageTemplate.IMAGE_DETACH == template_type:
+    def get_template(self, template_type: Templates) -> str:
+        if Templates.IMAGE_DETACH == template_type:
             return self.IMAGE_DETACH_TEMPLATE_DEFAULT
 
-        if MessageTemplate.IMAGE_CONFIRMATION == template_type:
+        if Templates.IMAGE_CONFIRMATION == template_type:
             return self.IMAGE_CONFIRMATION_TEMPLATE_DEFAULT
 
-        if MessageTemplate.PROMPT == template_type:
+        if Templates.IMAGE_UNAUTHORIZED == template_type:
+            return self.IMAGE_UNAUTHORIZED_TEMPLATE_DEFAULT
+
+        if Templates.PROMPT == template_type:
             return self.PROMPT_TEMPLATE_DEFAULT
 
-        if MessageTemplate.PROMPT_HISTORY_LINE == template_type:
+        if Templates.PROMPT_HISTORY_LINE == template_type:
             return self.PROMPT_HISTORY_LINE_TEMPLATE_DEFAULT
 
-        if MessageTemplate.PROMPT_IMAGE_COMING == template_type:
+        if Templates.PROMPT_IMAGE_COMING == template_type:
             return self.PROMPT_IMAGE_COMING_TEMPLATE_DEFAULT
 
         raise ValueError(f"unknown template type: {template_type}")
@@ -199,10 +193,6 @@ class Settings(argparse.ArgumentParser):
             + "environment variable:\n"
             f"\t{self.DISCORD_TOKEN_ENV_VAR} = <your bot's discord token>",
         )
-        self.template_store = TemplateStore()
-        for template, tokens in TemplateStore.TEMPLATES.items():
-            template_fmt = self.get_template(template)
-            self.template_store.add_template(template, template_fmt, tokens)
 
         ###########################################################
         # Discord Settings

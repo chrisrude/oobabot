@@ -9,24 +9,23 @@ import typing
 import aiohttp
 
 from oobabot.fancy_logging import get_logger
+from oobabot.http_client import OobaClientError
+from oobabot.http_client import SerializedHttpClient
 from oobabot.sentence_splitter import SentenceSplitter
 from oobabot.settings import Settings
 
 
-class OobaClientError(Exception):
-    pass
-
-
-class OobaClient:
+class OobaClient(SerializedHttpClient):
     # Purpose: Streaming client for the Ooba API.
     # Can provide the response by token or by sentence.
+
+    OOBABOOGA_STREAMING_URI_PATH: str = "/api/v1/stream"
 
     END_OF_INPUT = ""
 
     def __init__(self, base_url: str):
-        self.base_url = base_url
+        super().__init__(base_url)
         self.total_response_tokens = 0
-        self._session = None
 
     async def setup(self):
         """
@@ -39,9 +38,7 @@ class OobaClient:
             OobaClientError, if the connection fails
         """
         try:
-            async with self.get_session().ws_connect(
-                Settings.OOBABOOGA_STREAMING_URI_PATH
-            ):
+            async with self.get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
                 return
         except (
             ConnectionRefusedError,
@@ -71,7 +68,7 @@ class OobaClient:
         request.update(Settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS)
 
         async with self.get_session().ws_connect(
-            Settings.OOBABOOGA_STREAMING_URI_PATH
+            self.OOBABOOGA_STREAMING_URI_PATH
         ) as websocket:
             await websocket.send_json(request)
 
@@ -111,22 +108,3 @@ class OobaClient:
                 elif msg.type == aiohttp.WSMsgType.CLOSED:
                     get_logger().info(f"WebSocket connection closed normally: {msg}")
                     return
-
-    def get_session(self) -> aiohttp.ClientSession:
-        if not self._session:
-            raise OobaClientError("Session not initialized")
-        return self._session
-
-    async def __aenter__(self):
-        connector = aiohttp.TCPConnector(limit_per_host=1)
-        self._session = aiohttp.ClientSession(
-            base_url=self.base_url,
-            connector=connector,
-            timeout=Settings.HTTP_CLIENT_TIMEOUT_SECONDS,
-        )
-        return self
-
-    async def __aexit__(self, *_err):
-        if self._session:
-            await self._session.close()
-        self._session = None

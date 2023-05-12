@@ -1,8 +1,8 @@
 import typing
 
 from oobabot.fancy_logging import get_logger
-from oobabot.types import MessageTemplate
 from oobabot.types import TemplateToken
+from oobabot.types import Templates
 
 
 class TemplateMessageFormatter:
@@ -10,7 +10,7 @@ class TemplateMessageFormatter:
 
     def __init__(
         self,
-        template_name: MessageTemplate,
+        template_name: Templates,
         template: str,
         allowed_tokens: typing.List[TemplateToken],
     ):
@@ -24,7 +24,7 @@ class TemplateMessageFormatter:
 
     @staticmethod
     def _validate_format_string(
-        template_name: MessageTemplate,
+        template_name: Templates,
         format_str: str,
         allowed_args: typing.List[TemplateToken],
     ):
@@ -66,36 +66,37 @@ class TemplateStore:
     # Purpose: store templates and format messages using them
 
     # mapping of template names to tokens allowed in that template
-    TEMPLATES: typing.Dict[MessageTemplate, typing.List[TemplateToken]] = {
-        MessageTemplate.PROMPT: [
+    TEMPLATES: typing.Dict[Templates, typing.List[TemplateToken]] = {
+        Templates.PROMPT: [
             TemplateToken.AI_NAME,
             TemplateToken.IMAGE_COMING,
             TemplateToken.MESSAGE_HISTORY,
             TemplateToken.PERSONA,
         ],
-        MessageTemplate.PROMPT_HISTORY_LINE: [
+        Templates.PROMPT_HISTORY_LINE: [
             TemplateToken.USER_MESSAGE,
             TemplateToken.USER_NAME,
         ],
-        MessageTemplate.PROMPT_IMAGE_COMING: [
+        Templates.PROMPT_IMAGE_COMING: [
             TemplateToken.AI_NAME,
         ],
-        MessageTemplate.IMAGE_DETACH: [
-            TemplateToken.IMAGE_REQUEST,
+        Templates.IMAGE_DETACH: [
+            TemplateToken.IMAGE_PROMPT,
             TemplateToken.USER_NAME,
         ],
-        MessageTemplate.IMAGE_CONFIRMATION: [
-            TemplateToken.IMAGE_REQUEST,
+        Templates.IMAGE_CONFIRMATION: [
+            TemplateToken.IMAGE_PROMPT,
             TemplateToken.USER_NAME,
         ],
+        Templates.IMAGE_UNAUTHORIZED: [TemplateToken.USER_NAME],
     }
 
     def __init__(self):
-        self.templates: typing.Dict[MessageTemplate, TemplateMessageFormatter] = {}
+        self.templates: typing.Dict[Templates, TemplateMessageFormatter] = {}
 
     def add_template(
         self,
-        template_name: MessageTemplate,
+        template_name: Templates,
         format_str: str,
         allowed_tokens: typing.List[TemplateToken],
     ):
@@ -104,6 +105,6 @@ class TemplateStore:
         )
 
     def format(
-        self, template_name: MessageTemplate, format_args: dict[TemplateToken, str]
+        self, template_name: Templates, format_args: dict[TemplateToken, str]
     ) -> str:
         return self.templates[template_name].format(format_args)

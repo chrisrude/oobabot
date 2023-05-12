@@ -1,7 +1,7 @@
 import time
+from typing import Callable
 
 from oobabot.fancy_logging import get_logger
-from oobabot.ooba_client import OobaClient
 
 
 class ResponseStats:
@@ -9,10 +9,10 @@ class ResponseStats:
     Purpose: collects timing and rate statistics for a single response
     """
 
-    def __init__(self, ooba_client: OobaClient, prompt: str):
-        self.ooba_client = ooba_client
+    def __init__(self, fn_get_total_tokens: Callable[[], int], prompt: str):
+        self.fn_get_total_tokens = fn_get_total_tokens
         self.start_time = time.time()
-        self.start_tokens = ooba_client.total_response_tokens
+        self.start_tokens = fn_get_total_tokens()
         self.duration = 0
         self.latency = 0
         self.tokens = 0
@@ -27,7 +27,7 @@ class ResponseStats:
         if not self.latency:
             self.latency = now - self.start_time
         self.duration = now - self.start_time
-        self.tokens = self.ooba_client.total_response_tokens - self.start_tokens
+        self.tokens = self.fn_get_total_tokens() - self.start_tokens
 
     def tokens_per_second(self) -> float:
         """
@@ -56,8 +56,7 @@ class AggregateResponseStats:
     Purpose: collects timing and rate statistics for all AggregateResponseStats
     """
 
-    def __init__(self, ooba_client: OobaClient):
-        self.ooba_client = ooba_client
+    def __init__(self, fn_get_total_tokens: Callable[[], int]):
         self.total_requests_received = 0
         self.total_successful_responses = 0
         self.total_failed_responses = 0
@@ -66,6 +65,7 @@ class AggregateResponseStats:
         self.prompt_max_chars = 0
         self.prompt_min_chars = 0
         self.prompt_total_chars = 0
+        self.fn_get_total_tokens = fn_get_total_tokens
 
     def log_request_arrived(self, prompt) -> ResponseStats:
         """
@@ -74,7 +74,7 @@ class AggregateResponseStats:
         to log_response_part(), and then exactly one call to
         either log_response_failure() or log_response_success().
         """
-        result = ResponseStats(self.ooba_client, prompt)
+        result = ResponseStats(self.fn_get_total_tokens, prompt)
 
         self.total_requests_received += 1
         # update the prompt stats now
@@ -136,7 +136,7 @@ class AggregateResponseStats:
         """
         if 0 == self.total_successful_responses:
             return 0.0
-        return self.ooba_client.total_response_tokens / self.total_response_time_seconds
+        return self.fn_get_total_tokens() / self.total_response_time_seconds
 
     def average_prompt_length(self) -> float:
         """
