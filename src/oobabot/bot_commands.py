@@ -1,15 +1,15 @@
 import discord
 
 from oobabot import fancy_logger
+from oobabot import repetition_tracker
 from oobabot import templates
-from oobabot.repetition_tracker import RepetitionTracker
 
 
 class BotCommands:
     def __init__(
         self,
         ai_name: str,
-        repetition_tracker: RepetitionTracker,
+        repetition_tracker: repetition_tracker.RepetitionTracker,
         template_store: templates.TemplateStore,
     ):
         self.ai_name = ai_name

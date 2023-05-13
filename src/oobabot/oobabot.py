@@ -8,15 +8,15 @@ import sys
 
 import aiohttp
 
+from oobabot import decide_to_respond
 from oobabot import fancy_logger
+from oobabot import repetition_tracker
 from oobabot.bot_commands import BotCommands
-from oobabot.decide_to_respond import DecideToRespond
 from oobabot.discord_bot import DiscordBot
 from oobabot.image_generator import ImageGenerator
 from oobabot.ooba_client import OobaClient
 from oobabot.ooba_client import OobaClientError
 from oobabot.prompt_generator import PromptGenerator
-from oobabot.repetition_tracker import RepetitionTracker
 from oobabot.response_stats import AggregateResponseStats
 from oobabot.sd_client import StableDiffusionClient
 from oobabot.settings import Settings
@@ -94,7 +94,7 @@ def main():
     # Bot logic
 
     # decides which messages the bot will respond to
-    decide_to_respond = DecideToRespond(
+    decide_to_responder = decide_to_respond.DecideToRespond(
         settings.wakewords,
         settings.ignore_dms,
         settings.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
@@ -135,13 +135,13 @@ def main():
     # it will keep doing so forever.  This attempts to fix that.
     # by looking for repeated responses, and deciding how far
     # back in history the bot can see.
-    repetition_tracker = RepetitionTracker(
+    tracker = repetition_tracker.RepetitionTracker(
         repetition_threshold=Settings.REPETITION_TRACKER_THRESHOLD
     )
 
     bot_commands = BotCommands(
         ai_name=settings.ai_name,
-        repetition_tracker=repetition_tracker,
+        repetition_tracker=tracker,
         template_store=template_store,
     )
 
@@ -151,9 +151,9 @@ def main():
     logger.info("Connecting to Discord... ")
     bot = DiscordBot(
         ooba_client,
-        decide_to_respond=decide_to_respond,
+        decide_to_respond=decide_to_responder,
         prompt_generator=prompt_generator,
-        repetition_tracker=repetition_tracker,
+        repetition_tracker=tracker,
         aggregate_response_stats=aggregate_response_stats,
         image_generator=image_generator,
         bot_commands=bot_commands,

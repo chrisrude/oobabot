@@ -8,12 +8,12 @@ import typing
 import discord
 
 from oobabot import fancy_logger
+from oobabot import repetition_tracker
 from oobabot.bot_commands import BotCommands
 from oobabot.decide_to_respond import DecideToRespond
 from oobabot.image_generator import ImageGenerator
 from oobabot.ooba_client import OobaClient
 from oobabot.prompt_generator import PromptGenerator
-from oobabot.repetition_tracker import RepetitionTracker
 from oobabot.response_stats import AggregateResponseStats
 from oobabot.types import ChannelMessage
 from oobabot.types import DirectMessage
@@ -70,7 +70,7 @@ class DiscordBot(discord.Client):
         ooba_client: OobaClient,
         decide_to_respond: DecideToRespond,
         prompt_generator: PromptGenerator,
-        repetition_tracker: RepetitionTracker,
+        repetition_tracker: repetition_tracker.RepetitionTracker,
         aggregate_response_stats: AggregateResponseStats,
         bot_commands: BotCommands,
         image_generator: ImageGenerator | None,
