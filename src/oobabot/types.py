@@ -29,7 +29,7 @@ class DirectMessage(GenericMessage):
 
 class ChannelMessage(GenericMessage):
     def __init__(self, /, channel_id: int, mentions: typing.List[int], **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # type: ignore
         self.channel_id = channel_id
         self.mentions = mentions
 

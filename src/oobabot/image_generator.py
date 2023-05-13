@@ -6,9 +6,8 @@ from typing import List
 import discord
 
 from oobabot import fancy_logger
+from oobabot import sd_client
 from oobabot import templates
-from oobabot.sd_client import StableDiffusionClient
-from oobabot.templates import TemplateStore
 
 
 async def image_task_to_file(image_task: asyncio.Task[bytes], image_request: str):
@@ -30,12 +29,12 @@ class StableDiffusionImageView(discord.ui.View):
 
     def __init__(
         self,
-        sd_client: StableDiffusionClient,
+        sd_client: sd_client.StableDiffusionClient,
         is_channel_nsfw: bool,
         image_prompt: str,
         requesting_user_id: int,
         requesting_user_name: str,
-        template_store: TemplateStore,
+        template_store: templates.TemplateStore,
     ):
         super().__init__(timeout=120.0)
 
@@ -176,9 +175,9 @@ class StableDiffusionImageView(discord.ui.View):
 class ImageGenerator:
     def __init__(
         self,
-        stable_diffusion_client: StableDiffusionClient,
+        stable_diffusion_client: sd_client.StableDiffusionClient,
         image_words: List[str],
-        template_store: TemplateStore,
+        template_store: templates.TemplateStore,
     ):
         self.stable_diffusion_client = stable_diffusion_client
         self.template_store = template_store

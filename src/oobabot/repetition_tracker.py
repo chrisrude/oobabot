@@ -1,7 +1,7 @@
 import typing
 
 from oobabot import fancy_logger
-from oobabot.types import GenericMessage
+from oobabot import types
 
 
 class RepetitionTracker:
@@ -26,7 +26,9 @@ class RepetitionTracker:
         )
         return throttle_message_id
 
-    def log_message(self, channel_id: int, response_message: GenericMessage) -> None:
+    def log_message(
+        self, channel_id: int, response_message: types.GenericMessage
+    ) -> None:
         """
         Logs a message sent by the bot, to be used for repetition tracking
         """

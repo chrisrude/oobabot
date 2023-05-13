@@ -4,8 +4,7 @@ import typing
 
 from oobabot import fancy_logger
 from oobabot import templates
-from oobabot.templates import TemplateStore
-from oobabot.types import GenericMessage
+from oobabot import types
 
 
 class PromptGenerator:
@@ -43,7 +42,7 @@ class PromptGenerator:
         persona: str,
         history_lines: int,
         token_space: int,
-        template_store: TemplateStore,
+        template_store: templates.TemplateStore,
         dont_split_responses: bool,
     ):
         self.ai_name = ai_name
@@ -119,7 +118,7 @@ class PromptGenerator:
     async def _render_history(
         self,
         ai_user_id: int,
-        message_history: typing.AsyncIterator[GenericMessage],
+        message_history: typing.AsyncIterator[types.GenericMessage],
         stop_before_message_id: int | None,
     ) -> str:
         # add on more history, but only if we have room
@@ -201,7 +200,7 @@ class PromptGenerator:
     async def generate(
         self,
         ai_user_id: int,
-        message_history: typing.AsyncIterator[GenericMessage] | None,
+        message_history: typing.AsyncIterator[types.GenericMessage] | None,
         image_requested: bool,
         throttle_message_id: int,
     ) -> str:

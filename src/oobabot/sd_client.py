@@ -10,7 +10,7 @@ from typing import Dict
 import aiohttp
 
 from oobabot import fancy_logger
-from oobabot.http_client import SerializedHttpClient
+from oobabot import http_client
 
 
 class StableDiffusionClientError(Exception):
@@ -20,7 +20,7 @@ class StableDiffusionClientError(Exception):
 # todo: response stats for SD client
 
 
-class StableDiffusionClient(SerializedHttpClient):
+class StableDiffusionClient(http_client.SerializedHttpClient):
     """
     Purpose: Client for generating images using the AUTOMATIC1111
     API.  Takes a prompt and returns image binary data in PNG format.

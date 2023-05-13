@@ -10,12 +10,12 @@ import aiohttp
 
 from oobabot import decide_to_respond
 from oobabot import fancy_logger
+from oobabot import http_client
 from oobabot import repetition_tracker
 from oobabot.bot_commands import BotCommands
 from oobabot.discord_bot import DiscordBot
 from oobabot.image_generator import ImageGenerator
 from oobabot.ooba_client import OobaClient
-from oobabot.ooba_client import OobaClientError
 from oobabot.prompt_generator import PromptGenerator
 from oobabot.response_stats import AggregateResponseStats
 from oobabot.sd_client import StableDiffusionClient
@@ -33,7 +33,7 @@ def verify_client(client, service_name, url):
     logger.info(f"{service_name} is at {url}")
     try:
         asyncio.run(try_setup(client))
-    except (OobaClientError, aiohttp.ClientConnectionError) as e:
+    except (http_client.OobaClientError, aiohttp.ClientConnectionError) as e:
         logger.error(f"Could not connect to {service_name} server: [{url}]")
         logger.error("Please check the URL and try again.")
         logger.error(f"Reason: {e}")
@@ -67,7 +67,9 @@ def main():
     ########################################################
     # Connect to Oobabooga
 
-    ooba_client = OobaClient(settings.base_url)
+    ooba_client = OobaClient(
+        settings.base_url, Settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS
+    )
     verify_client(ooba_client, "Oobabooga", settings.base_url)
 
     ########################################################

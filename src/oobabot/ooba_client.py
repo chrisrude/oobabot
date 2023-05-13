@@ -9,13 +9,11 @@ import typing
 import aiohttp
 
 from oobabot import fancy_logger
-from oobabot.http_client import OobaClientError
-from oobabot.http_client import SerializedHttpClient
-from oobabot.sentence_splitter import SentenceSplitter
-from oobabot.settings import Settings
+from oobabot import http_client
+from oobabot import sentence_splitter
 
 
-class OobaClient(SerializedHttpClient):
+class OobaClient(http_client.SerializedHttpClient):
     # Purpose: Streaming client for the Ooba API.
     # Can provide the response by token or by sentence.
 
@@ -23,9 +21,10 @@ class OobaClient(SerializedHttpClient):
 
     END_OF_INPUT = ""
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, default_oobabooga_params: dict[str, typing.Any]):
         super().__init__(base_url)
         self.total_response_tokens = 0
+        self.default_oobabooga_params = default_oobabooga_params
 
     async def setup(self):
         """
@@ -45,14 +44,16 @@ class OobaClient(SerializedHttpClient):
             gaierror,
             TimeoutError,
         ) as e:
-            raise OobaClientError(f"Failed to connect to {self.base_url}: {e}", e)
+            raise http_client.OobaClientError(
+                f"Failed to connect to {self.base_url}: {e}", e
+            )
 
     async def request_by_sentence(self, prompt: str) -> typing.AsyncIterator[str]:
         """
         Yields each complete sentence of the response as it arrives.
         """
 
-        splitter = SentenceSplitter()
+        splitter = sentence_splitter.SentenceSplitter()
         async for new_token in self.request_by_token(prompt):
             for sentence in splitter.by_sentence(new_token):
                 yield sentence
@@ -75,7 +76,7 @@ class OobaClient(SerializedHttpClient):
         request: dict[str, bool | float | int | str | typing.List[typing.Any]] = {
             "prompt": prompt,
         }
-        request.update(Settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS)
+        request.update(self.default_oobabooga_params)
 
         async with self.get_session().ws_connect(
             self.OOBABOOGA_STREAMING_URI_PATH
@@ -114,7 +115,7 @@ class OobaClient(SerializedHttpClient):
                     fancy_logger.get().error(
                         f"WebSocket connection closed with error: {msg}"
                     )
-                    raise OobaClientError(
+                    raise http_client.OobaClientError(
                         f"WebSocket connection closed with error {msg}"
                     )
                 elif msg.type == aiohttp.WSMsgType.CLOSED:
