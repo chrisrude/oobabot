@@ -7,6 +7,7 @@ import typing
 
 import discord
 
+from oobabot.bot_commands import BotCommands
 from oobabot.decide_to_respond import DecideToRespond
 from oobabot.fancy_logging import get_logger
 from oobabot.image_generator import ImageGenerator
@@ -71,6 +72,7 @@ class DiscordBot(discord.Client):
         prompt_generator: PromptGenerator,
         repetition_tracker: RepetitionTracker,
         aggregate_response_stats: AggregateResponseStats,
+        bot_commands: BotCommands,
         image_generator: ImageGenerator | None,
         ai_name: str,
         persona: str,
@@ -98,78 +100,12 @@ class DiscordBot(discord.Client):
         # a list of timestamps in which we last posted to a channel
         self.channel_last_direct_response = {}
 
+        self.bot_commands = bot_commands
+
         intents = discord.Intents.default()
         intents.message_content = True
 
         super().__init__(intents=intents)
-
-    async def init_commands(self):
-        @discord.app_commands.command(
-            name="lobotomize",
-            description=f"Erase {self.ai_name}'s memory of any message "
-            + "before now in this channel.",
-        )
-        @discord.app_commands.guild_only()
-        async def lobotomize(interaction: discord.Interaction):
-            async def fail():
-                get_logger().warning(
-                    "lobotomize called from an unexpected channel: "
-                    + f"{interaction.channel_id}"
-                )
-                await interaction.response.send_message(
-                    "failed to lobotomize", ephemeral=True, silent=True
-                )
-
-            if interaction.channel_id is None:
-                await fail()
-                return
-
-            # find the current message in this channel
-            # tell the Repetition Tracker to hide messages
-            # before this message
-            channel = self.get_channel(interaction.channel_id)
-            if channel is None:
-                await fail()
-                return
-
-            if not isinstance(channel, discord.abc.Messageable):
-                await fail()
-                return
-
-            # find the current message in this channel
-            # tell the Repetition Tracker to hide messages
-            # before this message
-            async for message in channel.history(limit=1):
-                get_logger().info(
-                    f"lobotomize called in channel {channel.id}, "
-                    + f"hiding messages before {message.id}"
-                )
-                get_logger().info(
-                    f"lobotomize called for guid {channel.guild}"
-                    + f" # {channel.guild.id}, "
-                )
-                self.repetition_tracker.hide_messages_before(
-                    channel_id=channel.id,
-                    message_id=message.id,
-                )
-            await interaction.response.send_message("Memory wiped!", silent=True)
-
-        get_logger().debug("Registering commands, this may take a while sometimes...")
-
-        tree = discord.app_commands.CommandTree(self)
-        tree.add_command(lobotomize)
-        commands = await tree.sync(guild=None)
-        for command in commands:
-            get_logger().info(
-                f"Registered command: {command.name}: {command.description}"
-            )
-        get_logger().debug(
-            "If you try to run any command within the first ~5 minutes of "
-            + "the bot starting, it will fail with the error: 'This command "
-            + "is outdated, please try again in a few minutes'.  "
-            + "This is apparently what Discord just does, and nothing we can "
-            + " fix.  Sorry!"
-        )
 
     async def on_ready(self) -> None:
         guilds = self.guilds
@@ -218,7 +154,7 @@ class DiscordBot(discord.Client):
         # register
         try:
             # register the commands
-            await self.init_commands()
+            await self.bot_commands.on_ready(self)
         except Exception as e:
             get_logger().warning(
                 f"Failed to register commands: {e} (continuing without commands)"
@@ -371,6 +307,17 @@ class DiscordBot(discord.Client):
         )
         return result
 
+    def get_channel_name(self, channel: discord.abc.Messageable) -> str:
+        if isinstance(channel, discord.Thread):
+            return "thread #" + channel.name
+        if isinstance(channel, discord.abc.GuildChannel):
+            return "channel #" + channel.name
+        if isinstance(channel, discord.DMChannel):
+            return "-DM-"
+        if isinstance(channel, discord.GroupChannel):
+            return "-GROUP-DM-"
+        return "-Unknown-"
+
     async def send_response_in_channel(
         self,
         message: GenericMessage,
@@ -378,7 +325,8 @@ class DiscordBot(discord.Client):
         image_requested: bool,
         response_channel: discord.abc.Messageable,
     ) -> None:
-        get_logger().debug(f"Request from {message.author_name}")
+        channel_name = self.get_channel_name(raw_message.channel)
+        get_logger().debug(f"Request from {message.author_name} in {channel_name}")
 
         recent_messages = await self.recent_messages_following_thread(response_channel)
 
@@ -412,6 +360,9 @@ class DiscordBot(discord.Client):
                     print(sentence)
 
                 sentence = self.filter_immersion_breaking_lines(sentence)
+                if not sentence:
+                    # we can't send an empty message
+                    continue
 
                 response_message = await response_channel.send(sentence)
                 generic_response_message = discord_message_to_generic_message(

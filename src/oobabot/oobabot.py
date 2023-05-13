@@ -8,6 +8,7 @@ import sys
 
 import aiohttp
 
+from oobabot.bot_commands import BotCommands
 from oobabot.decide_to_respond import DecideToRespond
 from oobabot.discord_bot import DiscordBot
 from oobabot.fancy_logging import get_logger
@@ -139,6 +140,12 @@ def main():
         repetition_threshold=Settings.REPETITION_TRACKER_THRESHOLD
     )
 
+    bot_commands = BotCommands(
+        ai_name=settings.ai_name,
+        repetition_tracker=repetition_tracker,
+        template_store=template_store,
+    )
+
     ########################################################
     # Connect to Discord
 
@@ -150,6 +157,7 @@ def main():
         repetition_tracker=repetition_tracker,
         aggregate_response_stats=aggregate_response_stats,
         image_generator=image_generator,
+        bot_commands=bot_commands,
         ai_name=settings.ai_name,
         persona=settings.persona,
         ignore_dms=settings.ignore_dms,

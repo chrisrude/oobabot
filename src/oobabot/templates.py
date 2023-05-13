@@ -62,6 +62,10 @@ class TemplateStore:
 
     # mapping of template names to tokens allowed in that template
     TEMPLATES: typing.Dict[Templates, typing.List[TemplateToken]] = {
+        Templates.COMMAND_LOBOTOMIZE_RESPONSE: [
+            TemplateToken.AI_NAME,
+            TemplateToken.USER_NAME,
+        ],
         Templates.PROMPT: [
             TemplateToken.AI_NAME,
             TemplateToken.IMAGE_COMING,
@@ -132,6 +136,11 @@ class TemplateStore:
         Templates.IMAGE_UNAUTHORIZED: textwrap.dedent(
             """
             Sorry, only {USER_NAME} can press the buttons.
+            """
+        ),
+        Templates.COMMAND_LOBOTOMIZE_RESPONSE: textwrap.dedent(
+            """
+            Ummmm... what were we talking about?
             """
         ),
     }

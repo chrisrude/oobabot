@@ -39,6 +39,8 @@ class ChannelMessage(GenericMessage):
 
 
 class Templates(Enum):
+    COMMAND_LOBOTOMIZE_RESPONSE = "command_lobotomize_response"
+
     IMAGE_DETACH = "image_detach"
     IMAGE_CONFIRMATION = "image_confirmation"
     IMAGE_UNAUTHORIZED = "image_unauthorized"
