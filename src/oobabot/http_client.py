@@ -15,7 +15,7 @@ class SerializedHttpClient:
         total=None,
         connect=None,
         sock_connect=5.0,
-        sock_read=5.0,
+        sock_read=None,
     )
 
     def __init__(self, base_url: str):
