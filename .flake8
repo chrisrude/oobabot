@@ -1,0 +1,4 @@
+# Match black formatting.
+[flake8]
+max-line-length = 88
+extend-ignore = E203,W293,W503,W504
