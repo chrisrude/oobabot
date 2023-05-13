@@ -60,14 +60,6 @@ def discord_message_to_generic_message(raw_message: discord.Message) -> GenericM
     return GenericMessage(**generic_args)
 
 
-async def discord_to_generic_async(
-    raw_messages: typing.AsyncIterator[discord.Message],
-) -> typing.AsyncIterator[GenericMessage]:
-    async for raw_message in raw_messages:
-        message = discord_message_to_generic_message(raw_message)
-        yield message
-
-
 class DiscordBot(discord.Client):
     # seconds after which we'll lazily purge a channel
     # from channel_last_direct_response
@@ -260,6 +252,46 @@ class DiscordBot(discord.Client):
         response_task = asyncio.create_task(response_coro)
         return (response_task, response_channel)
 
+    async def history_plus_thread_kickoff_message(
+        self,
+        aiter: typing.AsyncIterator[discord.Message],
+        limit: int,
+    ) -> typing.AsyncIterator[GenericMessage]:
+        """
+        When returning the history of a thread, Discord
+        does not include the message that kicked off the thread.
+
+        It will show it in the UI as if it were, but it's not
+        one of the messages returned bby the history iterator.
+
+        This method attempts to return that message as well,
+        if we need it.
+        """
+        items = 0
+        last_returned = None
+        async for item in aiter:
+            last_returned = item
+            yield discord_message_to_generic_message(item)
+            items += 1
+        if last_returned is not None and items < limit:
+            # we've reached the beginning of the history, but
+            # still have space.  If this message was a reply
+            # to another message, return that message as well.
+            if last_returned.reference is not None:
+                ref = last_returned.reference.resolved
+                if ref is not None and isinstance(ref, discord.Message):
+                    yield discord_message_to_generic_message(ref)
+
+    async def recent_messages_following_thread(
+        self, channel: discord.abc.Messageable
+    ) -> typing.AsyncIterator[GenericMessage]:
+        history = channel.history(limit=self.prompt_generator.history_lines)
+        result = self.history_plus_thread_kickoff_message(
+            history,
+            limit=self.prompt_generator.history_lines,
+        )
+        return result
+
     async def send_response_in_channel(
         self,
         message: GenericMessage,
@@ -269,9 +301,7 @@ class DiscordBot(discord.Client):
     ) -> None:
         get_logger().debug(f"Request from {message.author_name}")
 
-        recent_messages = raw_message.channel.history(
-            limit=self.prompt_generator.history_lines
-        )
+        recent_messages = await self.recent_messages_following_thread(response_channel)
 
         repeated_id = self.repetition_tracker.get_throttle_message_id(
             raw_message.channel.id
@@ -279,7 +309,7 @@ class DiscordBot(discord.Client):
 
         prompt_prefix = await self.prompt_generator.generate(
             ai_user_id=self.ai_user_id,
-            message_history=discord_to_generic_async(recent_messages),
+            message_history=recent_messages,
             image_requested=image_requested,
             throttle_message_id=repeated_id,
         )

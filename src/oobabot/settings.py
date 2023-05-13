@@ -280,7 +280,7 @@ class Settings(argparse.ArgumentParser):
             "--sd-negative-prompt-nsfw",
             type=str,
             default=self.DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
-            help="Negative prompt to use when generating images in a channel marked as"
+            help="Negative prompt to use when generating images in a channel marked as "
             + "'Age-Restricted'.",
         )
 
