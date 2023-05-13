@@ -46,7 +46,7 @@ def main():
 
     settings = Settings()
     settings.load()
-    if not settings.DISCORD_TOKEN:
+    if not settings.discord_token:
         msg = (
             f"Please set the '{Settings.DISCORD_TOKEN_ENV_VAR}' "
             + "environment variable to your bot's discord token."
@@ -160,12 +160,21 @@ def main():
     # opens http connections to our services,
     # then connects to Discord
     async def init_then_start():
-        if stable_diffusion_client is not None:
-            async with stable_diffusion_client:
+        try:
+            if stable_diffusion_client is not None:
+                async with stable_diffusion_client:
+                    async with ooba_client:
+                        try:
+                            await bot.start(settings.discord_token)
+                        finally:
+                            await bot.close()
+            else:
                 async with ooba_client:
-                    await bot.start(settings.DISCORD_TOKEN)
-        else:
-            async with ooba_client:
-                await bot.start(settings.DISCORD_TOKEN)
+                    try:
+                        await bot.start(settings.discord_token)
+                    finally:
+                        await bot.close()
+        except Exception as e:
+            logger.error(f"Error starting bot: {e}")
 
     asyncio.run(init_then_start())

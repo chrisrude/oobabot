@@ -71,7 +71,7 @@ class Settings(argparse.ArgumentParser):
     # overridden by environment variables or command line arguments.
 
     # number lines back in the message history to include in the prompt
-    DEFAULT_HISTORY_LINES_TO_SUPPLY = 20
+    DEFAULT_HISTORY_LINES_TO_SUPPLY = 15
 
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
@@ -93,7 +93,7 @@ class Settings(argparse.ArgumentParser):
     # ENVIRONMENT VARIABLES ####
 
     DISCORD_TOKEN_ENV_VAR: str = "DISCORD_TOKEN"
-    DISCORD_TOKEN: str = os.environ.get(DISCORD_TOKEN_ENV_VAR, "")
+    DISCORD_TOKEN_ENV: str = os.environ.get(DISCORD_TOKEN_ENV_VAR, "")
 
     OOBABOT_PERSONA_ENV_VAR: str = "OOBABOT_PERSONA"
     OOBABOT_PERSONA: str = os.environ.get(OOBABOT_PERSONA_ENV_VAR, "")
@@ -130,26 +130,34 @@ class Settings(argparse.ArgumentParser):
 
         discord_group = self.add_argument_group("Discord Settings")
         discord_group.add_argument(
+            "--discord-token",
+            type=str,
+            default=self.DISCORD_TOKEN_ENV,
+            help="Token to log into Discord with.  For security "
+            + "purposes it's strongly recommended that you set "
+            + f"this via the {self.DISCORD_TOKEN_ENV_VAR} environment "
+            + "variable instead, if possible.",
+        )
+        discord_group.add_argument(
+            "--dont-split-responses",
+            default=False,
+            help="If set, the bot post its entire response as a single "
+            + "message, rather than splitting it into seperate "
+            + "messages by sentence.",
+            action="store_true",
+        )
+        discord_group.add_argument(
             "--history-lines",
             type=int,
             default=self.DEFAULT_HISTORY_LINES_TO_SUPPLY,
-            help="Number of lines of history to supply to the AI.  "
-            + "This is the number of lines of history that the AI will "
-            + "see when generating a response.  The default is "
+            help="Number of lines of chat history the AI will see "
+            + "when generating a response.  The default is "
             + f"{self.DEFAULT_HISTORY_LINES_TO_SUPPLY}.",
         )
         discord_group.add_argument(
             "--ignore-dms",
             default=False,
             help="If set, the bot will ignore direct messages.",
-            action="store_true",
-        )
-        discord_group.add_argument(
-            "--dont-split-responses",
-            default=False,
-            help="If set, the bot post the entire bot response into Discord "
-            + "as a single message, rather than splitting it into seperate "
-            + "messages by sentence.",
             action="store_true",
         )
         discord_group.add_argument(
@@ -280,6 +288,7 @@ class Settings(argparse.ArgumentParser):
         self._settings = self.parse_args().__dict__
 
         # Discord Settings
+        self.discord_token = self._settings.pop("discord_token")
         self.dont_split_responses = self._settings.pop("dont_split_responses")
         self.history_lines = self._settings.pop("history_lines")
         self.ignore_dms = self._settings.pop("ignore_dms")

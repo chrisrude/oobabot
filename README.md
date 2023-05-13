@@ -72,11 +72,12 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 You should now be able to run oobabot from wherever pip installed it.
 
 ```none
-usage: oobabot [-h] [--history-lines HISTORY_LINES] [--ignore-dms] [--dont-split-responses]
-               [--wakewords [WAKEWORDS ...]] [--ai-name AI_NAME] [--base-url BASE_URL]
-               [--log-all-the-things] [--persona PERSONA]
-               [--diffusion-steps DIFFUSION_STEPS] [--image-height IMAGE_HEIGHT]
-               [--image-width IMAGE_WIDTH] [--image-words [IMAGE_WORDS ...]]
+usage: oobabot [-h] [--discord-token] [--dont-split-responses]
+               [--history-lines HISTORY_LINES] [--ignore-dms] [--wakewords [WAKEWORDS ...]]
+               [--ai-name AI_NAME] [--base-url BASE_URL] [--log-all-the-things]
+               [--persona PERSONA] [--reply-in-thread] [--diffusion-steps DIFFUSION_STEPS]
+               [--image-height IMAGE_HEIGHT] [--image-width IMAGE_WIDTH]
+               [--image-words [IMAGE_WORDS ...]]
                [--stable-diffusion-sampler STABLE_DIFFUSION_SAMPLER]
                [--stable-diffusion-url STABLE_DIFFUSION_URL]
                [--sd-negative-prompt SD_NEGATIVE_PROMPT]
@@ -88,21 +89,22 @@ options:
   -h, --help            show this help message and exit
 
 Discord Settings:
-  --history-lines HISTORY_LINES
-                        Number of lines of history to supply to the AI. This is the number
-                        of lines of history that the AI will see when generating a response.
-                        The default is 20.
-  --ignore-dms          If set, the bot will ignore direct messages.
+  --discord-token       Token to log into Discord with. For security purposes it's strongly
+                        recommended that you set this via the DISCORD_TOKEN environment
+                        variable instead, if possible.
   --dont-split-responses
-                        If set, the bot post the entire bot response into Discord as a
-                        single message, rather than splitting it into seperate messages by
-                        sentence.
+                        If set, the bot post its entire response as a single message,
+                        rather than splitting it into seperate messages by sentence.
+  --history-lines HISTORY_LINES
+                        Number of lines of chat history the AI will see when generating a
+                        response. The default is 15.
+  --ignore-dms          If set, the bot will ignore direct messages.
   --wakewords [WAKEWORDS ...]
                         One or more words that the bot will listen for. The bot will listen
                         in all discord channels can access for one of these words to be
                         mentioned, then reply to any messages it sees with a matching word.
-                        The bot will always reply to @-mentions and direct messages, even if
-                        no wakewords are supplied.
+                        The bot will always reply to @-mentions and direct messages, even
+                        if no wakewords are supplied.
 
 Oobabooga Seetings:
   --ai-name AI_NAME     Name of the AI to use for requests. This can be whatever you want,
@@ -116,6 +118,9 @@ Oobabooga Seetings:
                         This is useful for setting up a 'character' for the bot to play.
                         Alternatively, this can be set with the OOBABOT_PERSONA environment
                         variable.
+  --reply-in-thread     When set, the bot will generate a new thread for each response it
+                        generates. But it will only do so if the user who prompted the bot
+                        has thread-create permissions.
 
 Stable Diffusion Settings:
   --diffusion-steps DIFFUSION_STEPS
@@ -131,8 +136,8 @@ Stable Diffusion Settings:
                         One or more words that will indicate the user is requeting an image
                         to be generated.
   --stable-diffusion-sampler STABLE_DIFFUSION_SAMPLER, --sd-sampler STABLE_DIFFUSION_SAMPLER
-                        Sampler to use when generating images. If not specified, the one set
-                        on the AUTOMATIC1111 server will be used.
+                        Sampler to use when generating images. If not specified, the one
+                        set on the AUTOMATIC1111 server will be used.
   --stable-diffusion-url STABLE_DIFFUSION_URL, --sd-url STABLE_DIFFUSION_URL
                         URL for an AUTOMATIC1111 Stable Diffusion server
   --sd-negative-prompt SD_NEGATIVE_PROMPT
@@ -164,6 +169,9 @@ Also, to authenticate to Discord, you must set the environment variable: DISCORD
     ``` fish
     set -Ux DISCORD_TOKEN ___YOUR_TOKEN___
     ```
+
+    In certain environments, it may be difficult to set an environment variable.  In that case, you can also pass the token in as a command-line argument using `--discord-token`.  But doing so might leak the token to other
+    users on a shared sysem, as it will be visible to anyone who can run `ps`.
 
 - **`--base-url`**
 
