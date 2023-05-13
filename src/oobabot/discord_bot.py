@@ -152,9 +152,7 @@ class DiscordBot(discord.Client):
                     channel_id=channel.id,
                     message_id=message.id,
                 )
-            await interaction.response.send_message(
-                "Memory wiped!", ephemeral=True, silent=True
-            )
+            await interaction.response.send_message("Memory wiped!", silent=True)
 
         get_logger().debug("Registering commands, this may take a while sometimes...")
 
@@ -177,14 +175,6 @@ class DiscordBot(discord.Client):
         guilds = self.guilds
         num_guilds = len(guilds)
         num_channels = sum([len(guild.channels) for guild in guilds])
-
-        try:
-            # register the commands
-            await self.init_commands()
-        except Exception as e:
-            get_logger().warning(
-                f"Failed to register commands: {e} (continuing without commands)"
-            )
 
         if self.user:
             self.ai_user_id = self.user.id
@@ -222,6 +212,17 @@ class DiscordBot(discord.Client):
             else "<none>"
         )
         get_logger().debug(f"Wakewords: {str_wakewords}")
+
+        # we do this at the very end because when you restart
+        # the bot, it can take a while for the commands to
+        # register
+        try:
+            # register the commands
+            await self.init_commands()
+        except Exception as e:
+            get_logger().warning(
+                f"Failed to register commands: {e} (continuing without commands)"
+            )
 
     async def on_message(self, raw_message: discord.Message) -> None:
         try:
@@ -410,21 +411,7 @@ class DiscordBot(discord.Client):
                 if self.log_all_the_things:
                     print(sentence)
 
-                # if the AI gives itself a second line, just ignore
-                # the line instruction and continue
-                if self.prompt_generator.bot_prompt_line == sentence:
-                    get_logger().warning(
-                        f'Filtered out "{sentence}" from response, continuing'
-                    )
-                    continue
-
-                # hack: abort response if it looks like the AI is
-                # continuing the conversation as someone else
-                if sentence.endswith(" says:"):
-                    get_logger().warning(
-                        f'Filtered out "{sentence}" from response, aborting'
-                    )
-                    break
+                sentence = self.filter_immersion_breaking_lines(sentence)
 
                 response_message = await response_channel.send(sentence)
                 generic_response_message = discord_message_to_generic_message(
@@ -443,3 +430,27 @@ class DiscordBot(discord.Client):
 
         response_stats.write_to_log(f"Response to {message.author_name} done!  ")
         self.aggregate_response_stats.log_response_success(response_stats)
+
+    def filter_immersion_breaking_lines(self, sentence: str) -> str:
+        lines = sentence.split("\n")
+        good_lines = []
+        previous_line = ""
+        for line in lines:
+            # if the AI gives itself a second line, just ignore
+            # the line instruction and continue
+            if self.prompt_generator.bot_prompt_line == line:
+                get_logger().warning(f'Filtered out "{line}" from response, continuing')
+                continue
+
+            # hack: abort response if it looks like the AI is
+            # continuing the conversation as someone else
+            if line.endswith(" says:"):
+                get_logger().warning(f'Filtered out "{line}" from response, aborting')
+                break
+
+            if not line and not previous_line:
+                # filter out multiple blank lines in a row
+                continue
+
+            good_lines.append(line)
+        return "\n".join(good_lines)

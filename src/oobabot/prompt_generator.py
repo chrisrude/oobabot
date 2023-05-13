@@ -20,7 +20,7 @@ class PromptGenerator:
     # the rest of the prompt_prefix
     # note: we don't currently measure tokens, we just
     # count characters. This is a rough estimate.
-    EST_CHARACTERS_PER_TOKEN = 4
+    EST_CHARACTERS_PER_TOKEN = 3
 
     # the estimated number of characters in a line of message history
     # this is used to rougly calculate whether we'll have enough space
@@ -33,6 +33,11 @@ class PromptGenerator:
     # so even counting characters exactly is still an estimate.
     EST_CHARACTERS_PER_HISTORY_LINE = 30
 
+    # when we're not splitting responses, each history line is
+    # much larger, and it's easier to run out of token space,
+    # so we use a different estimate
+    EST_CHARACTERS_PER_HISTORY_LINE_NOT_SPLITTING_RESPONSES = 180
+
     def __init__(
         self,
         ai_name: str,
@@ -40,12 +45,14 @@ class PromptGenerator:
         history_lines: int,
         token_space: int,
         template_store: TemplateStore,
+        dont_split_responses: bool,
     ):
         self.ai_name = ai_name
         self.persona = persona
         self.history_lines = history_lines
         self.token_space = token_space
         self.template_store = template_store
+        self.dont_split_responses = dont_split_responses
 
         # this will be also used when sending message
         # to suppress sending the prompt text to the user
@@ -91,9 +98,13 @@ class PromptGenerator:
         )
         # how many chars do we need for the requested number of
         # lines of history?
-        required_history_size_chars = (
-            self.history_lines * self.EST_CHARACTERS_PER_HISTORY_LINE
-        )
+        chars_per_history_line = self.EST_CHARACTERS_PER_HISTORY_LINE
+        if self.dont_split_responses:
+            chars_per_history_line = (
+                self.EST_CHARACTERS_PER_HISTORY_LINE_NOT_SPLITTING_RESPONSES
+            )
+
+        required_history_size_chars = self.history_lines * chars_per_history_line
 
         if available_chars_for_history < required_history_size_chars:
             raise ValueError(

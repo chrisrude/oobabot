@@ -72,7 +72,7 @@ class StableDiffusionImageView(discord.ui.View):
                 await interaction.response.defer()
                 await self.get_image_message().edit(attachments=[regen_file])
             except Exception as e:
-                get_logger().error("Could not regenerate image: " + str(e))
+                get_logger().error(f"Could not regenerate image: {e}")
 
         btn_try_again.callback = on_try_again
 

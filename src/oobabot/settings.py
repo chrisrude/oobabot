@@ -19,7 +19,7 @@ class Settings(argparse.ArgumentParser):
 
     # this is the number of tokens the AI has available
     # across its entire request + response
-    OOBABOT_MAX_AI_TOKEN_SPACE: int = 2048
+    OOBABOT_MAX_AI_TOKEN_SPACE: int = 730
 
     # This is a table of the probability that the bot will respond
     # in an unsolicited manner (i.e. it isn't specifically pinged)
@@ -71,7 +71,7 @@ class Settings(argparse.ArgumentParser):
     # overridden by environment variables or command line arguments.
 
     # number lines back in the message history to include in the prompt
-    DEFAULT_HISTORY_LINES_TO_SUPPLY = 15
+    DEFAULT_HISTORY_LINES_TO_SUPPLY = 7
 
     # words to look for in the prompt to indicate that the user
     # wants to generate an image

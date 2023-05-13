@@ -113,6 +113,7 @@ def main():
         history_lines=settings.history_lines,
         token_space=settings.OOBABOT_MAX_AI_TOKEN_SPACE,
         template_store=template_store,
+        dont_split_responses=settings.dont_split_responses,
     )
 
     # tracks of the time spent on responding, success rate, etc.
