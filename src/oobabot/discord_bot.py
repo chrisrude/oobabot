@@ -130,64 +130,71 @@ class DiscordBot(discord.Client):
             )
             if not should_respond:
                 return
+
             async with raw_message.channel.typing():
-                image_prompt = None
-                if self.image_generator is not None:
-                    # are we creating an image?
-                    image_prompt = self.image_generator.maybe_get_image_prompt(
-                        raw_message
-                    )
-
-                message_task, response_channel = await self.send_response(
-                    message=message,
-                    raw_message=raw_message,
-                    image_requested=image_prompt is not None,
-                )
-                if response_channel is None:
-                    # we failed to create a thread that the user could
-                    # read our response in, so we're done here.  Abort!
-                    return
-
-                # log the mention, now that we know the channel we
-                # want to montior later to continue to conversation
-                if isinstance(message, types.ChannelMessage):
-                    # this logic is weird, so let's explain it...
-                    #
-                    # we're eventually going to call log_mention()
-                    # if all these conditions pass.  When we do this,
-                    # we'll start monitoring the channel_id in the near
-                    # future for replies that we might respond to, unprompted.
-                    #
-                    # In the general case, we want to monitor the channel
-                    # only if we were summoned in it.
-                    #
-                    # However if we were summonned in a channel but are
-                    # creating a new thread for the answer (because of
-                    # the --reply-in-thread flag), we want to monitor
-                    # that thread, not the original channel.
-                    #
-                    if is_summon:
-                        if isinstance(response_channel, discord.Thread):
-                            message.channel_id = response_channel.id
-                        self.decide_to_respond.log_mention(message)
-
-                image_task = None
-                if self.image_generator is not None and image_prompt is not None:
-                    image_task = await self.image_generator.generate_image(
-                        image_prompt,
-                        raw_message,
-                        response_channel=response_channel,
-                    )
-
-                response_tasks = [
-                    task for task in [message_task, image_task] if task is not None
-                ]
-                await asyncio.wait(response_tasks)
+                await self._handle_response(message, raw_message, is_summon)
 
         except Exception as e:
             fancy_logger.get().error(
                 f"Exception while processing message: {e}", exc_info=True
             )
+
+    async def _handle_response(
+        self,
+        message: types.GenericMessage,
+        raw_message: discord.Message,
+        is_summon: bool,
+    ):
+        image_prompt = None
+        if self.image_generator is not None:
+            # are we creating an image?
+            image_prompt = self.image_generator.maybe_get_image_prompt(raw_message)
+
+        message_task, response_channel = await self.send_response(
+            message=message,
+            raw_message=raw_message,
+            image_requested=image_prompt is not None,
+        )
+        if response_channel is None:
+            # we failed to create a thread that the user could
+            # read our response in, so we're done here.  Abort!
+            return
+
+        # log the mention, now that we know the channel we
+        # want to montior later to continue to conversation
+        if isinstance(message, types.ChannelMessage):
+            # this logic is weird, so let's explain it...
+            #
+            # we're eventually going to call log_mention()
+            # if all these conditions pass.  When we do this,
+            # we'll start monitoring the channel_id in the near
+            # future for replies that we might respond to, unprompted.
+            #
+            # In the general case, we want to monitor the channel
+            # only if we were summoned in it.
+            #
+            # However if we were summonned in a channel but are
+            # creating a new thread for the answer (because of
+            # the --reply-in-thread flag), we want to monitor
+            # that thread, not the original channel.
+            #
+            if is_summon:
+                if isinstance(response_channel, discord.Thread):
+                    message.channel_id = response_channel.id
+                self.decide_to_respond.log_mention(message)
+
+        image_task = None
+        if self.image_generator is not None and image_prompt is not None:
+            image_task = await self.image_generator.generate_image(
+                image_prompt,
+                raw_message,
+                response_channel=response_channel,
+            )
+
+        response_tasks = [
+            task for task in [message_task, image_task] if task is not None
+        ]
+        await asyncio.wait(response_tasks)
 
     async def send_response(
         self,
