@@ -1,5 +1,5 @@
 import time
-from typing import Callable
+import typing
 
 from oobabot import fancy_logger
 
@@ -9,7 +9,7 @@ class ResponseStats:
     Purpose: collects timing and rate statistics for a single response
     """
 
-    def __init__(self, fn_get_total_tokens: Callable[[], int], prompt: str):
+    def __init__(self, fn_get_total_tokens: typing.Callable[[], int], prompt: str):
         self.fn_get_total_tokens = fn_get_total_tokens
         self.start_time = time.time()
         self.start_tokens = fn_get_total_tokens()
@@ -56,7 +56,7 @@ class AggregateResponseStats:
     Purpose: collects timing and rate statistics for all AggregateResponseStats
     """
 
-    def __init__(self, fn_get_total_tokens: Callable[[], int]):
+    def __init__(self, fn_get_total_tokens: typing.Callable[[], int]):
         self.total_requests_received = 0
         self.total_successful_responses = 0
         self.total_failed_responses = 0

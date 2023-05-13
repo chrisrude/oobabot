@@ -1,7 +1,7 @@
 import asyncio
 import io
 import re
-from typing import List
+import typing
 
 import discord
 
@@ -176,7 +176,7 @@ class ImageGenerator:
     def __init__(
         self,
         stable_diffusion_client: sd_client.StableDiffusionClient,
-        image_words: List[str],
+        image_words: typing.List[str],
         template_store: templates.TemplateStore,
     ):
         self.stable_diffusion_client = stable_diffusion_client

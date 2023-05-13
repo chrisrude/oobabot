@@ -2,8 +2,8 @@
 # Can provide the response by token or by sentence.
 #
 
-from asyncio.exceptions import TimeoutError
-from socket import gaierror
+import asyncio
+import socket
 import typing
 
 import aiohttp
@@ -41,8 +41,8 @@ class OobaClient(http_client.SerializedHttpClient):
                 return
         except (
             ConnectionRefusedError,
-            gaierror,
-            TimeoutError,
+            socket.gaierror,
+            asyncio.exceptions.TimeoutError,
         ) as e:
             raise http_client.OobaClientError(
                 f"Failed to connect to {self.base_url}: {e}", e

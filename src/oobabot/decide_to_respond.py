@@ -1,12 +1,9 @@
 import random
 import re
 import typing
-from typing import List
 
 from oobabot import fancy_logger
-from oobabot.types import ChannelMessage
-from oobabot.types import DirectMessage
-from oobabot.types import GenericMessage
+from oobabot import types
 
 
 class LastReplyTimes(dict):
@@ -33,10 +30,10 @@ class LastReplyTimes(dict):
         self.clear()
         self.update(purged)
 
-    def log_mention(self, message: ChannelMessage) -> None:
+    def log_mention(self, message: types.ChannelMessage) -> None:
         self[message.channel_id] = message.send_timestamp
 
-    def time_since_last_mention(self, message: ChannelMessage) -> float:
+    def time_since_last_mention(self, message: types.ChannelMessage) -> float:
         self.purge_outdated(message.send_timestamp)
         return message.send_timestamp - self.get(message.channel_id, 0)
 
@@ -48,7 +45,7 @@ class DecideToRespond:
 
     def __init__(
         self,
-        wakewords: List[str],
+        wakewords: typing.List[str],
         ignore_dms: bool,
         interrobang_bonus: float,
         time_vs_response_chance: typing.List[typing.Tuple[float, float]],
@@ -67,20 +64,22 @@ class DecideToRespond:
             re.compile(rf"\b{wakeword}\b", re.IGNORECASE) for wakeword in self.wakewords
         ]
 
-    def is_directly_mentioned(self, our_user_id: int, message: GenericMessage) -> bool:
+    def is_directly_mentioned(
+        self, our_user_id: int, message: types.GenericMessage
+    ) -> bool:
         """
         Returns True if the message is a direct message to us, or if it
         mentions us by @name or wakeword.
         """
 
         # reply to all private messages
-        if isinstance(message, DirectMessage):
+        if isinstance(message, types.DirectMessage):
             if self.ignore_dms:
                 return False
             return True
 
         # reply to all messages in which we're @-mentioned
-        if isinstance(message, ChannelMessage):
+        if isinstance(message, types.ChannelMessage):
             if message.is_mentioned(our_user_id):
                 return True
 
@@ -91,7 +90,9 @@ class DecideToRespond:
 
         return False
 
-    def calc_base_chance_of_unsolicited_reply(self, message: ChannelMessage) -> float:
+    def calc_base_chance_of_unsolicited_reply(
+        self, message: types.ChannelMessage
+    ) -> float:
         """
         Calculate base chance of unsolicited reply using the
         TIME_VS_RESPONSE_CHANCE table.
@@ -108,7 +109,7 @@ class DecideToRespond:
         return response_chance
 
     def provide_unsolicited_reply_in_channel(
-        self, our_user_id: int, message: ChannelMessage
+        self, our_user_id: int, message: types.ChannelMessage
     ) -> bool:
         # if we're not at-mentioned but others are, don't reply
         if message.mentions and not message.is_mentioned(our_user_id):
@@ -149,7 +150,7 @@ class DecideToRespond:
         return False
 
     def should_reply_to_message(
-        self, our_user_id: int, message: GenericMessage
+        self, our_user_id: int, message: types.GenericMessage
     ) -> typing.Tuple[bool, bool]:
         """
         Returns a tuple of (should_reply, is_direct_mention).
@@ -178,12 +179,12 @@ class DecideToRespond:
         if self.is_directly_mentioned(our_user_id, message):
             return (True, True)
 
-        if isinstance(message, ChannelMessage):
+        if isinstance(message, types.ChannelMessage):
             if self.provide_unsolicited_reply_in_channel(our_user_id, message):
                 return (True, False)
 
         # ignore anything else
         return (False, False)
 
-    def log_mention(self, message: ChannelMessage) -> None:
+    def log_mention(self, message: types.ChannelMessage) -> None:
         self.last_reply_times.log_mention(message)
