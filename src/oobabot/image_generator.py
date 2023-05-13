@@ -5,11 +5,10 @@ from typing import List
 
 import discord
 
+from oobabot import templates
 from oobabot.fancy_logging import get_logger
 from oobabot.sd_client import StableDiffusionClient
 from oobabot.templates import TemplateStore
-from oobabot.types import TemplateToken
-from oobabot.types import Templates
 
 
 async def image_task_to_file(image_task: asyncio.Task[bytes], image_request: str):
@@ -151,7 +150,7 @@ class StableDiffusionImageView(discord.ui.View):
         """
         if interaction.user.id == self.requesting_user_id:
             return True
-        error_mesage = self._get_message(Templates.IMAGE_UNAUTHORIZED)
+        error_mesage = self._get_message(templates.Templates.IMAGE_UNAUTHORIZED)
         await interaction.response.send_message(
             content=error_mesage,
             ephemeral=True,
@@ -159,17 +158,17 @@ class StableDiffusionImageView(discord.ui.View):
         return False
 
     def get_image_message_text(self) -> str:
-        return self._get_message(Templates.IMAGE_CONFIRMATION)
+        return self._get_message(templates.Templates.IMAGE_CONFIRMATION)
 
     def get_detach_message(self) -> str:
-        return self._get_message(Templates.IMAGE_DETACH)
+        return self._get_message(templates.Templates.IMAGE_DETACH)
 
-    def _get_message(self, message_type: Templates) -> str:
+    def _get_message(self, message_type: templates.Templates) -> str:
         return self.template_store.format(
             message_type,
             {
-                TemplateToken.USER_NAME: self.requesting_user_name,
-                TemplateToken.IMAGE_PROMPT: self.image_prompt,
+                templates.TemplateToken.USER_NAME: self.requesting_user_name,
+                templates.TemplateToken.IMAGE_PROMPT: self.image_prompt,
             },
         )
 
@@ -206,7 +205,18 @@ class ImageGenerator:
         image_task = self.stable_diffusion_client.generate_image(
             image_prompt, is_channel_nsfw=is_channel_nsfw
         )
-        file = await image_task_to_file(image_task, image_prompt)
+        try:
+            file = await image_task_to_file(image_task, image_prompt)
+        except Exception as e:
+            get_logger().error(f"Could not generate image: {e}")
+            error_message = self.template_store.format(
+                templates.Templates.IMAGE_GENERATION_ERROR,
+                {
+                    templates.TemplateToken.USER_NAME: raw_message.author.display_name,
+                    templates.TemplateToken.IMAGE_PROMPT: image_prompt,
+                },
+            )
+            return await response_channel.send(error_message, reference=raw_message)
 
         regen_view = StableDiffusionImageView(
             self.stable_diffusion_client,

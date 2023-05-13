@@ -1,8 +1,150 @@
+import enum
 import textwrap
 import typing
 
-from oobabot.types import TemplateToken
-from oobabot.types import Templates
+
+class Templates(enum.Enum):
+    COMMAND_LOBOTOMIZE_RESPONSE = "command_lobotomize_response"
+
+    IMAGE_DETACH = "image_detach"
+    IMAGE_CONFIRMATION = "image_confirmation"
+    IMAGE_GENERATION_ERROR = "image_generation_error"
+    IMAGE_UNAUTHORIZED = "image_unauthorized"
+
+    PROMPT = "prompt"
+    PROMPT_HISTORY_LINE = "prompt_history_line"
+    PROMPT_IMAGE_COMING = "prompt_image_coming"
+
+
+class TemplateToken(str, enum.Enum):
+    AI_NAME = "AI_NAME"
+    PERSONA = "PERSONA"
+    IMAGE_COMING = "IMAGE_COMING"
+    IMAGE_PROMPT = "IMAGE_PROMPT"
+    MESSAGE_HISTORY = "MESSAGE_HISTORY"
+    USER_MESSAGE = "USER_MESSAGE"
+    USER_NAME = "USER_NAME"
+
+
+class TemplateStore:
+    # Purpose: store templates and format messages using them
+
+    # mapping of template names to tokens allowed in that template
+    TEMPLATES: typing.Dict[Templates, typing.List[TemplateToken]] = {
+        Templates.COMMAND_LOBOTOMIZE_RESPONSE: [
+            TemplateToken.AI_NAME,
+            TemplateToken.USER_NAME,
+        ],
+        Templates.PROMPT: [
+            TemplateToken.AI_NAME,
+            TemplateToken.IMAGE_COMING,
+            TemplateToken.MESSAGE_HISTORY,
+            TemplateToken.PERSONA,
+        ],
+        Templates.PROMPT_HISTORY_LINE: [
+            TemplateToken.USER_MESSAGE,
+            TemplateToken.USER_NAME,
+        ],
+        Templates.PROMPT_IMAGE_COMING: [
+            TemplateToken.AI_NAME,
+        ],
+        Templates.IMAGE_DETACH: [
+            TemplateToken.IMAGE_PROMPT,
+            TemplateToken.USER_NAME,
+        ],
+        Templates.IMAGE_CONFIRMATION: [
+            TemplateToken.IMAGE_PROMPT,
+            TemplateToken.USER_NAME,
+        ],
+        Templates.IMAGE_GENERATION_ERROR: [
+            TemplateToken.IMAGE_PROMPT,
+            TemplateToken.USER_NAME,
+        ],
+        Templates.IMAGE_UNAUTHORIZED: [TemplateToken.USER_NAME],
+    }
+
+    DEFAULT_TEMPLATES: typing.Dict[Templates, str] = {
+        Templates.PROMPT: textwrap.dedent(
+            """
+            You are in a chat room with multiple participants.
+            Below is a transcript of recent messages in the conversation.
+            Write the next one to three messages that you would send in this
+            conversation, from the point of view of the participant named
+            {AI_NAME}.
+
+            {PERSONA}
+
+            All responses you write must be from the point of view of
+            {AI_NAME}.
+            ### Transcript:
+            {MESSAGE_HISTORY}
+            {IMAGE_COMING}
+            """
+        ),
+        Templates.PROMPT_HISTORY_LINE: textwrap.dedent(
+            """
+            {USER_NAME} says:
+            {USER_MESSAGE}
+
+            """
+        ),
+        Templates.PROMPT_IMAGE_COMING: textwrap.dedent(
+            """
+            {AI_NAME}: is currently generating an image, as requested.
+            """
+        ),
+        Templates.IMAGE_DETACH: textwrap.dedent(
+            """
+            {USER_NAME} tried to make an image with the prompt:
+                '{IMAGE_PROMPT}'
+            ...but couldn't find a suitable one.
+            """
+        ),
+        Templates.IMAGE_CONFIRMATION: textwrap.dedent(
+            """
+            {USER_NAME}, is this what you wanted?
+            If no choice is made, this message will 💣 self-destuct 💣 in 3 minutes.
+            """
+        ),
+        Templates.IMAGE_GENERATION_ERROR: textwrap.dedent(
+            """
+            Something went wrong generating your image.  Sorry about that!
+            """
+        ),
+        Templates.IMAGE_UNAUTHORIZED: textwrap.dedent(
+            """
+            Sorry, only {USER_NAME} can press the buttons.
+            """
+        ),
+        Templates.COMMAND_LOBOTOMIZE_RESPONSE: textwrap.dedent(
+            """
+            Ummmm... what were we talking about?
+            """
+        ),
+    }
+
+    def __init__(self):
+        self.templates: typing.Dict[Templates, TemplateMessageFormatter] = {}
+        for template, tokens in self.TEMPLATES.items():
+            template_fmt = TemplateStore.DEFAULT_TEMPLATES.get(template)
+            if template_fmt is None:
+                raise ValueError(f"Template {template} has no default format")
+            self.add_template(template, template_fmt, tokens)
+
+    def add_template(
+        self,
+        template_name: Templates,
+        format_str: str,
+        allowed_tokens: typing.List[TemplateToken],
+    ):
+        self.templates[template_name] = TemplateMessageFormatter(
+            template_name, format_str, allowed_tokens
+        )
+
+    def format(
+        self, template_name: Templates, format_args: dict[TemplateToken, str]
+    ) -> str:
+        return self.templates[template_name].format(format_args)
 
 
 class TemplateMessageFormatter:
@@ -55,115 +197,3 @@ class TemplateMessageFormatter:
                     f"invalid template: {template_name} contains "
                     + f"an argument not in {allowed_args}"
                 )
-
-
-class TemplateStore:
-    # Purpose: store templates and format messages using them
-
-    # mapping of template names to tokens allowed in that template
-    TEMPLATES: typing.Dict[Templates, typing.List[TemplateToken]] = {
-        Templates.COMMAND_LOBOTOMIZE_RESPONSE: [
-            TemplateToken.AI_NAME,
-            TemplateToken.USER_NAME,
-        ],
-        Templates.PROMPT: [
-            TemplateToken.AI_NAME,
-            TemplateToken.IMAGE_COMING,
-            TemplateToken.MESSAGE_HISTORY,
-            TemplateToken.PERSONA,
-        ],
-        Templates.PROMPT_HISTORY_LINE: [
-            TemplateToken.USER_MESSAGE,
-            TemplateToken.USER_NAME,
-        ],
-        Templates.PROMPT_IMAGE_COMING: [
-            TemplateToken.AI_NAME,
-        ],
-        Templates.IMAGE_DETACH: [
-            TemplateToken.IMAGE_PROMPT,
-            TemplateToken.USER_NAME,
-        ],
-        Templates.IMAGE_CONFIRMATION: [
-            TemplateToken.IMAGE_PROMPT,
-            TemplateToken.USER_NAME,
-        ],
-        Templates.IMAGE_UNAUTHORIZED: [TemplateToken.USER_NAME],
-    }
-
-    DEFAULT_TEMPLATES: typing.Dict[Templates, str] = {
-        Templates.PROMPT: textwrap.dedent(
-            """
-            You are in a chat room with multiple participants.
-            Below is a transcript of recent messages in the conversation.
-            Write the next one to three messages that you would send in this
-            conversation, from the point of view of the participant named
-            {AI_NAME}.
-
-            {PERSONA}
-
-            All responses you write must be from the point of view of
-            {AI_NAME}.
-            ### Transcript:
-            {MESSAGE_HISTORY}
-            {IMAGE_COMING}
-            """
-        ),
-        Templates.PROMPT_HISTORY_LINE: textwrap.dedent(
-            """
-            {USER_NAME} says:
-            {USER_MESSAGE}
-
-            """
-        ),
-        Templates.PROMPT_IMAGE_COMING: textwrap.dedent(
-            """
-            {AI_NAME}: is currently generating an image, as requested.
-            """
-        ),
-        Templates.IMAGE_DETACH: textwrap.dedent(
-            """
-            {USER_NAME} tried to make an image with the prompt:
-                '{IMAGE_PROMPT}'
-            ...but couldn't find a suitable one.
-            """
-        ),
-        Templates.IMAGE_CONFIRMATION: textwrap.dedent(
-            """
-            {USER_NAME}, is this what you wanted?
-            If no choice is made, this message will 💣 self-destuct 💣 in 3 minutes.
-            """
-        ),
-        Templates.IMAGE_UNAUTHORIZED: textwrap.dedent(
-            """
-            Sorry, only {USER_NAME} can press the buttons.
-            """
-        ),
-        Templates.COMMAND_LOBOTOMIZE_RESPONSE: textwrap.dedent(
-            """
-            Ummmm... what were we talking about?
-            """
-        ),
-    }
-
-    def __init__(self):
-        self.templates: typing.Dict[Templates, TemplateMessageFormatter] = {}
-        for template, tokens in self.TEMPLATES.items():
-            template_fmt = TemplateStore.DEFAULT_TEMPLATES.get(template)
-            if template_fmt is None:
-                raise ValueError(f"Template {template} has no default format")
-            self.add_template(template, template_fmt, tokens)
-
-    def add_template(
-        self,
-        template_name: Templates,
-        format_str: str,
-        allowed_tokens: typing.List[TemplateToken],
-    ):
-        self.templates[template_name] = TemplateMessageFormatter(
-            template_name, format_str, allowed_tokens
-        )
-
-    def format(
-        self, template_name: Templates, format_args: dict[TemplateToken, str]
-    ) -> str:
-        return self.templates[template_name].format(format_args)

@@ -1,4 +1,3 @@
-from enum import Enum
 import typing
 
 
@@ -36,25 +35,3 @@ class ChannelMessage(GenericMessage):
 
     def is_mentioned(self, user_id: int) -> bool:
         return user_id in self.mentions
-
-
-class Templates(Enum):
-    COMMAND_LOBOTOMIZE_RESPONSE = "command_lobotomize_response"
-
-    IMAGE_DETACH = "image_detach"
-    IMAGE_CONFIRMATION = "image_confirmation"
-    IMAGE_UNAUTHORIZED = "image_unauthorized"
-
-    PROMPT = "prompt"
-    PROMPT_HISTORY_LINE = "prompt_history_line"
-    PROMPT_IMAGE_COMING = "prompt_image_coming"
-
-
-class TemplateToken(str, Enum):
-    AI_NAME = "AI_NAME"
-    PERSONA = "PERSONA"
-    IMAGE_COMING = "IMAGE_COMING"
-    IMAGE_PROMPT = "IMAGE_PROMPT"
-    MESSAGE_HISTORY = "MESSAGE_HISTORY"
-    USER_MESSAGE = "USER_MESSAGE"
-    USER_NAME = "USER_NAME"

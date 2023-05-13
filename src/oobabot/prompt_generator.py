@@ -2,11 +2,10 @@
 # the message history and persona.
 import typing
 
+from oobabot import templates
 from oobabot.fancy_logging import get_logger
 from oobabot.templates import TemplateStore
 from oobabot.types import GenericMessage
-from oobabot.types import TemplateToken
-from oobabot.types import Templates
 
 
 class PromptGenerator:
@@ -57,17 +56,17 @@ class PromptGenerator:
         # this will be also used when sending message
         # to suppress sending the prompt text to the user
         self.bot_prompt_line = self.template_store.format(
-            Templates.PROMPT_HISTORY_LINE,
+            templates.Templates.PROMPT_HISTORY_LINE,
             {
-                TemplateToken.USER_NAME: self.ai_name,
-                TemplateToken.USER_MESSAGE: "",
+                templates.TemplateToken.USER_NAME: self.ai_name,
+                templates.TemplateToken.USER_MESSAGE: "",
             },
         ).strip()
 
         self.image_request_made = self.template_store.format(
-            Templates.PROMPT_IMAGE_COMING,
+            templates.Templates.PROMPT_IMAGE_COMING,
             {
-                TemplateToken.AI_NAME: self.ai_name,
+                templates.TemplateToken.AI_NAME: self.ai_name,
             },
         )
         self._init_history_available_chars()
@@ -159,10 +158,10 @@ class PromptGenerator:
                 continue
 
             line = self.template_store.format(
-                Templates.PROMPT_HISTORY_LINE,
+                templates.Templates.PROMPT_HISTORY_LINE,
                 {
-                    TemplateToken.USER_NAME: adjusted_author_name,
-                    TemplateToken.USER_MESSAGE: message.body_text,
+                    templates.TemplateToken.USER_NAME: adjusted_author_name,
+                    templates.TemplateToken.USER_MESSAGE: message.body_text,
                 },
             )
 
@@ -187,12 +186,12 @@ class PromptGenerator:
         image_coming: str,
     ) -> str:
         prompt = self.template_store.format(
-            Templates.PROMPT,
+            templates.Templates.PROMPT,
             {
-                TemplateToken.AI_NAME: self.ai_name,
-                TemplateToken.PERSONA: self.persona,
-                TemplateToken.MESSAGE_HISTORY: message_history_txt,
-                TemplateToken.IMAGE_COMING: image_coming,
+                templates.TemplateToken.AI_NAME: self.ai_name,
+                templates.TemplateToken.PERSONA: self.persona,
+                templates.TemplateToken.MESSAGE_HISTORY: message_history_txt,
+                templates.TemplateToken.IMAGE_COMING: image_coming,
             },
         )
         # todo: make this part of the template?

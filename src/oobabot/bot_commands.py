@@ -1,10 +1,8 @@
 import discord
 
+from oobabot import templates
 from oobabot.fancy_logging import get_logger
 from oobabot.repetition_tracker import RepetitionTracker
-from oobabot.templates import TemplateStore
-from oobabot.types import TemplateToken
-from oobabot.types import Templates
 
 
 class BotCommands:
@@ -12,7 +10,7 @@ class BotCommands:
         self,
         ai_name: str,
         repetition_tracker: RepetitionTracker,
-        template_store: TemplateStore,
+        template_store: templates.TemplateStore,
     ):
         self.ai_name = ai_name
         self.repetition_tracker = repetition_tracker
@@ -69,10 +67,10 @@ class BotCommands:
                 )
 
             response = self.template_store.format(
-                template_name=Templates.COMMAND_LOBOTOMIZE_RESPONSE,
+                template_name=templates.Templates.COMMAND_LOBOTOMIZE_RESPONSE,
                 format_args={
-                    TemplateToken.AI_NAME: self.ai_name,
-                    TemplateToken.USER_NAME: interaction.user.name,
+                    templates.TemplateToken.AI_NAME: self.ai_name,
+                    templates.TemplateToken.USER_NAME: interaction.user.name,
                 },
             )
             await interaction.response.send_message(
