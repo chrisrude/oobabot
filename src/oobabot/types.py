@@ -6,6 +6,8 @@ class GenericMessage(object):
         self,
         author_id: int,
         author_name: str,
+        channel_id: int,
+        channel_name: str,
         message_id: int,
         body_text: str,
         author_is_bot: bool,
@@ -17,6 +19,8 @@ class GenericMessage(object):
         self.body_text = body_text
         self.author_is_bot = author_is_bot
         self.send_timestamp = send_timestamp
+        self.channel_id = channel_id
+        self.channel_name = channel_name
 
     def is_empty(self) -> bool:
         return not self.body_text.strip()
@@ -28,9 +32,13 @@ class DirectMessage(GenericMessage):
 
 
 class ChannelMessage(GenericMessage):
-    def __init__(self, /, channel_id: int, mentions: typing.List[int], **kwargs):
+    def __init__(
+        self,
+        /,
+        mentions: typing.List[int],
+        **kwargs,
+    ):
         super().__init__(**kwargs)  # type: ignore
-        self.channel_id = channel_id
         self.mentions = mentions
 
     def is_mentioned(self, user_id: int) -> bool:

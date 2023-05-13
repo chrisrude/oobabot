@@ -290,9 +290,8 @@ class DiscordBot(discord.Client):
         image_requested: bool,
         response_channel: discord.abc.Messageable,
     ) -> None:
-        channel_name = discord_utils.get_channel_name(raw_message.channel)
         fancy_logger.get().debug(
-            f"Request from {message.author_name} in {channel_name}"
+            f"Request from {message.author_name} in {message.channel_name}"
         )
 
         recent_messages = await self.recent_messages_following_thread(response_channel)

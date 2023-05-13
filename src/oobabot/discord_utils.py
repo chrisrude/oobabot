@@ -12,7 +12,7 @@ FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
 def get_channel_name(channel: discord.abc.Messageable) -> str:
     if isinstance(channel, discord.Thread):
         return "thread #" + channel.name
-    if isinstance(channel, discord.TextChannel):
+    if isinstance(channel, discord.abc.GuildChannel):
         return "channel #" + channel.name
     if isinstance(channel, discord.DMChannel):
         return "-DM-"
@@ -30,13 +30,15 @@ def sanitize_string(raw_string: str) -> str:
 
 def discord_message_to_generic_message(
     raw_message: discord.Message,
-) -> types.GenericMessage:
+) -> types.GenericMessage | types.ChannelMessage | types.DirectMessage:
     """
     Convert a discord message to a GenericMessage or subclass thereof
     """
     generic_args = {
         "author_id": raw_message.author.id,
         "author_name": sanitize_string(raw_message.author.display_name),
+        "channel_id": raw_message.channel.id,
+        "channel_name": get_channel_name(raw_message.channel),
         "message_id": raw_message.id,
         "body_text": sanitize_string(raw_message.content),
         "author_is_bot": raw_message.author.bot,
@@ -50,7 +52,6 @@ def discord_message_to_generic_message(
         or isinstance(raw_message.channel, discord.Thread)
     ):
         return types.ChannelMessage(
-            channel_id=raw_message.channel.id,
             mentions=[mention.id for mention in raw_message.mentions],
             **generic_args,
         )
