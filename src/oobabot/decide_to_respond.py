@@ -30,8 +30,8 @@ class LastReplyTimes(dict):
         self.clear()
         self.update(purged)
 
-    def log_mention(self, message: types.ChannelMessage) -> None:
-        self[message.channel_id] = message.send_timestamp
+    def log_mention(self, channel_id: int, send_timestamp: float) -> None:
+        self[channel_id] = send_timestamp
 
     def time_since_last_mention(self, message: types.ChannelMessage) -> float:
         self.purge_outdated(message.send_timestamp)
@@ -187,4 +187,7 @@ class DecideToRespond:
         return (False, False)
 
     def log_mention(self, message: types.ChannelMessage) -> None:
-        self.last_reply_times.log_mention(message)
+        self.last_reply_times.log_mention(message.channel_id, message.send_timestamp)
+
+    def log_mention_raw(self, channel_id: int, send_timestamp: float) -> None:
+        self.last_reply_times.log_mention(channel_id, send_timestamp)

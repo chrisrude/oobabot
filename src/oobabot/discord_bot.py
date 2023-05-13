@@ -2,13 +2,13 @@
 #
 
 import asyncio
-import re
 import typing
 
 import discord
 
 from oobabot import bot_commands
 from oobabot import decide_to_respond
+from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import image_generator
 from oobabot import ooba_client
@@ -16,49 +16,6 @@ from oobabot import prompt_generator
 from oobabot import repetition_tracker
 from oobabot import response_stats
 from oobabot import types
-
-FORBIDDEN_CHARACTERS = r"[\n\r\t]"
-FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
-
-
-def sanitize_string(raw_string: str) -> str:
-    """
-    Filter out any characters that would confuse the AI
-    """
-    return FORBIDDEN_CHARACTERS_PATTERN.sub(" ", raw_string)
-
-
-def discord_message_to_generic_message(
-    raw_message: discord.Message,
-) -> types.GenericMessage:
-    """
-    Convert a discord message to a GenericMessage or subclass thereof
-    """
-    generic_args = {
-        "author_id": raw_message.author.id,
-        "author_name": sanitize_string(raw_message.author.display_name),
-        "message_id": raw_message.id,
-        "body_text": sanitize_string(raw_message.content),
-        "author_is_bot": raw_message.author.bot,
-        "send_timestamp": raw_message.created_at.timestamp(),
-    }
-    if isinstance(raw_message.channel, discord.DMChannel):
-        return types.DirectMessage(**generic_args)
-    if (
-        isinstance(raw_message.channel, discord.TextChannel)
-        or isinstance(raw_message.channel, discord.GroupChannel)
-        or isinstance(raw_message.channel, discord.Thread)
-    ):
-        return types.ChannelMessage(
-            channel_id=raw_message.channel.id,
-            mentions=[mention.id for mention in raw_message.mentions],
-            **generic_args,
-        )
-    fancy_logger.get().warning(
-        f"Unknown channel type {type(raw_message.channel)}, "
-        + f"unsolicited replies disabled.: {raw_message.channel}"
-    )
-    return types.GenericMessage(**generic_args)
 
 
 class DiscordBot(discord.Client):
@@ -167,7 +124,7 @@ class DiscordBot(discord.Client):
 
     async def on_message(self, raw_message: discord.Message) -> None:
         try:
-            message = discord_message_to_generic_message(raw_message)
+            message = discord_utils.discord_message_to_generic_message(raw_message)
             should_respond, is_summon = self.decide_to_respond.should_reply_to_message(
                 self.ai_user_id, message
             )
@@ -191,16 +148,28 @@ class DiscordBot(discord.Client):
                     # read our response in, so we're done here.  Abort!
                     return
 
-                # log the mention, now that we know the channel
-                # we want to reply to
-                if is_summon and isinstance(message, types.ChannelMessage):
-                    # we need to hack up the channel id, since it
-                    # might now be a thread.  We want to watch the
-                    # thread, not the original channel for unsolicited
-                    # responses.
-                    if isinstance(response_channel, discord.Thread):
-                        message.channel_id = response_channel.id
-                    self.decide_to_respond.log_mention(message)
+                # log the mention, now that we know the channel we
+                # want to montior later to continue to conversation
+                if isinstance(message, types.ChannelMessage):
+                    # this logic is weird, so let's explain it...
+                    #
+                    # we're eventually going to call log_mention()
+                    # if all these conditions pass.  When we do this,
+                    # we'll start monitoring the channel_id in the near
+                    # future for replies that we might respond to, unprompted.
+                    #
+                    # In the general case, we want to monitor the channel
+                    # only if we were summoned in it.
+                    #
+                    # However if we were summonned in a channel but are
+                    # creating a new thread for the answer (because of
+                    # the --reply-in-thread flag), we want to monitor
+                    # that thread, not the original channel.
+                    #
+                    if is_summon:
+                        if isinstance(response_channel, discord.Thread):
+                            message.channel_id = response_channel.id
+                        self.decide_to_respond.log_mention(message)
 
                 image_task = None
                 if self.image_generator is not None and image_prompt is not None:
@@ -251,7 +220,8 @@ class DiscordBot(discord.Client):
                 )
                 fancy_logger.get().debug(
                     f"Created response thread {response_channel.name} "
-                    f"in {raw_message.channel.name}"
+                    + f"({response_channel.id}) "
+                    + f"in {raw_message.channel.name}"
                 )
             else:
                 # This user can't create threads, so we won't resond.
@@ -292,7 +262,7 @@ class DiscordBot(discord.Client):
         last_returned = None
         async for item in aiter:
             last_returned = item
-            yield discord_message_to_generic_message(item)
+            yield discord_utils.discord_message_to_generic_message(item)
             items += 1
         if last_returned is not None and items < limit:
             # we've reached the beginning of the history, but
@@ -301,7 +271,7 @@ class DiscordBot(discord.Client):
             if last_returned.reference is not None:
                 ref = last_returned.reference.resolved
                 if ref is not None and isinstance(ref, discord.Message):
-                    yield discord_message_to_generic_message(ref)
+                    yield discord_utils.discord_message_to_generic_message(ref)
 
     async def recent_messages_following_thread(
         self, channel: discord.abc.Messageable
@@ -313,17 +283,6 @@ class DiscordBot(discord.Client):
         )
         return result
 
-    def get_channel_name(self, channel: discord.abc.Messageable) -> str:
-        if isinstance(channel, discord.Thread):
-            return "thread #" + channel.name
-        if isinstance(channel, discord.abc.GuildChannel):
-            return "channel #" + channel.name
-        if isinstance(channel, discord.DMChannel):
-            return "-DM-"
-        if isinstance(channel, discord.GroupChannel):
-            return "-GROUP-DM-"
-        return "-Unknown-"
-
     async def send_response_in_channel(
         self,
         message: types.GenericMessage,
@@ -331,7 +290,7 @@ class DiscordBot(discord.Client):
         image_requested: bool,
         response_channel: discord.abc.Messageable,
     ) -> None:
-        channel_name = self.get_channel_name(raw_message.channel)
+        channel_name = discord_utils.get_channel_name(raw_message.channel)
         fancy_logger.get().debug(
             f"Request from {message.author_name} in {channel_name}"
         )
@@ -371,8 +330,8 @@ class DiscordBot(discord.Client):
                     continue
 
                 response_message = await response_channel.send(sentence)
-                generic_response_message = discord_message_to_generic_message(
-                    response_message
+                generic_response_message = (
+                    discord_utils.discord_message_to_generic_message(response_message)
                 )
                 self.repetition_tracker.log_message(
                     raw_message.channel.id, generic_response_message

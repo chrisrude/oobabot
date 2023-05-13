@@ -143,7 +143,9 @@ def main():
 
     bot_commands_obj = bot_commands.BotCommands(
         ai_name=settings_obj.ai_name,
+        decide_to_respond=decide_to_responder,
         repetition_tracker=tracker,
+        reply_in_thread=settings_obj.reply_in_thread,
         template_store=template_store,
     )
 

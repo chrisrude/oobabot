@@ -1,5 +1,7 @@
 import discord
 
+from oobabot import decide_to_respond
+from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import repetition_tracker
 from oobabot import templates
@@ -9,11 +11,15 @@ class BotCommands:
     def __init__(
         self,
         ai_name: str,
+        decide_to_respond: decide_to_respond.DecideToRespond,
         repetition_tracker: repetition_tracker.RepetitionTracker,
+        reply_in_thread: bool,
         template_store: templates.TemplateStore,
     ):
         self.ai_name = ai_name
+        self.decide_to_respond = decide_to_respond
         self.repetition_tracker = repetition_tracker
+        self.reply_in_thread = reply_in_thread
         self.template_store = template_store
 
     async def on_ready(self, client: discord.Client):
@@ -21,44 +27,95 @@ class BotCommands:
         Register commands with Discord.
         """
 
+        async def fail(interaction: discord.Interaction, reason: str | None = None):
+            msg = reason
+            if msg is None:
+                command = "command"
+                if interaction.command is not None:
+                    command = interaction.command.name
+                fancy_logger.get().warning(
+                    f"{command} called from an unexpected channel: "
+                    + f"{interaction.channel_id}"
+                )
+                msg = f"{command} failed"
+
+            await interaction.response.send_message(msg, ephemeral=True, silent=True)
+
+        async def get_messageable(
+            interaction: discord.Interaction,
+        ) -> (
+            discord.TextChannel
+            | discord.Thread
+            | discord.DMChannel
+            | discord.GroupChannel
+            | None
+        ):
+            if interaction.channel_id is not None:
+                # find the current message in this channel
+                # tell the Repetition Tracker to hide messages
+                # before this message
+                channel = await interaction.client.fetch_channel(interaction.channel_id)
+                if channel is not None:
+                    if isinstance(channel, discord.TextChannel):
+                        return channel
+                    if isinstance(channel, discord.Thread):
+                        return channel
+                    if isinstance(channel, discord.DMChannel):
+                        return channel
+                    if isinstance(channel, discord.GroupChannel):
+                        return channel
+            return None
+
+        @discord.app_commands.command(
+            name="say",
+            description=f"Force {self.ai_name} to say the provided message.",
+        )
+        @discord.app_commands.rename(text_to_send="message")
+        @discord.app_commands.describe(
+            text_to_send=f"Message to force {self.ai_name} to say."
+        )
+        async def say(interaction: discord.Interaction, text_to_send: str):
+            if interaction.channel_id is None:
+                await fail(interaction)
+                return
+
+            # if reply_in_thread is True, we don't want our bot to
+            # speak in guild channels, only threads and private messages
+            if self.reply_in_thread:
+                channel = await get_messageable(interaction)
+                if channel is None or isinstance(channel, discord.TextChannel):
+                    await fail(interaction, f"{self.ai_name} may only speak in threads")
+                    return
+
+            fancy_logger.get().debug(
+                f"say called by {interaction.user.name} in {interaction.channel_id}"
+            )
+            # this will cause the bot to monitor the channel
+            # and consider unsolicited responses
+            self.decide_to_respond.log_mention_raw(
+                channel_id=interaction.channel_id,
+                send_timestamp=interaction.created_at.timestamp(),
+            )
+            await interaction.response.send_message(text_to_send)
+
         @discord.app_commands.command(
             name="lobotomize",
             description=f"Erase {self.ai_name}'s memory of any message "
             + "before now in this channel.",
         )
-        @discord.app_commands.guild_only()
         async def lobotomize(interaction: discord.Interaction):
-            async def fail():
-                fancy_logger.get().warning(
-                    "lobotomize called from an unexpected channel: "
-                    + f"{interaction.channel_id}"
-                )
-                await interaction.response.send_message(
-                    "failed to lobotomize", ephemeral=True, silent=True
-                )
-
-            if interaction.channel_id is None:
-                await fail()
-                return
-
-            # find the current message in this channel
-            # tell the Repetition Tracker to hide messages
-            # before this message
-            channel = interaction.client.get_channel(interaction.channel_id)
+            channel = await get_messageable(interaction)
             if channel is None:
-                await fail()
-                return
-
-            if not isinstance(channel, discord.abc.Messageable):
-                await fail()
+                await fail(interaction)
                 return
 
             # find the current message in this channel
             # tell the Repetition Tracker to hide messages
             # before this message
             async for message in channel.history(limit=1):
+                channel_name = discord_utils.get_channel_name(channel)
                 fancy_logger.get().info(
-                    f"lobotomize called in #{channel.name}, "
+                    f"lobotomize called in #{channel_name}, "
                     + f"hiding messages before {message.id}"
                 )
                 self.repetition_tracker.hide_messages_before(
@@ -84,6 +141,7 @@ class BotCommands:
 
         tree = discord.app_commands.CommandTree(client)
         tree.add_command(lobotomize)
+        tree.add_command(say)
         commands = await tree.sync(guild=None)
         for command in commands:
             fancy_logger.get().info(
