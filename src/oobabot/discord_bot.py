@@ -36,7 +36,7 @@ def discord_message_to_generic_message(raw_message: discord.Message) -> GenericM
     """
     generic_args = {
         "author_id": raw_message.author.id,
-        "author_name": sanitize_string(raw_message.author.name),
+        "author_name": sanitize_string(raw_message.author.display_name),
         "message_id": raw_message.id,
         "body_text": sanitize_string(raw_message.content),
         "author_is_bot": raw_message.author.bot,
@@ -104,6 +104,7 @@ class DiscordBot(discord.Client):
 
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.members = True
 
         super().__init__(intents=intents)
 

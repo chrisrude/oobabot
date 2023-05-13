@@ -90,7 +90,5 @@ class BotCommands:
         get_logger().debug(
             "If you try to run any command within the first ~5 minutes of "
             + "the bot starting, it will fail with the error: 'This command "
-            + "is outdated, please try again in a few minutes'.  "
-            + "This is apparently what Discord just does, and nothing we can "
-            + " fix.  Sorry!"
+            + "is outdated,...'."
         )
