@@ -150,27 +150,40 @@ class DecideToRespond:
 
     def should_reply_to_message(
         self, our_user_id: int, message: GenericMessage
-    ) -> bool:
+    ) -> typing.Tuple[bool, bool]:
+        """
+        Returns a tuple of (should_reply, is_direct_mention).
+
+        Direct mentions are always replied to, but also, the
+        caller should log the mention later by calling log_mention().
+
+        The only reason this method doesn't to so itself is that
+        in the case of us generating a thread to reply on, the
+        channel ID we want to track will be that of the thread
+        we create, not the channel the message was posted in.
+        """
+
         # ignore messages from other bots, out of fear of infinite loops,
         # as well as world domination
         if message.author_is_bot:
-            return False
+            return (False, False)
 
         # we do not want the bot to reply to itself.  This is redundant
         # with the previous check, except it won't be if someone decides
         # to run this under their own user token, rather than a proper
         # bot token.
         if message.author_id == our_user_id:
-            return False
+            return (False, False)
 
         if self.is_directly_mentioned(our_user_id, message):
-            if isinstance(message, ChannelMessage):
-                self.last_reply_times.log_mention(message)
-            return True
+            return (True, True)
 
         if isinstance(message, ChannelMessage):
             if self.provide_unsolicited_reply_in_channel(our_user_id, message):
-                return True
+                return (True, False)
 
         # ignore anything else
-        return False
+        return (False, False)
+
+    def log_mention(self, message: ChannelMessage) -> None:
+        self.last_reply_times.log_mention(message)

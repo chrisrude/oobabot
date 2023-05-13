@@ -1,8 +1,6 @@
 from enum import Enum
 import typing
 
-from oobabot.fancy_logging import get_logger
-
 
 class GenericMessage(object):
     def __init__(

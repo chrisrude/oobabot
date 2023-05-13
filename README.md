@@ -277,5 +277,7 @@ flow, without forcing others to always post a wakeword.
 - detection of requests for photos is very crude, and will likely be improved in the future.
 - some of the default settings are very specific to my use case, and will likely be made
   configurable in the future
+- public threads in 'age restricted' channels are treated as if they
+  were not age-restricted
 - sometimes the bot wants to continue conversations on behalf of other members of the chatroom.  I have some hacks in place to notice and truncate this behavior, but it can lead to terse responses on occasion.
 - found one not listed here?  Have an idea?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!

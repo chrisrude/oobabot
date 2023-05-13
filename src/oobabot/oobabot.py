@@ -153,6 +153,7 @@ def main():
         persona=settings.persona,
         ignore_dms=settings.ignore_dms,
         dont_split_responses=settings.dont_split_responses,
+        reply_in_thread=settings.reply_in_thread,
         log_all_the_things=settings.log_all_the_things,
     )
 

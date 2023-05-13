@@ -43,8 +43,10 @@ def discord_message_to_generic_message(raw_message: discord.Message) -> GenericM
     }
     if isinstance(raw_message.channel, discord.DMChannel):
         return DirectMessage(**generic_args)
-    if isinstance(raw_message.channel, discord.TextChannel) or isinstance(
-        raw_message.channel, discord.GroupChannel
+    if (
+        isinstance(raw_message.channel, discord.TextChannel)
+        or isinstance(raw_message.channel, discord.GroupChannel)
+        or isinstance(raw_message.channel, discord.Thread)
     ):
         return ChannelMessage(
             channel_id=raw_message.channel.id,
@@ -82,6 +84,7 @@ class DiscordBot(discord.Client):
         persona: str,
         ignore_dms: bool,
         dont_split_responses: bool,
+        reply_in_thread: bool,
         log_all_the_things: bool,
     ):
         self.ooba_client = ooba_client
@@ -97,6 +100,7 @@ class DiscordBot(discord.Client):
 
         self.ignore_dms = ignore_dms
         self.dont_split_responses = dont_split_responses
+        self.reply_in_thread = reply_in_thread
         self.log_all_the_things = log_all_the_things
 
         # a list of timestamps in which we last posted to a channel
@@ -132,6 +136,11 @@ class DiscordBot(discord.Client):
         else:
             get_logger().debug("Responses: streamed as separate sentences")
 
+        if self.image_generator:
+            get_logger().debug("Image generation: enabled")
+        else:
+            get_logger().debug("Image generation: disabled")
+
         get_logger().debug(f"AI name: {self.ai_name}")
         get_logger().debug(f"AI persona: {self.persona}")
 
@@ -147,24 +156,47 @@ class DiscordBot(discord.Client):
     async def on_message(self, raw_message: discord.Message) -> None:
         try:
             message = discord_message_to_generic_message(raw_message)
-            if not self.decide_to_respond.should_reply_to_message(
+            should_respond, is_summon = self.decide_to_respond.should_reply_to_message(
                 self.ai_user_id, message
-            ):
+            )
+            if not should_respond:
                 return
             async with raw_message.channel.typing():
-                image_task = None
+                image_prompt = None
                 if self.image_generator is not None:
-                    image_task = (
-                        await self.image_generator.maybe_generate_image_from_message(
-                            raw_message
-                        )
+                    # are we creating an image?
+                    image_prompt = self.image_generator.maybe_get_image_prompt(
+                        raw_message
                     )
 
-                message_task = self.send_response(
+                message_task, response_channel = await self.send_response(
                     message=message,
                     raw_message=raw_message,
-                    image_requested=image_task is not None,
+                    image_requested=image_prompt is not None,
                 )
+                if response_channel is None:
+                    # we failed to create a thread that the user could
+                    # read our response in, so we're done here.  Abort!
+                    return
+
+                # log the mention, now that we know the channel
+                # we want to reply to
+                if is_summon and isinstance(message, ChannelMessage):
+                    # we need to hack up the channel id, since it
+                    # might now be a thread.  We want to watch the
+                    # thread, not the original channel for unsolicited
+                    # responses.
+                    if isinstance(response_channel, discord.Thread):
+                        message.channel_id = response_channel.id
+                    self.decide_to_respond.log_mention(message)
+
+                image_task = None
+                if self.image_generator is not None and image_prompt is not None:
+                    image_task = await self.image_generator.generate_image(
+                        image_prompt,
+                        raw_message,
+                        response_channel=response_channel,
+                    )
 
                 response_tasks = [
                     task for task in [message_task, image_task] if task is not None
@@ -181,6 +213,59 @@ class DiscordBot(discord.Client):
         message: GenericMessage,
         raw_message: discord.Message,
         image_requested: bool,
+    ) -> typing.Tuple[asyncio.Task | None, discord.abc.Messageable | None]:
+        """
+        Send a response to a message.
+
+        Returns a tuple of the task that was created to send the message,
+        and the channel that the message was sent to.
+
+        If no message was sent, the task and channel will be None.
+        """
+        response_channel = raw_message.channel
+        if (
+            self.reply_in_thread
+            and isinstance(raw_message.channel, discord.TextChannel)
+            and isinstance(raw_message.author, discord.Member)
+        ):
+            # we want to create a response thread, if possible
+            # but we have to see if the user has permission to do so
+            # if the user can't we wont respond at all.
+            perms = raw_message.channel.permissions_for(raw_message.author)
+            if perms.create_public_threads:
+                response_channel = await raw_message.create_thread(
+                    name=f"{self.ai_name}: Response to {raw_message.author.name}",
+                )
+                get_logger().debug(
+                    f"Created response thread {response_channel.name} "
+                    f"in {raw_message.channel.name}"
+                )
+            else:
+                # This user can't create threads, so we won't resond.
+                # The reason we don't respond in the channel is that
+                # it can create confusion later if a second user who
+                # DOES have thread-create permission replies to that
+                # message.  We'd end up creating a thread for that
+                # second user's response, and again for a third user,
+                # etc.
+                get_logger().debug("User can't create threads, not responding.")
+                return (None, None)
+
+        response_coro = self.send_response_in_channel(
+            message=message,
+            raw_message=raw_message,
+            image_requested=image_requested,
+            response_channel=response_channel,
+        )
+        response_task = asyncio.create_task(response_coro)
+        return (response_task, response_channel)
+
+    async def send_response_in_channel(
+        self,
+        message: GenericMessage,
+        raw_message: discord.Message,
+        image_requested: bool,
+        response_channel: discord.abc.Messageable,
     ) -> None:
         get_logger().debug(f"Request from {message.author_name}")
 
@@ -233,7 +318,7 @@ class DiscordBot(discord.Client):
                     )
                     break
 
-                response_message = await raw_message.channel.send(sentence)
+                response_message = await response_channel.send(sentence)
                 generic_response_message = discord_message_to_generic_message(
                     response_message
                 )

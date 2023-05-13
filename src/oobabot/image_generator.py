@@ -192,9 +192,14 @@ class ImageGenerator:
         ]
 
     async def _generate_image(
-        self, image_prompt: str, raw_message: discord.Message
+        self,
+        image_prompt: str,
+        raw_message: discord.Message,
+        response_channel: discord.abc.Messageable,
     ) -> discord.Message:
         is_channel_nsfw = False
+
+        # note: public threads in NSFW chanels are not considered here
         if isinstance(raw_message.channel, discord.TextChannel):
             is_channel_nsfw = raw_message.channel.is_nsfw()
 
@@ -212,17 +217,39 @@ class ImageGenerator:
             template_store=self.template_store,
         )
 
-        image_message = await raw_message.channel.send(
+        kwargs = {}
+        # we can only pass a reference if the message is in the same channel
+        # as the original request.  Also, send() won't take None of this
+        # argument, so we need to conditionally add it.
+        if raw_message.channel == response_channel:
+            kwargs["reference"] = raw_message
+
+        image_message = await response_channel.send(
             content=regen_view.get_image_message_text(),
-            reference=raw_message,
             file=file,
             view=regen_view,
+            **kwargs,
         )
         regen_view.image_message = image_message
         return image_message
 
-    async def maybe_generate_image_from_message(
-        self, raw_message: discord.Message
+    def maybe_get_image_prompt(self, raw_message: discord.Message) -> str | None:
+        image_prompt = None
+        for image_pattern in self.image_patterns:
+            match = image_pattern.search(raw_message.content)
+            if match:
+                image_prompt = match.group(2)
+                return image_prompt
+        if image_prompt is None:
+            return None
+
+        get_logger().debug("Found image prompt: %s", image_prompt)
+
+    async def generate_image(
+        self,
+        image_prompt: str,
+        raw_message: discord.Message,
+        response_channel: discord.abc.Messageable,
     ) -> asyncio.Task[discord.Message] | None:
         """
         If the message contains a photo word, kick off a task
@@ -231,17 +258,7 @@ class ImageGenerator:
 
         If the message does not contain a photo word, return None.
         """
-        image_prompt = None
-        for image_pattern in self.image_patterns:
-            match = image_pattern.search(raw_message.content)
-            if match:
-                image_prompt = match.group(2)
-                break
-        if image_prompt is None:
-            return None
-
-        get_logger().debug("Found image prompt: %s", image_prompt)
         create_image_task = asyncio.create_task(
-            self._generate_image(image_prompt, raw_message)
+            self._generate_image(image_prompt, raw_message, response_channel)
         )
         return create_image_task

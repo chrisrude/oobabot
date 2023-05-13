@@ -202,7 +202,14 @@ class Settings(argparse.ArgumentParser):
             + "bot to play.  Alternatively, this can be set with the "
             + f"{self.OOBABOT_PERSONA_ENV_VAR} environment variable.",
         )
-
+        oobabooga_group.add_argument(
+            "--reply-in-thread",
+            default=False,
+            help="When set, the bot will generate a new thread for each "
+            + "response it generates.  But it will only do so if the "
+            + "user who prompted the bot has thread-create permissions.",
+            action="store_true",
+        )
         ###########################################################
         # Stable Diffusion Settings
 
@@ -276,6 +283,7 @@ class Settings(argparse.ArgumentParser):
         self.dont_split_responses = self._settings.pop("dont_split_responses")
         self.history_lines = self._settings.pop("history_lines")
         self.ignore_dms = self._settings.pop("ignore_dms")
+        self.reply_in_thread = self._settings.pop("reply_in_thread")
         self.wakewords = self._settings.pop("wakewords")
 
         # OogaBooga Settings
