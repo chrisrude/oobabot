@@ -8,7 +8,7 @@ import typing
 
 import aiohttp
 
-from oobabot.fancy_logging import get_logger
+from oobabot import fancy_logger
 from oobabot.http_client import OobaClientError
 from oobabot.http_client import SerializedHttpClient
 from oobabot.sentence_splitter import SentenceSplitter
@@ -108,13 +108,17 @@ class OobaClient(SerializedHttpClient):
                         return
 
                     else:
-                        get_logger().warning(f"Unexpected event: {incoming_data}")
+                        fancy_logger.get().warning(f"Unexpected event: {incoming_data}")
 
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    get_logger().error(f"WebSocket connection closed with error: {msg}")
+                    fancy_logger.get().error(
+                        f"WebSocket connection closed with error: {msg}"
+                    )
                     raise OobaClientError(
                         f"WebSocket connection closed with error {msg}"
                     )
                 elif msg.type == aiohttp.WSMsgType.CLOSED:
-                    get_logger().info(f"WebSocket connection closed normally: {msg}")
+                    fancy_logger.get().info(
+                        f"WebSocket connection closed normally: {msg}"
+                    )
                     return

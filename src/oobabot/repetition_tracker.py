@@ -1,6 +1,6 @@
 import typing
 
-from oobabot.fancy_logging import get_logger
+from oobabot import fancy_logger
 from oobabot.types import GenericMessage
 
 
@@ -42,12 +42,12 @@ class RepetitionTracker:
             repetition_count = 0
 
         if repetition_count > 0:
-            get_logger().debug(
+            fancy_logger.get().debug(
                 f"Repetition count for channel {channel_id} is {repetition_count}"
             )
 
         if self.should_throttle(repetition_count):
-            get_logger().warning(
+            fancy_logger.get().warning(
                 "Repetition found, will throttle history for channel "
                 + f"{channel_id} in next request"
             )
@@ -66,7 +66,7 @@ class RepetitionTracker:
         sentence, _, repetition_count = self.repetition_count.get(
             channel_id, ("", 0, 0)
         )
-        get_logger().info(
+        fancy_logger.get().info(
             "Hiding messages before message ID "
             + f"{message_id} in channel {channel_id}"
         )

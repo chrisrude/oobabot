@@ -7,9 +7,9 @@ import typing
 
 import discord
 
+from oobabot import fancy_logger
 from oobabot.bot_commands import BotCommands
 from oobabot.decide_to_respond import DecideToRespond
-from oobabot.fancy_logging import get_logger
 from oobabot.image_generator import ImageGenerator
 from oobabot.ooba_client import OobaClient
 from oobabot.prompt_generator import PromptGenerator
@@ -54,7 +54,7 @@ def discord_message_to_generic_message(raw_message: discord.Message) -> GenericM
             mentions=[mention.id for mention in raw_message.mentions],
             **generic_args,
         )
-    get_logger().warning(
+    fancy_logger.get().warning(
         f"Unknown channel type {type(raw_message.channel)}, "
         + f"unsolicited replies disabled.: {raw_message.channel}"
     )
@@ -119,36 +119,40 @@ class DiscordBot(discord.Client):
         else:
             user_id_str = "<unknown>"
 
-        get_logger().info(f"Connected to discord as {self.user} (ID: {user_id_str})")
-        get_logger().debug(
+        fancy_logger.get().info(
+            f"Connected to discord as {self.user} (ID: {user_id_str})"
+        )
+        fancy_logger.get().debug(
             f"monitoring {num_channels} channels across " + f"{num_guilds} server(s)"
         )
         if self.ignore_dms:
-            get_logger().debug("Ignoring DMs")
+            fancy_logger.get().debug("Ignoring DMs")
         else:
-            get_logger().debug("listening to DMs")
+            fancy_logger.get().debug("listening to DMs")
 
         if self.dont_split_responses:
-            get_logger().debug("Responses: returned as single messages")
+            fancy_logger.get().debug("Responses: returned as single messages")
         else:
-            get_logger().debug("Responses: streamed as separate sentences")
+            fancy_logger.get().debug("Responses: streamed as separate sentences")
 
         if self.image_generator:
-            get_logger().debug("Image generation: enabled")
+            fancy_logger.get().debug("Image generation: enabled")
         else:
-            get_logger().debug("Image generation: disabled")
+            fancy_logger.get().debug("Image generation: disabled")
 
-        get_logger().debug(f"AI name: {self.ai_name}")
-        get_logger().debug(f"AI persona: {self.persona}")
+        fancy_logger.get().debug(f"AI name: {self.ai_name}")
+        fancy_logger.get().debug(f"AI persona: {self.persona}")
 
-        get_logger().debug(f"History: {self.prompt_generator.history_lines} lines ")
+        fancy_logger.get().debug(
+            f"History: {self.prompt_generator.history_lines} lines "
+        )
 
         str_wakewords = (
             ", ".join(self.decide_to_respond.wakewords)
             if self.decide_to_respond.wakewords
             else "<none>"
         )
-        get_logger().debug(f"Wakewords: {str_wakewords}")
+        fancy_logger.get().debug(f"Wakewords: {str_wakewords}")
 
         # we do this at the very end because when you restart
         # the bot, it can take a while for the commands to
@@ -157,7 +161,7 @@ class DiscordBot(discord.Client):
             # register the commands
             await self.bot_commands.on_ready(self)
         except Exception as e:
-            get_logger().warning(
+            fancy_logger.get().warning(
                 f"Failed to register commands: {e} (continuing without commands)"
             )
 
@@ -212,7 +216,7 @@ class DiscordBot(discord.Client):
                 await asyncio.wait(response_tasks)
 
         except Exception as e:
-            get_logger().error(
+            fancy_logger.get().error(
                 f"Exception while processing message: {e}", exc_info=True
             )
 
@@ -244,7 +248,7 @@ class DiscordBot(discord.Client):
                 response_channel = await raw_message.create_thread(
                     name=f"{self.ai_name}: Response to {raw_message.author.name}",
                 )
-                get_logger().debug(
+                fancy_logger.get().debug(
                     f"Created response thread {response_channel.name} "
                     f"in {raw_message.channel.name}"
                 )
@@ -256,7 +260,7 @@ class DiscordBot(discord.Client):
                 # message.  We'd end up creating a thread for that
                 # second user's response, and again for a third user,
                 # etc.
-                get_logger().debug("User can't create threads, not responding.")
+                fancy_logger.get().debug("User can't create threads, not responding.")
                 return (None, None)
 
         response_coro = self.send_response_in_channel(
@@ -327,7 +331,9 @@ class DiscordBot(discord.Client):
         response_channel: discord.abc.Messageable,
     ) -> None:
         channel_name = self.get_channel_name(raw_message.channel)
-        get_logger().debug(f"Request from {message.author_name} in {channel_name}")
+        fancy_logger.get().debug(
+            f"Request from {message.author_name} in {channel_name}"
+        )
 
         recent_messages = await self.recent_messages_following_thread(response_channel)
 
@@ -376,7 +382,7 @@ class DiscordBot(discord.Client):
                 response_stats.log_response_part()
 
         except Exception as err:
-            get_logger().error(f"Error: {str(err)}")
+            fancy_logger.get().error(f"Error: {str(err)}")
             self.aggregate_response_stats.log_response_failure()
             return
 
@@ -391,13 +397,17 @@ class DiscordBot(discord.Client):
             # if the AI gives itself a second line, just ignore
             # the line instruction and continue
             if self.prompt_generator.bot_prompt_line == line:
-                get_logger().warning(f'Filtered out "{line}" from response, continuing')
+                fancy_logger.get().warning(
+                    f'Filtered out "{line}" from response, continuing'
+                )
                 continue
 
             # hack: abort response if it looks like the AI is
             # continuing the conversation as someone else
             if line.endswith(" says:"):
-                get_logger().warning(f'Filtered out "{line}" from response, aborting')
+                fancy_logger.get().warning(
+                    f'Filtered out "{line}" from response, aborting'
+                )
                 break
 
             if not line and not previous_line:

@@ -3,7 +3,7 @@ import re
 import typing
 from typing import List
 
-from oobabot.fancy_logging import get_logger
+from oobabot import fancy_logger
 from oobabot.types import ChannelMessage
 from oobabot.types import DirectMessage
 from oobabot.types import GenericMessage
@@ -137,7 +137,7 @@ class DecideToRespond:
             response_chance += self.interrobang_bonus
 
         time_since_last_mention = self.last_reply_times.time_since_last_mention(message)
-        get_logger().debug(
+        fancy_logger.get().debug(
             f"Considering unsolicited message in channel {message.channel_id} "
             f"after {time_since_last_mention:2.0f} seconds, "
             f"with chance {response_chance*100.0:2.0f}%."

@@ -9,7 +9,7 @@ from typing import Dict
 
 import aiohttp
 
-from oobabot.fancy_logging import get_logger
+from oobabot import fancy_logger
 from oobabot.http_client import SerializedHttpClient
 
 
@@ -143,14 +143,14 @@ class StableDiffusionClient(SerializedHttpClient):
             if v == current_options[k]:
                 continue
             options_to_set[k] = v
-            get_logger().info(
+            fancy_logger.get().info(
                 self.LOG_PREFIX
                 + f" changing option '{k}' from to "
                 + f"'{current_options[k]}' to '{v}'"
             )
 
         if not options_to_set:
-            get_logger().debug(
+            fancy_logger.get().debug(
                 self.LOG_PREFIX + "Options are already set correctly, no changes made."
             )
             return
@@ -203,7 +203,7 @@ class StableDiffusionClient(SerializedHttpClient):
             request["sampler_name"] = self._sampler
 
         async def do_post() -> bytes:
-            get_logger().debug(
+            fancy_logger.get().debug(
                 self.LOG_PREFIX
                 + f"Image request (nsfw: {is_channel_nsfw}): {request['prompt']}"
             )
@@ -218,7 +218,7 @@ class StableDiffusionClient(SerializedHttpClient):
                 duration = time.time() - start_time
                 json_body = await response.json()
                 bytes = base64.b64decode(json_body["images"][0])
-                get_logger().debug(
+                fancy_logger.get().debug(
                     self.LOG_PREFIX
                     + "Image generated, {} bytes in {:.2f} seconds".format(
                         len(bytes), duration
@@ -237,7 +237,7 @@ class StableDiffusionClient(SerializedHttpClient):
                         raise e
                     if tries > 2:
                         raise e
-                    get_logger().warning(
+                    fancy_logger.get().warning(
                         self.LOG_PREFIX
                         + f"Connection reset error: {e}, retrying in 1 second"
                     )
@@ -251,19 +251,21 @@ class StableDiffusionClient(SerializedHttpClient):
         samplers = await self.get_samplers()
         if self.desired_sampler is not None:
             if self.desired_sampler in samplers:
-                get_logger().debug(
+                fancy_logger.get().debug(
                     self.LOG_PREFIX + "Using desired sampler '%s'", self.desired_sampler
                 )
                 self._sampler = self.desired_sampler
             else:
-                get_logger().warn(
+                fancy_logger.get().warn(
                     self.LOG_PREFIX + "Desired sampler '%s' not available",
                     self.desired_sampler,
                 )
                 self._sampler = None
         if self._sampler is None:
-            get_logger().debug(self.LOG_PREFIX + "Using default sampler on SD server")
-            get_logger().debug(
+            fancy_logger.get().debug(
+                self.LOG_PREFIX + "Using default sampler on SD server"
+            )
+            fancy_logger.get().debug(
                 self.LOG_PREFIX + "Available samplers: %s", ", ".join(samplers)
             )
             self._sampler = None
@@ -271,7 +273,7 @@ class StableDiffusionClient(SerializedHttpClient):
     async def setup(self):
         await self.set_sampler()
         await self.set_options()
-        get_logger().debug(
+        fancy_logger.get().debug(
             self.LOG_PREFIX
             + "Using negative prompt: "
             + self.negative_prompt[:20]

@@ -1,7 +1,7 @@
 import discord
 
+from oobabot import fancy_logger
 from oobabot import templates
-from oobabot.fancy_logging import get_logger
 from oobabot.repetition_tracker import RepetitionTracker
 
 
@@ -29,7 +29,7 @@ class BotCommands:
         @discord.app_commands.guild_only()
         async def lobotomize(interaction: discord.Interaction):
             async def fail():
-                get_logger().warning(
+                fancy_logger.get().warning(
                     "lobotomize called from an unexpected channel: "
                     + f"{interaction.channel_id}"
                 )
@@ -57,7 +57,7 @@ class BotCommands:
             # tell the Repetition Tracker to hide messages
             # before this message
             async for message in channel.history(limit=1):
-                get_logger().info(
+                fancy_logger.get().info(
                     f"lobotomize called in #{channel.name}, "
                     + f"hiding messages before {message.id}"
                 )
@@ -78,16 +78,18 @@ class BotCommands:
                 silent=True,
             )
 
-        get_logger().debug("Registering commands, this may take a while sometimes...")
+        fancy_logger.get().debug(
+            "Registering commands, this may take a while sometimes..."
+        )
 
         tree = discord.app_commands.CommandTree(client)
         tree.add_command(lobotomize)
         commands = await tree.sync(guild=None)
         for command in commands:
-            get_logger().info(
+            fancy_logger.get().info(
                 f"Registered command: {command.name}: {command.description}"
             )
-        get_logger().debug(
+        fancy_logger.get().debug(
             "If you try to run any command within the first ~5 minutes of "
             + "the bot starting, it will fail with the error: 'This command "
             + "is outdated,...'."

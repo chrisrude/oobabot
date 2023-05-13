@@ -2,8 +2,8 @@
 # the message history and persona.
 import typing
 
+from oobabot import fancy_logger
 from oobabot import templates
-from oobabot.fancy_logging import get_logger
 from oobabot.templates import TemplateStore
 from oobabot.types import GenericMessage
 
@@ -167,7 +167,7 @@ class PromptGenerator:
 
             if len(line) > prompt_len_remaining:
                 num_discarded_lines = self.history_lines - len(history_lines)
-                get_logger().warn(
+                fancy_logger.get().warn(
                     "ran out of prompt space, discarding "
                     + f"{num_discarded_lines} lines "
                     + "of chat history"

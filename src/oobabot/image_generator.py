@@ -5,8 +5,8 @@ from typing import List
 
 import discord
 
+from oobabot import fancy_logger
 from oobabot import templates
-from oobabot.fancy_logging import get_logger
 from oobabot.sd_client import StableDiffusionClient
 from oobabot.templates import TemplateStore
 
@@ -71,7 +71,7 @@ class StableDiffusionImageView(discord.ui.View):
                 await interaction.response.defer()
                 await self.get_image_message().edit(attachments=[regen_file])
             except Exception as e:
-                get_logger().error(f"Could not regenerate image: {e}")
+                fancy_logger.get().error(f"Could not regenerate image: {e}")
 
         btn_try_again.callback = on_try_again
 
@@ -208,7 +208,7 @@ class ImageGenerator:
         try:
             file = await image_task_to_file(image_task, image_prompt)
         except Exception as e:
-            get_logger().error(f"Could not generate image: {e}")
+            fancy_logger.get().error(f"Could not generate image: {e}")
             error_message = self.template_store.format(
                 templates.Templates.IMAGE_GENERATION_ERROR,
                 {
@@ -253,7 +253,7 @@ class ImageGenerator:
         if image_prompt is None:
             return None
 
-        get_logger().debug("Found image prompt: %s", image_prompt)
+        fancy_logger.get().debug("Found image prompt: %s", image_prompt)
 
     async def generate_image(
         self,

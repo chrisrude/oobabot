@@ -1,7 +1,7 @@
 import time
 from typing import Callable
 
-from oobabot.fancy_logging import get_logger
+from oobabot import fancy_logger
 
 
 class ResponseStats:
@@ -42,7 +42,7 @@ class ResponseStats:
         This writes the statistics for this specific
         request to the log.
         """
-        get_logger().debug(
+        fancy_logger.get().debug(
             log_prefix
             + f"tokens: {self.tokens}, "
             + f"time: {self.duration:.2f}s, "
@@ -152,41 +152,41 @@ class AggregateResponseStats:
         Call this after all AggregateResponseStats have been handled.
         """
         if 0 == self.total_requests_received:
-            get_logger().info("No requests handled")
+            fancy_logger.get().info("No requests handled")
             return
 
-        get_logger().info(
+        fancy_logger.get().info(
             f"Recevied {self.total_requests_received} request(s), "
             + f"sent {self.total_successful_responses} successful responses "
             + f"and failed to send one {self.total_failed_responses} times(s)"
         )
 
         if self.total_failed_responses > 0:
-            get_logger().error(
+            fancy_logger.get().error(
                 "Error rate:                  " + f"{self.error_rate()}%"
             )
 
         if self.total_successful_responses > 0:
-            get_logger().debug(
+            fancy_logger.get().debug(
                 "Average response time:       "
                 + f"{self.average_response_time():6.2f}s"
             )
-            get_logger().debug(
+            fancy_logger.get().debug(
                 "Average response latency:    "
                 + f"{self.average_response_latency():6.2f}s"
             )
-            get_logger().debug(
+            fancy_logger.get().debug(
                 "Average tokens per response: "
                 + f"{self.average_tokens_per_second():6.2f}"
             )
 
         if self.total_response_time_seconds > 0:
-            get_logger().debug(
+            fancy_logger.get().debug(
                 "Average tokens per second:   "
                 + f"{self.average_tokens_per_second():6.2f}"
             )
 
-        get_logger().debug(
+        fancy_logger.get().debug(
             "Prompt length: "
             + f"max: {self.prompt_max_chars}, "
             + f"min: {self.prompt_min_chars}, "

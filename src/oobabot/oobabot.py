@@ -8,11 +8,10 @@ import sys
 
 import aiohttp
 
+from oobabot import fancy_logger
 from oobabot.bot_commands import BotCommands
 from oobabot.decide_to_respond import DecideToRespond
 from oobabot.discord_bot import DiscordBot
-from oobabot.fancy_logging import get_logger
-from oobabot.fancy_logging import init_logging
 from oobabot.image_generator import ImageGenerator
 from oobabot.ooba_client import OobaClient
 from oobabot.ooba_client import OobaClientError
@@ -30,7 +29,7 @@ def verify_client(client, service_name, url):
         async with client:
             await client.setup()
 
-    logger = get_logger()
+    logger = fancy_logger.get()
     logger.info(f"{service_name} is at {url}")
     try:
         asyncio.run(try_setup(client))
@@ -43,7 +42,7 @@ def verify_client(client, service_name, url):
 
 
 def main():
-    logger = init_logging()
+    logger = fancy_logger.init_logging()
 
     settings = Settings()
     settings.load()

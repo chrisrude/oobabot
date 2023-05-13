@@ -44,12 +44,12 @@ class ColorfulLoggingFormatter(logging.Formatter):
             return record.getMessage()
 
 
-def get_logger(name: str = "oobabot") -> logging.Logger:
+def get(name: str = "oobabot") -> logging.Logger:
     return logging.getLogger(name)
 
 
 def init_logging() -> logging.Logger:
-    logger = get_logger()
+    logger = get()
     logger.setLevel(logging.DEBUG)
 
     console_handler = logging.StreamHandler()
