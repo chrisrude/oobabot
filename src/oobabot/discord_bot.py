@@ -178,14 +178,13 @@ class DiscordBot(discord.Client):
         num_guilds = len(guilds)
         num_channels = sum([len(guild.channels) for guild in guilds])
 
-        # todo: re-enable this after more testing
-        # try:
-        #     # register the commands
-        #     await self.init_commands()
-        # except Exception as e:
-        #     get_logger().warning(
-        #         f"Failed to register commands: {e} (continuing without commands)"
-        #     )
+        try:
+            # register the commands
+            await self.init_commands()
+        except Exception as e:
+            get_logger().warning(
+                f"Failed to register commands: {e} (continuing without commands)"
+            )
 
         if self.user:
             self.ai_user_id = self.user.id
