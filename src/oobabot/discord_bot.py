@@ -246,7 +246,8 @@ class DiscordBot(discord.Client):
             perms = raw_message.channel.permissions_for(raw_message.author)
             if perms.create_public_threads:
                 response_channel = await raw_message.create_thread(
-                    name=f"{self.ai_name}: Response to {raw_message.author.name}",
+                    name=f"{self.ai_name}, replying to "
+                    + f"{raw_message.author.display_name}",
                 )
                 fancy_logger.get().debug(
                     f"Created response thread {response_channel.name} "
