@@ -59,6 +59,19 @@ class RepetitionTracker:
             repetition_count,
         )
 
+    def hide_messages_before(self, channel_id: int, message_id: int) -> None:
+        """
+        Hides all messages before the given message ID in the given channel
+        """
+        sentence, _, repetition_count = self.repetition_count.get(
+            channel_id, ("", 0, 0)
+        )
+        get_logger().info(
+            "Hiding messages before message ID "
+            + f"{message_id} in channel {channel_id}"
+        )
+        self.repetition_count[channel_id] = (sentence, message_id, repetition_count)
+
     def should_throttle(self, repetition_count: int) -> bool:
         """
         Returns whether the bot should throttle history for a given repetition count

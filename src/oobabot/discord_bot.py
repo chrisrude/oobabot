@@ -103,10 +103,88 @@ class DiscordBot(discord.Client):
 
         super().__init__(intents=intents)
 
+    async def init_commands(self):
+        @discord.app_commands.command(
+            name="lobotomize",
+            description=f"Erase {self.ai_name}'s memory of any message "
+            + "before now in this channel.",
+        )
+        @discord.app_commands.guild_only()
+        async def lobotomize(interaction: discord.Interaction):
+            async def fail():
+                get_logger().warning(
+                    "lobotomize called from an unexpected channel: "
+                    + f"{interaction.channel_id}"
+                )
+                await interaction.response.send_message(
+                    "failed to lobotomize", ephemeral=True, silent=True
+                )
+
+            if interaction.channel_id is None:
+                await fail()
+                return
+
+            # find the current message in this channel
+            # tell the Repetition Tracker to hide messages
+            # before this message
+            channel = self.get_channel(interaction.channel_id)
+            if channel is None:
+                await fail()
+                return
+
+            if not isinstance(channel, discord.abc.Messageable):
+                await fail()
+                return
+
+            # find the current message in this channel
+            # tell the Repetition Tracker to hide messages
+            # before this message
+            async for message in channel.history(limit=1):
+                get_logger().info(
+                    f"lobotomize called in channel {channel.id}, "
+                    + f"hiding messages before {message.id}"
+                )
+                get_logger().info(
+                    f"lobotomize called for guid {channel.guild}"
+                    + f" # {channel.guild.id}, "
+                )
+                self.repetition_tracker.hide_messages_before(
+                    channel_id=channel.id,
+                    message_id=message.id,
+                )
+            await interaction.response.send_message(
+                "Memory wiped!", ephemeral=True, silent=True
+            )
+
+        get_logger().debug("Registering commands, this may take a while sometimes...")
+
+        tree = discord.app_commands.CommandTree(self)
+        tree.add_command(lobotomize)
+        commands = await tree.sync(guild=None)
+        for command in commands:
+            get_logger().info(
+                f"Registered command: {command.name}: {command.description}"
+            )
+        get_logger().debug(
+            "If you try to run any command within the first ~5 minutes of "
+            + "the bot starting, it will fail with the error: 'This command "
+            + "is outdated, please try again in a few minutes'.  "
+            + "This is apparently what Discord just does, and nothing we can "
+            + " fix.  Sorry!"
+        )
+
     async def on_ready(self) -> None:
         guilds = self.guilds
         num_guilds = len(guilds)
         num_channels = sum([len(guild.channels) for guild in guilds])
+
+        try:
+            # register the commands
+            await self.init_commands()
+        except Exception as e:
+            get_logger().warning(
+                f"Failed to register commands: {e} (continuing without commands)"
+            )
 
         if self.user:
             self.ai_user_id = self.user.id
@@ -262,7 +340,7 @@ class DiscordBot(discord.Client):
         does not include the message that kicked off the thread.
 
         It will show it in the UI as if it were, but it's not
-        one of the messages returned bby the history iterator.
+        one of the messages returned by the history iterator.
 
         This method attempts to return that message as well,
         if we need it.
