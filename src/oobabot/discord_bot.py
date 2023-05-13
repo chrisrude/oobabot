@@ -7,17 +7,15 @@ import typing
 
 import discord
 
+from oobabot import bot_commands
+from oobabot import decide_to_respond
 from oobabot import fancy_logger
+from oobabot import image_generator
+from oobabot import ooba_client
+from oobabot import prompt_generator
 from oobabot import repetition_tracker
-from oobabot.bot_commands import BotCommands
-from oobabot.decide_to_respond import DecideToRespond
-from oobabot.image_generator import ImageGenerator
-from oobabot.ooba_client import OobaClient
-from oobabot.prompt_generator import PromptGenerator
-from oobabot.response_stats import AggregateResponseStats
-from oobabot.types import ChannelMessage
-from oobabot.types import DirectMessage
-from oobabot.types import GenericMessage
+from oobabot import response_stats
+from oobabot import types
 
 FORBIDDEN_CHARACTERS = r"[\n\r\t]"
 FORBIDDEN_CHARACTERS_PATTERN = re.compile(FORBIDDEN_CHARACTERS)
@@ -30,7 +28,9 @@ def sanitize_string(raw_string: str) -> str:
     return FORBIDDEN_CHARACTERS_PATTERN.sub(" ", raw_string)
 
 
-def discord_message_to_generic_message(raw_message: discord.Message) -> GenericMessage:
+def discord_message_to_generic_message(
+    raw_message: discord.Message,
+) -> types.GenericMessage:
     """
     Convert a discord message to a GenericMessage or subclass thereof
     """
@@ -43,13 +43,13 @@ def discord_message_to_generic_message(raw_message: discord.Message) -> GenericM
         "send_timestamp": raw_message.created_at.timestamp(),
     }
     if isinstance(raw_message.channel, discord.DMChannel):
-        return DirectMessage(**generic_args)
+        return types.DirectMessage(**generic_args)
     if (
         isinstance(raw_message.channel, discord.TextChannel)
         or isinstance(raw_message.channel, discord.GroupChannel)
         or isinstance(raw_message.channel, discord.Thread)
     ):
-        return ChannelMessage(
+        return types.ChannelMessage(
             channel_id=raw_message.channel.id,
             mentions=[mention.id for mention in raw_message.mentions],
             **generic_args,
@@ -58,7 +58,7 @@ def discord_message_to_generic_message(raw_message: discord.Message) -> GenericM
         f"Unknown channel type {type(raw_message.channel)}, "
         + f"unsolicited replies disabled.: {raw_message.channel}"
     )
-    return GenericMessage(**generic_args)
+    return types.GenericMessage(**generic_args)
 
 
 class DiscordBot(discord.Client):
@@ -67,13 +67,13 @@ class DiscordBot(discord.Client):
 
     def __init__(
         self,
-        ooba_client: OobaClient,
-        decide_to_respond: DecideToRespond,
-        prompt_generator: PromptGenerator,
+        ooba_client: ooba_client.OobaClient,
+        decide_to_respond: decide_to_respond.DecideToRespond,
+        prompt_generator: prompt_generator.PromptGenerator,
         repetition_tracker: repetition_tracker.RepetitionTracker,
-        aggregate_response_stats: AggregateResponseStats,
-        bot_commands: BotCommands,
-        image_generator: ImageGenerator | None,
+        response_stats: response_stats.AggregateResponseStats,
+        bot_commands: bot_commands.BotCommands,
+        image_generator: image_generator.ImageGenerator | None,
         ai_name: str,
         persona: str,
         ignore_dms: bool,
@@ -85,7 +85,7 @@ class DiscordBot(discord.Client):
         self.decide_to_respond = decide_to_respond
         self.prompt_generator = prompt_generator
         self.repetition_tracker = repetition_tracker
-        self.aggregate_response_stats = aggregate_response_stats
+        self.response_stats = response_stats
 
         self.ai_name = ai_name
         self.persona = persona
@@ -193,7 +193,7 @@ class DiscordBot(discord.Client):
 
                 # log the mention, now that we know the channel
                 # we want to reply to
-                if is_summon and isinstance(message, ChannelMessage):
+                if is_summon and isinstance(message, types.ChannelMessage):
                     # we need to hack up the channel id, since it
                     # might now be a thread.  We want to watch the
                     # thread, not the original channel for unsolicited
@@ -222,7 +222,7 @@ class DiscordBot(discord.Client):
 
     async def send_response(
         self,
-        message: GenericMessage,
+        message: types.GenericMessage,
         raw_message: discord.Message,
         image_requested: bool,
     ) -> typing.Tuple[asyncio.Task | None, discord.abc.Messageable | None]:
@@ -277,7 +277,7 @@ class DiscordBot(discord.Client):
         self,
         aiter: typing.AsyncIterator[discord.Message],
         limit: int,
-    ) -> typing.AsyncIterator[GenericMessage]:
+    ) -> typing.AsyncIterator[types.GenericMessage]:
         """
         When returning the history of a thread, Discord
         does not include the message that kicked off the thread.
@@ -305,7 +305,7 @@ class DiscordBot(discord.Client):
 
     async def recent_messages_following_thread(
         self, channel: discord.abc.Messageable
-    ) -> typing.AsyncIterator[GenericMessage]:
+    ) -> typing.AsyncIterator[types.GenericMessage]:
         history = channel.history(limit=self.prompt_generator.history_lines)
         result = self.history_plus_thread_kickoff_message(
             history,
@@ -326,7 +326,7 @@ class DiscordBot(discord.Client):
 
     async def send_response_in_channel(
         self,
-        message: GenericMessage,
+        message: types.GenericMessage,
         raw_message: discord.Message,
         image_requested: bool,
         response_channel: discord.abc.Messageable,
@@ -349,9 +349,7 @@ class DiscordBot(discord.Client):
             throttle_message_id=repeated_id,
         )
 
-        response_stats = self.aggregate_response_stats.log_request_arrived(
-            prompt_prefix
-        )
+        this_response_stat = self.response_stats.log_request_arrived(prompt_prefix)
         if self.log_all_the_things:
             print("prompt_prefix:\n----------\n")
             print(prompt_prefix)
@@ -380,15 +378,15 @@ class DiscordBot(discord.Client):
                     raw_message.channel.id, generic_response_message
                 )
 
-                response_stats.log_response_part()
+                this_response_stat.log_response_part()
 
         except Exception as err:
             fancy_logger.get().error(f"Error: {str(err)}")
-            self.aggregate_response_stats.log_response_failure()
+            self.response_stats.log_response_failure()
             return
 
-        response_stats.write_to_log(f"Response to {message.author_name} done!  ")
-        self.aggregate_response_stats.log_response_success(response_stats)
+        this_response_stat.write_to_log(f"Response to {message.author_name} done!  ")
+        self.response_stats.log_response_success(this_response_stat)
 
     def filter_immersion_breaking_lines(self, sentence: str) -> str:
         lines = sentence.split("\n")

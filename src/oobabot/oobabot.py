@@ -8,19 +8,19 @@ import sys
 
 import aiohttp
 
+from oobabot import bot_commands
 from oobabot import decide_to_respond
+from oobabot import discord_bot
 from oobabot import fancy_logger
 from oobabot import http_client
+from oobabot import image_generator
+from oobabot import ooba_client
+from oobabot import prompt_generator
 from oobabot import repetition_tracker
-from oobabot.bot_commands import BotCommands
-from oobabot.discord_bot import DiscordBot
-from oobabot.image_generator import ImageGenerator
-from oobabot.ooba_client import OobaClient
-from oobabot.prompt_generator import PromptGenerator
-from oobabot.response_stats import AggregateResponseStats
-from oobabot.sd_client import StableDiffusionClient
-from oobabot.settings import Settings
-from oobabot.templates import TemplateStore
+from oobabot import response_stats
+from oobabot import sd_client
+from oobabot import settings
+from oobabot import templates
 
 
 def verify_client(client, service_name, url):
@@ -44,15 +44,15 @@ def verify_client(client, service_name, url):
 def main():
     logger = fancy_logger.init_logging()
 
-    settings = Settings()
-    settings.load()
-    if not settings.discord_token:
+    settings_obj = settings.Settings()
+    settings_obj.load()
+    if not settings_obj.discord_token:
         msg = (
-            f"Please set the '{Settings.DISCORD_TOKEN_ENV_VAR}' "
+            f"Please set the '{settings_obj.DISCORD_TOKEN_ENV_VAR}' "
             + "environment variable to your bot's discord token."
         )
         # will exit() after printing
-        settings.error(msg)
+        settings_obj.error(msg)
 
     aggregate_response_stats = None
 
@@ -67,29 +67,29 @@ def main():
     ########################################################
     # Connect to Oobabooga
 
-    ooba_client = OobaClient(
-        settings.base_url, Settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS
+    ooba_client_obj = ooba_client.OobaClient(
+        settings_obj.base_url, settings_obj.OOBABOOGA_DEFAULT_REQUEST_PARAMS
     )
-    verify_client(ooba_client, "Oobabooga", settings.base_url)
+    verify_client(ooba_client_obj, "Oobabooga", settings_obj.base_url)
 
     ########################################################
     # Connect to Stable Diffusion, if configured
 
     stable_diffusion_client = None
-    if settings.stable_diffusion_url:
-        stable_diffusion_client = StableDiffusionClient(
-            base_url=settings.stable_diffusion_url,
-            negative_prompt=settings.stable_diffusion_negative_prompt,
-            negative_prompt_nsfw=settings.stable_diffusion_negative_prompt_nsfw,
-            image_width=settings.image_width,
-            image_height=settings.image_height,
-            steps=settings.diffusion_steps,
-            desired_sampler=settings.stable_diffusion_sampler,
+    if settings_obj.stable_diffusion_url:
+        stable_diffusion_client = sd_client.StableDiffusionClient(
+            base_url=settings_obj.stable_diffusion_url,
+            negative_prompt=settings_obj.stable_diffusion_negative_prompt,
+            negative_prompt_nsfw=settings_obj.stable_diffusion_negative_prompt_nsfw,
+            image_width=settings_obj.image_width,
+            image_height=settings_obj.image_height,
+            steps=settings_obj.diffusion_steps,
+            desired_sampler=settings_obj.stable_diffusion_sampler,
         )
         verify_client(
             stable_diffusion_client,
             "Stable Diffusion",
-            settings.stable_diffusion_url,
+            settings_obj.stable_diffusion_url,
         )
 
     ########################################################
@@ -97,39 +97,39 @@ def main():
 
     # decides which messages the bot will respond to
     decide_to_responder = decide_to_respond.DecideToRespond(
-        settings.wakewords,
-        settings.ignore_dms,
-        settings.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
-        settings.DECIDE_TO_RESPOND_TIME_VS_RESPONSE_CHANCE,
+        settings_obj.wakewords,
+        settings_obj.ignore_dms,
+        settings_obj.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
+        settings_obj.DECIDE_TO_RESPOND_TIME_VS_RESPONSE_CHANCE,
     )
 
     # templates used to generate prompts to send to the AI
     # as well as for some UI elements
-    template_store = TemplateStore()
+    template_store = templates.TemplateStore()
 
     # once we decide to respond, this generates a prompt
     # to send to the AI, given a message history
-    prompt_generator = PromptGenerator(
-        ai_name=settings.ai_name,
-        persona=settings.persona,
-        history_lines=settings.history_lines,
-        token_space=settings.OOBABOT_MAX_AI_TOKEN_SPACE,
+    prompt_generator_obj = prompt_generator.PromptGenerator(
+        ai_name=settings_obj.ai_name,
+        persona=settings_obj.persona,
+        history_lines=settings_obj.history_lines,
+        token_space=settings_obj.OOBABOT_MAX_AI_TOKEN_SPACE,
         template_store=template_store,
-        dont_split_responses=settings.dont_split_responses,
+        dont_split_responses=settings_obj.dont_split_responses,
     )
 
     # tracks of the time spent on responding, success rate, etc.
-    aggregate_response_stats = AggregateResponseStats(
-        fn_get_total_tokens=lambda: ooba_client.total_response_tokens
+    aggregate_response_stats = response_stats.AggregateResponseStats(
+        fn_get_total_tokens=lambda: ooba_client_obj.total_response_tokens
     )
 
     # generates images, if stable diffusion is configured
     # also includes a UI to regenerate images on demand
-    image_generator = None
+    image_generator_obj = None
     if stable_diffusion_client is not None:
-        image_generator = ImageGenerator(
+        image_generator_obj = image_generator.ImageGenerator(
             stable_diffusion_client=stable_diffusion_client,
-            image_words=settings.image_words,
+            image_words=settings_obj.image_words,
             template_store=template_store,
         )
 
@@ -138,11 +138,11 @@ def main():
     # by looking for repeated responses, and deciding how far
     # back in history the bot can see.
     tracker = repetition_tracker.RepetitionTracker(
-        repetition_threshold=Settings.REPETITION_TRACKER_THRESHOLD
+        repetition_threshold=settings_obj.REPETITION_TRACKER_THRESHOLD
     )
 
-    bot_commands = BotCommands(
-        ai_name=settings.ai_name,
+    bot_commands_obj = bot_commands.BotCommands(
+        ai_name=settings_obj.ai_name,
         repetition_tracker=tracker,
         template_store=template_store,
     )
@@ -151,20 +151,20 @@ def main():
     # Connect to Discord
 
     logger.info("Connecting to Discord... ")
-    bot = DiscordBot(
-        ooba_client,
+    bot = discord_bot.DiscordBot(
+        ooba_client_obj,
         decide_to_respond=decide_to_responder,
-        prompt_generator=prompt_generator,
+        prompt_generator=prompt_generator_obj,
         repetition_tracker=tracker,
-        aggregate_response_stats=aggregate_response_stats,
-        image_generator=image_generator,
-        bot_commands=bot_commands,
-        ai_name=settings.ai_name,
-        persona=settings.persona,
-        ignore_dms=settings.ignore_dms,
-        dont_split_responses=settings.dont_split_responses,
-        reply_in_thread=settings.reply_in_thread,
-        log_all_the_things=settings.log_all_the_things,
+        response_stats=aggregate_response_stats,
+        image_generator=image_generator_obj,
+        bot_commands=bot_commands_obj,
+        ai_name=settings_obj.ai_name,
+        persona=settings_obj.persona,
+        ignore_dms=settings_obj.ignore_dms,
+        dont_split_responses=settings_obj.dont_split_responses,
+        reply_in_thread=settings_obj.reply_in_thread,
+        log_all_the_things=settings_obj.log_all_the_things,
     )
 
     # opens http connections to our services,
@@ -173,15 +173,15 @@ def main():
         try:
             if stable_diffusion_client is not None:
                 async with stable_diffusion_client:
-                    async with ooba_client:
+                    async with ooba_client_obj:
                         try:
-                            await bot.start(settings.discord_token)
+                            await bot.start(settings_obj.discord_token)
                         finally:
                             await bot.close()
             else:
-                async with ooba_client:
+                async with ooba_client_obj:
                     try:
-                        await bot.start(settings.discord_token)
+                        await bot.start(settings_obj.discord_token)
                     finally:
                         await bot.close()
         except Exception as e:
