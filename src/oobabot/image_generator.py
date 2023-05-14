@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import asyncio
 import io
 import re
@@ -6,6 +7,7 @@ import typing
 import discord
 
 from oobabot import fancy_logger
+from oobabot import http_client
 from oobabot import sd_client
 from oobabot import templates
 
@@ -29,7 +31,7 @@ class StableDiffusionImageView(discord.ui.View):
 
     def __init__(
         self,
-        sd_client: sd_client.StableDiffusionClient,
+        stable_diffusion_client: sd_client.StableDiffusionClient,
         is_channel_nsfw: bool,
         image_prompt: str,
         requesting_user_id: int,
@@ -65,11 +67,13 @@ class StableDiffusionImageView(discord.ui.View):
 
             try:
                 # generate a new image
-                regen_task = sd_client.generate_image(image_prompt, is_channel_nsfw)
+                regen_task = stable_diffusion_client.generate_image(
+                    image_prompt, is_channel_nsfw
+                )
                 regen_file = await image_task_to_file(regen_task, image_prompt)
                 await interaction.response.defer()
                 await self.get_image_message().edit(attachments=[regen_file])
-            except Exception as err:
+            except (http_client.OobaHttpClientError, discord.DiscordException) as err:
                 fancy_logger.get().error(
                     "Could not regenerate image: %s", err, exc_info=True
                 )
@@ -208,7 +212,7 @@ class ImageGenerator:
         )
         try:
             file = await image_task_to_file(image_task, image_prompt)
-        except Exception as err:
+        except (http_client.OobaHttpClientError, discord.DiscordException) as err:
             fancy_logger.get().error("Could not generate image: %s", err, exc_info=True)
             error_message = self.template_store.format(
                 templates.Templates.IMAGE_GENERATION_ERROR,

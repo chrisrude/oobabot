@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Purpose: Streaming client for the Ooba API.
 # Can provide the response by token or by sentence.
 #

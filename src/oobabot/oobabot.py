@@ -3,6 +3,7 @@
 #
 
 import asyncio
+import contextlib
 import signal
 import sys
 
@@ -49,8 +50,8 @@ class OobaBot:
         if self.settings.stable_diffusion_url:
             self.stable_diffusion_client = sd_client.StableDiffusionClient(
                 base_url=self.settings.stable_diffusion_url,
-                negative_prompt=self.settings.stable_diffusion_negative_prompt,
-                negative_prompt_nsfw=self.settings.stable_diffusion_negative_prompt_nsfw,  # noqa: E501
+                negative_prompt=self.settings.sd_negative_prompt,
+                negative_prompt_nsfw=self.settings.sd_negative_prompt_nsfw,
                 image_width=self.settings.image_width,
                 image_height=self.settings.image_height,
                 steps=self.settings.diffusion_steps,
@@ -166,22 +167,18 @@ class OobaBot:
         # opens http connections to our services,
         # then connects to Discord
         async def init_then_start():
-            try:
-                if self.stable_diffusion_client is not None:
-                    async with self.stable_diffusion_client:
-                        async with self.ooba_client:
-                            try:
-                                await bot.start(self.settings.discord_token)
-                            finally:
-                                await bot.close()
-                else:
-                    async with self.ooba_client:
-                        try:
-                            await bot.start(self.settings.discord_token)
-                        finally:
-                            await bot.close()
-            except Exception as err:
-                fancy_logger.get().error("Error starting bot: %s", err, exc_info=True)
+            async with contextlib.AsyncExitStack() as stack:
+                for context_manager in [
+                    self.ooba_client,
+                    self.stable_diffusion_client,
+                ]:
+                    if context_manager is not None:
+                        await stack.enter_async_context(context_manager)
+
+                try:
+                    await bot.start(self.settings.discord_token)
+                finally:
+                    await bot.close()
 
         asyncio.run(init_then_start())
 

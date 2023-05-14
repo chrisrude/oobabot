@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # purpose: generate a prompt for the AI to respond to, given
 # the message history and persona.
 import typing

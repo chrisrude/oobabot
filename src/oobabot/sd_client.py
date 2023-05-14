@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Purpose: Client for generating images using the AUTOMATIC1111
 # API.  Takes a prompt and returns image binary data in PNG format.
 #
@@ -228,11 +229,9 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             while True:
                 try:
                     return await do_post()
-                except aiohttp.ClientOSError as err:
-                    if err.__cause__ is not ConnectionResetError:
-                        raise err
-                    if tries > 2:
-                        raise err
+                except aiohttp.ClientError as err:
+                    if tries > 2 or err.__cause__ is not ConnectionResetError:
+                        raise http_client.OobaHttpClientError(err) from err
                     fancy_logger.get().warning(
                         "Stable Diffusion: Connection reset error: %s, "
                         + "retrying in 1 second",

@@ -47,5 +47,5 @@ py-version = '3.8.1'
 
 [tool.pylint.'MESSAGES CONTROL']
 max-line-length = 88
-disable = "C0103,C0114,C0115,C0116,R0902,R0903,R0913,W0201,W0621"
+disable = "C0103,C0114,C0115,C0116,R0902,R0903,R0913,W0201,W0511,W0621"
 include-naming-hint = true

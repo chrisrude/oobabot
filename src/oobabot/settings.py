@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import argparse
 import os
 import typing
@@ -307,9 +308,7 @@ class Settings(argparse.ArgumentParser):
         self.image_height = self._settings.pop("image_height")
         self.image_width = self._settings.pop("image_width")
         self.image_words = self._settings.pop("image_words")
-        self.stable_diffusion_negative_prompt = self._settings.pop("sd_negative_prompt")
-        self.stable_diffusion_negative_prompt_nsfw = self._settings.pop(
-            "sd_negative_prompt_nsfw"
-        )
+        self.sd_negative_prompt = self._settings.pop("sd_negative_prompt")
+        self.sd_negative_prompt_nsfw = self._settings.pop("sd_negative_prompt_nsfw")
         self.stable_diffusion_sampler = self._settings.pop("stable_diffusion_sampler")
         self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Purpose: Split a string into sentences, based on a set of terminators.
 #          This is a helper class for ooba_client.py.
 import typing

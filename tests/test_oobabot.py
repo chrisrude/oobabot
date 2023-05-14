@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # todo: write tests
 
 from oobabot import oobabot
