@@ -29,6 +29,17 @@ class StableDiffusionImageView(discord.ui.View):
     in the current image.
     """
 
+    LABEL_ACCEPT = "Accept"
+    LABEL_DELETE = "Delete"
+
+    # these two phrases (along with exactly two periods)
+    # in "Drawing.." were chosen because they render at
+    # the exact same width as each other.  If they don't,
+    # the buttons will shift to the left and right as the
+    # labels are swapped.
+    LABEL_TRY_AGAIN = "Try Again"
+    LABEL_DRAWING = "Drawing.."
+
     def __init__(
         self,
         stable_diffusion_client: sd_client.StableDiffusionClient,
@@ -53,7 +64,7 @@ class StableDiffusionImageView(discord.ui.View):
         # "Try Again" button
         #
         btn_try_again = discord.ui.Button(
-            label="Try Again",
+            label=self.LABEL_TRY_AGAIN,
             style=discord.ButtonStyle.blurple,
             row=1,
         )
@@ -66,13 +77,32 @@ class StableDiffusionImageView(discord.ui.View):
                 return
 
             try:
+                btn_try_again.label = self.LABEL_DRAWING
+
+                # we disable all three buttons because otherwise
+                # the lock_in and delete buttons will flicker
+                # when we disable the try_again button.  And it
+                # doesn't make much sense for them to work anyway
+                # when the button is being regenerated.
+                btn_try_again.disabled = True
+                btn_lock_in.disabled = True
+                btn_delete.disabled = True
+
+                await self.get_image_message().edit(view=self)
+                await interaction.response.defer()
+
                 # generate a new image
                 regen_task = stable_diffusion_client.generate_image(
                     image_prompt, is_channel_nsfw
                 )
                 regen_file = await image_task_to_file(regen_task, image_prompt)
-                await interaction.response.defer()
-                await self.get_image_message().edit(attachments=[regen_file])
+
+                btn_try_again.label = self.LABEL_TRY_AGAIN
+                btn_try_again.disabled = False
+                btn_lock_in.disabled = False
+                btn_delete.disabled = False
+
+                await self.get_image_message().edit(attachments=[regen_file], view=self)
             except (http_client.OobaHttpClientError, discord.DiscordException) as err:
                 fancy_logger.get().error(
                     "Could not regenerate image: %s", err, exc_info=True
@@ -84,7 +114,7 @@ class StableDiffusionImageView(discord.ui.View):
         # "Accept" button
         #
         btn_lock_in = discord.ui.Button(
-            label="Accept",
+            label=self.LABEL_ACCEPT,
             style=discord.ButtonStyle.success,
             row=1,
         )
@@ -103,7 +133,7 @@ class StableDiffusionImageView(discord.ui.View):
         # "Delete" button
         #
         btn_delete = discord.ui.Button(
-            label="Delete",
+            label=self.LABEL_DELETE,
             style=discord.ButtonStyle.danger,
             row=1,
         )
