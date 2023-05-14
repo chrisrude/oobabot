@@ -50,6 +50,7 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 | **stats** | track token generation speed, latency, failures and usage |
 | **easy networking** | connects to discord from your machine using websockets, so no need to expose a server to the internet |
 | ✨**Stable Diffusion** | new in v0.1.4!  Optional image generation with AUTOMATIC1111 |
+| ✨**Slash Commands* | coming in v0.1.6... did your bot get confused?  `/lobotomize` it! |
 
 ## Getting Started with **`oobabot`**
 
@@ -279,6 +280,19 @@ Also, the bot has a random chance of sending follow-up messages within the
 same channel if others reply within 120 seconds of its last post.  The exact
 parameters for this are in flux, but is meant to simulate a natural conversation
 flow, without forcing others to always post a wakeword.
+
+### Slash Commands
+
+As of 0.1.6, the bot now supports slash commands:
+
+| **`/command`**  | what it does |
+|---------------|------------------|
+| **`/lobotomize`** | make the bot forget everything in the channel before the command is run |
+| **`/say "message"`** | speak as the bot |
+
+Oobabot doesn't add any restrictions on who can run these commands, but luckily Discord does!  You can find this inside Discord by visiting "Server Settings" -> Integrations -> Bots and Apps -> hit the icon which looks like [/] next to your bot
+
+If you're running on a large server, you may want to restrict who can run these commands.  I suggest creating a new role, and only allowing that role to run the commands.
 
 ## Known Issues
 
