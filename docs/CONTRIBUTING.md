@@ -43,13 +43,37 @@ Hopefully this will make things easier to understand!  This exact list of files 
 
 ## Development Environment
 
-You'll need a machine running Python 3.9 or higher, and [poetry](https://python-poetry.org/) installed.  You'll also need a Discord account, and a bot token.  You can get one by following the instructions [here](https://discordpy.readthedocs.io/en/stable/discord.html).
+tl;dr: Install Python 3.9+, [install poetry](https://python-poetry.org/docs/), clone the repo, run `poetry install`, run `poetry run oobabot`
 
-You'll want to use a virtual environment manager of your choice.  Personally I'm using conda, but you can use whatever you like.  I'm not going to go into detail on how to set that up, but you can find instructions [here](https://docs.python.org/3/library/venv.html).
+```bash
+sudo apt-get install python3 git curl
 
-Once you have your environment set up, you can install the dependencies with `poetry install`.  This will install all the dependencies, including the dev dependencies.
+# install poetry (see https://python-poetry.org/docs/)
+curl -sSL https://install.python-poetry.org | python3 -
 
-After you've made your change, you can run tests with `poetry run pytest`.  This will run all the tests in the `tests` directory.  If you want to run a specific test, you can do so with `poetry run pytest tests/test_file.py::test_function`.  You can also run a specific test class with `poetry run pytest tests/test_file.py::TestClass`.
+# or whatever the poetry installer tells you to do
+export PATH="~/.local/bin:$PATH"
+
+# clone the repo and cd into it
+git clone https://github.com/chrisrude/oobabot.git
+cd oobabot
+
+# this will build the project, downloading all dependencies
+poetry install
+
+# run it!
+poetry run oobabot
+```
+
+You'll need a machine running Python 3.9 or higher, and [poetry](https://python-poetry.org/) installed.  Then just clone the repo.
+
+Once you have the code checked out, you can install the dependencies with `poetry install`.  This will install all the dependencies, including the dev dependencies.
+
+Running it is as simple as `poetry run oobabot`.
+
+For it to do soemthing interesting, you'll need a Discord account, and a bot token.  You can get one by following the instructions [here](https://discordpy.readthedocs.io/en/stable/discord.html).  Once you have a token, you can set it in your environment with `export DISCORD_TOKEN=your_token_here`.
+
+For tests, you can run them with `poetry run pytest`.  This will run all the tests in the `tests` directory.  If you want to run a specific test, you can do so with `poetry run pytest tests/test_file.py::test_function`.  You can also run a specific test class with `poetry run pytest tests/test_file.py::TestClass`.
 
 ## Coding Guidelines
 
