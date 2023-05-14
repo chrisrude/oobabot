@@ -284,8 +284,8 @@ class Settings(argparse.ArgumentParser):
             + "'Age-Restricted'.",
         )
 
-    def load(self) -> None:
-        self._settings = self.parse_args().__dict__
+    def load(self, args) -> None:
+        self._settings = self.parse_args(args=args).__dict__
 
         # Discord Settings
         self.discord_token = self._settings.pop("discord_token")

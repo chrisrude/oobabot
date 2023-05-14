@@ -22,11 +22,11 @@ from oobabot import templates
 
 
 class OobaBot:
-    def __init__(self):
+    def __init__(self, cli_args=None):
         fancy_logger.init_logging()
 
         self.settings = settings.Settings()
-        self.settings.load()
+        self.settings.load(cli_args)
         if not self.settings.discord_token:
             msg = (
                 f"Please set the '{self.settings.DISCORD_TOKEN_ENV_VAR}' "
