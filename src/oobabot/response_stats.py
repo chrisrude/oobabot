@@ -163,27 +163,23 @@ class AggregateResponseStats:
 
         if self.total_failed_responses > 0:
             fancy_logger.get().error(
-                "Error rate:                  " + f"{self.error_rate()}%"
+                "Error rate:                  %0.2f%%", self.error_rate()
             )
 
         if self.total_successful_responses > 0:
             fancy_logger.get().debug(
-                "Average response time:       "
-                + f"{self.average_response_time():6.2f}s"
+                "Average response time:       %6.2fs", self.average_response_time()
             )
             fancy_logger.get().debug(
-                "Average response latency:    "
-                + f"{self.average_response_latency():6.2f}s"
+                "Average response latency:    %6.2fs", self.average_response_latency()
             )
             fancy_logger.get().debug(
-                "Average tokens per response: "
-                + f"{self.average_tokens_per_second():6.2f}"
+                "Average tokens per response: %6.2f", self.average_tokens_per_second()
             )
 
         if self.total_response_time_seconds > 0:
             fancy_logger.get().debug(
-                "Average tokens per second:   "
-                + f"{self.average_tokens_per_second():6.2f}"
+                "Average tokens per second:   %6.2f", self.average_tokens_per_second()
             )
 
         fancy_logger.get().debug(

@@ -313,6 +313,3 @@ class Settings(argparse.ArgumentParser):
         )
         self.stable_diffusion_sampler = self._settings.pop("stable_diffusion_sampler")
         self.stable_diffusion_url = self._settings.pop("stable_diffusion_url")
-
-    def __repr__(self) -> str:
-        return super().__repr__()

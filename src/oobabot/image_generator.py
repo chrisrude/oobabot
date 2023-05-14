@@ -247,16 +247,13 @@ class ImageGenerator:
     def maybe_get_image_prompt(
         self, raw_message: discord.Message
     ) -> typing.Optional[str]:
-        image_prompt = None
         for image_pattern in self.image_patterns:
             match = image_pattern.search(raw_message.content)
             if match:
                 image_prompt = match.group(2)
+                fancy_logger.get().debug("Found image prompt: %s", image_prompt)
                 return image_prompt
-        if image_prompt is None:
-            return None
-
-        fancy_logger.get().debug("Found image prompt: %s", image_prompt)
+        return None
 
     async def generate_image(
         self,

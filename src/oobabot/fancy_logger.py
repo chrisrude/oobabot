@@ -31,7 +31,7 @@ class ColorfulLoggingFormatter(logging.Formatter):
     def __init__(self) -> None:
         super().__init__()
         self.formatters = {}
-        for logging_level in FORMATS.keys():
+        for logging_level in FORMATS:
             self.formatters[logging_level] = logging.Formatter(
                 FORMATS.get(logging_level)
             )

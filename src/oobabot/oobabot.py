@@ -117,7 +117,7 @@ class OobaBot:
         def sigint_handler(_signum, _frame):
             fancy_logger.get().info("Received SIGINT, exiting...")
             self.response_stats.write_stat_summary_to_log()
-            exit(1)
+            sys.exit(1)
 
         signal.signal(signal.SIGINT, sigint_handler)
 
@@ -128,10 +128,10 @@ class OobaBot:
             if client is None:
                 continue
 
-            fancy_logger.get().info(f"{client.service_name} is at {client.base_url}")
+            fancy_logger.get().info("%s is at %s", client.service_name, client.base_url)
             try:
                 client.test_connection()
-                fancy_logger.get().info(f"Connected to {client.service_name}!")
+                fancy_logger.get().info("Connected to %s!", client.service_name)
             except http_client.OobaHttpClientError as err:
                 fancy_logger.get().error(
                     "Could not connect to %s server: [%s]",

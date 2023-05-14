@@ -139,9 +139,11 @@ class DecideToRespond:
 
         time_since_last_mention = self.last_reply_times.time_since_last_mention(message)
         fancy_logger.get().debug(
-            f"Considering unsolicited message in channel {message.channel_name} "
-            f"after {time_since_last_mention:2.0f} seconds, "
-            f"with chance {response_chance*100.0:2.0f}%."
+            "Considering unsolicited response in channel %s after %2.0f seconds.  "
+            + "chance: %2.0f%%.",
+            message.channel_name,
+            time_since_last_mention,
+            response_chance * 100.0,
         )
 
         if random.random() < response_chance:

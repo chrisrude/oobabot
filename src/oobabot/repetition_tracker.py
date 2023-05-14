@@ -45,13 +45,14 @@ class RepetitionTracker:
 
         if repetition_count > 0:
             fancy_logger.get().debug(
-                f"Repetition count for channel {channel_id} is {repetition_count}"
+                "Repetition count for channel %d is %d", channel_id, repetition_count
             )
 
         if self.should_throttle(repetition_count):
             fancy_logger.get().warning(
-                "Repetition found, will throttle history for channel "
-                + f"{channel_id} in next request"
+                "Repetition found, will throttle history for channel #%d "
+                + "in next request",
+                channel_id,
             )
             throttle_message_id = response_message.message_id
 
@@ -69,8 +70,7 @@ class RepetitionTracker:
             channel_id, ("", 0, 0)
         )
         fancy_logger.get().info(
-            "Hiding messages before message ID "
-            + f"{message_id} in channel {channel_id}"
+            "Hiding messages before message ID %d in channel %d", message_id, channel_id
         )
         self.repetition_count[channel_id] = (sentence, message_id, repetition_count)
 

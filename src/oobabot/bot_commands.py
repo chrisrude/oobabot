@@ -95,7 +95,9 @@ class BotCommands:
                     return
 
             fancy_logger.get().debug(
-                f"say called by {interaction.user.name} in {interaction.channel_id}"
+                "/say called by user '%s' in channel #%d",
+                interaction.user.name,
+                interaction.channel_id,
             )
             # this will cause the bot to monitor the channel
             # and consider unsolicited responses
@@ -122,8 +124,9 @@ class BotCommands:
             async for message in channel.history(limit=1):
                 channel_name = discord_utils.get_channel_name(channel)
                 fancy_logger.get().info(
-                    f"lobotomize called in #{channel_name}, "
-                    + f"hiding messages before {message.id}"
+                    "/lobotomize called by user '%s' in #%s",
+                    interaction.user.name,
+                    channel_name,
                 )
                 self.repetition_tracker.hide_messages_before(
                     channel_id=channel.id,
@@ -152,7 +155,7 @@ class BotCommands:
         commands = await tree.sync(guild=None)
         for command in commands:
             fancy_logger.get().info(
-                f"Registered command: {command.name}: {command.description}"
+                "Registered command: %s: %s", command.name, command.description
             )
         fancy_logger.get().debug(
             "If you try to run any command within the first ~5 minutes of "

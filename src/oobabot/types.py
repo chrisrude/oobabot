@@ -1,7 +1,7 @@
 import typing
 
 
-class GenericMessage(object):
+class GenericMessage:
     def __init__(
         self,
         author_id: int,
@@ -27,8 +27,7 @@ class GenericMessage(object):
 
 
 class DirectMessage(GenericMessage):
-    def __init__(self, /, **kwargs):
-        super().__init__(**kwargs)
+    pass
 
 
 class ChannelMessage(GenericMessage):

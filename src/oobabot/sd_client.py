@@ -22,7 +22,6 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     """
 
     SERVICE_NAME = "Stable Diffusion"
-    LOG_PREFIX = SERVICE_NAME + ": "
     STABLE_DIFFUSION_API_URI_PATH: str = "/sdapi/v1/"
 
     API_COMMAND_URLS = {
@@ -140,14 +139,15 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
                 continue
             options_to_set[k] = v
             fancy_logger.get().info(
-                self.LOG_PREFIX
-                + f" changing option '{k}' from to "
-                + f"'{current_options[k]}' to '{v}'"
+                "Stable Diffusion:  changing option '%s' from to '%s' to '%s'",
+                k,
+                current_options[k],
+                v,
             )
 
         if not options_to_set:
             fancy_logger.get().debug(
-                self.LOG_PREFIX + "Options are already set correctly, no changes made."
+                "Stable Diffusion: Options are already set correctly, no changes made."
             )
             return
 
@@ -200,8 +200,9 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
 
         async def do_post() -> bytes:
             fancy_logger.get().debug(
-                self.LOG_PREFIX
-                + f"Image request (nsfw: {is_channel_nsfw}): {request['prompt']}"
+                "Stable Diffusion: Image request (nsfw: %r): %s",
+                is_channel_nsfw,
+                request["prompt"],
             )
             start_time = time.time()
 
@@ -213,14 +214,13 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
                     raise http_client.OobaHttpClientError(response)
                 duration = time.time() - start_time
                 json_body = await response.json()
-                bytes = base64.b64decode(json_body["images"][0])
+                image_bytes = base64.b64decode(json_body["images"][0])
                 fancy_logger.get().debug(
-                    self.LOG_PREFIX
-                    + "Image generated, {} bytes in {:.2f} seconds".format(
-                        len(bytes), duration
-                    )
+                    "Stable Diffusion: Image generated, %d bytes in %.2f seconds",
+                    len(image_bytes),
+                    duration,
                 )
-                return bytes
+                return image_bytes
 
         # works around aiohttp being bad
         async def do_post_with_retry() -> bytes:
@@ -234,8 +234,8 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
                     if tries > 2:
                         raise err
                     fancy_logger.get().warning(
-                        self.LOG_PREFIX
-                        + "Connection reset error: %s, retrying in 1 second",
+                        "Stable Diffusion: Connection reset error: %s, "
+                        + "retrying in 1 second",
                         err,
                     )
                     await asyncio.sleep(1)
@@ -249,21 +249,21 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         if self.desired_sampler is not None:
             if self.desired_sampler in samplers:
                 fancy_logger.get().debug(
-                    self.LOG_PREFIX + "Using desired sampler '%s'", self.desired_sampler
+                    "Stable Diffusion: Using desired sampler '%s'", self.desired_sampler
                 )
                 self._sampler = self.desired_sampler
             else:
-                fancy_logger.get().warn(
-                    self.LOG_PREFIX + "Desired sampler '%s' not available",
+                fancy_logger.get().warning(
+                    "Stable Diffusion: Desired sampler '%s' not available",
                     self.desired_sampler,
                 )
                 self._sampler = None
         if self._sampler is None:
             fancy_logger.get().debug(
-                self.LOG_PREFIX + "Using default sampler on SD server"
+                "Stable Diffusion: Using default sampler on SD server"
             )
             fancy_logger.get().debug(
-                self.LOG_PREFIX + "Available samplers: %s", ", ".join(samplers)
+                "Stable Diffusion: Available samplers: %s", ", ".join(samplers)
             )
             self._sampler = None
 
@@ -271,8 +271,5 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         await self.set_sampler()
         await self.set_options()
         fancy_logger.get().debug(
-            self.LOG_PREFIX
-            + "Using negative prompt: "
-            + self.negative_prompt[:20]
-            + "..."
+            "Stable Diffusion: Using negative prompt: %s...", self.negative_prompt[:20]
         )
