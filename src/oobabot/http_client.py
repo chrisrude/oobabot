@@ -45,10 +45,10 @@ class SerializedHttpClient(abc.ABC):
             ConnectionRefusedError,
             socket.gaierror,
             asyncio.exceptions.TimeoutError,
-        ) as e:
+        ) as err:
             raise OobaHttpClientError(
                 f"Could not connect to {self.service_name} server: [{self.base_url}]"
-            ) from e
+            ) from err
 
     def __init__(self, sevice_name: str, base_url: str):
         self.service_name = sevice_name
@@ -81,10 +81,10 @@ class SerializedHttpClient(abc.ABC):
 
         try:
             asyncio.run(try_setup())
-        except AssertionError as e:
+        except AssertionError as err:
             # asyncio will throw an AssertionError if we try to run
             # with a base_url that has a path.  This is a user-supplied
             # value, so catching this is grody but necessary.
             raise OobaHttpClientError(
                 f"Could not connect to {self.service_name} server: [{self.base_url}]"
-            ) from e
+            ) from err

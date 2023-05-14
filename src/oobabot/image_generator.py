@@ -69,8 +69,10 @@ class StableDiffusionImageView(discord.ui.View):
                 regen_file = await image_task_to_file(regen_task, image_prompt)
                 await interaction.response.defer()
                 await self.get_image_message().edit(attachments=[regen_file])
-            except Exception as e:
-                fancy_logger.get().error(f"Could not regenerate image: {e}")
+            except Exception as err:
+                fancy_logger.get().error(
+                    "Could not regenerate image: %s", err, exc_info=True
+                )
 
         btn_try_again.callback = on_try_again
 
@@ -206,8 +208,8 @@ class ImageGenerator:
         )
         try:
             file = await image_task_to_file(image_task, image_prompt)
-        except Exception as e:
-            fancy_logger.get().error(f"Could not generate image: {e}")
+        except Exception as err:
+            fancy_logger.get().error("Could not generate image: %s", err, exc_info=True)
             error_message = self.template_store.format(
                 templates.Templates.IMAGE_GENERATION_ERROR,
                 {

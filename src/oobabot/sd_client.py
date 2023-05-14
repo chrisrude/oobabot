@@ -228,14 +228,15 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             while True:
                 try:
                     return await do_post()
-                except aiohttp.ClientOSError as e:
-                    if e.__cause__ is not ConnectionResetError:
-                        raise e
+                except aiohttp.ClientOSError as err:
+                    if err.__cause__ is not ConnectionResetError:
+                        raise err
                     if tries > 2:
-                        raise e
+                        raise err
                     fancy_logger.get().warning(
                         self.LOG_PREFIX
-                        + f"Connection reset error: {e}, retrying in 1 second"
+                        + "Connection reset error: %s, retrying in 1 second",
+                        err,
                     )
                     await asyncio.sleep(1)
                     tries += 1

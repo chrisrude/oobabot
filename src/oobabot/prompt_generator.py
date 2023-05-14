@@ -166,10 +166,9 @@ class PromptGenerator:
 
             if len(line) > prompt_len_remaining:
                 num_discarded_lines = self.history_lines - len(history_lines)
-                fancy_logger.get().warn(
-                    "ran out of prompt space, discarding "
-                    + f"{num_discarded_lines} lines "
-                    + "of chat history"
+                fancy_logger.get().warning(
+                    "ran out of prompt space, discarding {%d} lines of chat history",
+                    num_discarded_lines,
                 )
                 break
 

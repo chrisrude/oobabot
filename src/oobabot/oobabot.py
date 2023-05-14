@@ -35,16 +35,6 @@ class OobaBot:
             # will exit() after printing
             self.settings.error(msg)
 
-        self.response_stats = None
-
-        def sigint_handler(_signum, _frame):
-            fancy_logger.get().info("Received SIGINT, exiting...")
-            if self.response_stats is not None:
-                self.response_stats.write_stat_summary_to_log()
-            exit(1)
-
-        signal.signal(signal.SIGINT, sigint_handler)
-
         ########################################################
         # Connect to Oobabooga
 
@@ -124,6 +114,13 @@ class OobaBot:
             template_store=self.template_store,
         )
 
+        def sigint_handler(_signum, _frame):
+            fancy_logger.get().info("Received SIGINT, exiting...")
+            self.response_stats.write_stat_summary_to_log()
+            exit(1)
+
+        signal.signal(signal.SIGINT, sigint_handler)
+
     def run(self):
         ########################################################
         # Test connection to services
@@ -135,14 +132,15 @@ class OobaBot:
             try:
                 client.test_connection()
                 fancy_logger.get().info(f"Connected to {client.service_name}!")
-            except http_client.OobaHttpClientError as e:
+            except http_client.OobaHttpClientError as err:
                 fancy_logger.get().error(
-                    f"Could not connect to {client.service_name} "
-                    + f"server: [{client.base_url}]"
+                    "Could not connect to %s server: [%s]",
+                    client.service_name,
+                    client.base_url,
                 )
                 fancy_logger.get().error("Please check the URL and try again.")
-                if e.__cause__ is not None:
-                    fancy_logger.get().error(f"Reason: {e.__cause__}")
+                if err.__cause__ is not None:
+                    fancy_logger.get().error("Reason: %s", err.__cause__)
                 sys.exit(1)
 
         ########################################################
@@ -182,8 +180,8 @@ class OobaBot:
                             await bot.start(self.settings.discord_token)
                         finally:
                             await bot.close()
-            except Exception as e:
-                fancy_logger.get().error(f"Error starting bot: {e}")
+            except Exception as err:
+                fancy_logger.get().error("Error starting bot: %s", err, exc_info=True)
 
         asyncio.run(init_then_start())
 

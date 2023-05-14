@@ -40,8 +40,7 @@ class ColorfulLoggingFormatter(logging.Formatter):
         formatter = self.formatters.get(record.levelno)
         if formatter:
             return formatter.format(record)
-        else:
-            return record.getMessage()
+        return record.getMessage()
 
 
 def get(name: str = "oobabot") -> logging.Logger:

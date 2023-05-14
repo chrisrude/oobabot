@@ -46,11 +46,7 @@ class OobaClient(http_client.SerializedHttpClient):
         """
         Yields the entire response as a single string.
         """
-
-        response = ""
-        async for token in self.request_by_token(prompt):
-            response += token
-        yield response
+        yield "".join([token async for token in self.request_by_token(prompt)])
 
     async def request_by_token(self, prompt: str) -> typing.AsyncIterator[str]:
         """
@@ -95,17 +91,19 @@ class OobaClient(http_client.SerializedHttpClient):
                         return
 
                     else:
-                        fancy_logger.get().warning(f"Unexpected event: {incoming_data}")
+                        fancy_logger.get().warning(
+                            "Unexpected event: %s", incoming_data
+                        )
 
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     fancy_logger.get().error(
-                        f"WebSocket connection closed with error: {msg}"
+                        "WebSocket connection closed with error: %s", msg
                     )
                     raise http_client.OobaHttpClientError(
                         f"WebSocket connection closed with error {msg}"
                     )
                 elif msg.type == aiohttp.WSMsgType.CLOSED:
                     fancy_logger.get().info(
-                        f"WebSocket connection closed normally: {msg}"
+                        "WebSocket connection closed normally: %s", msg
                     )
                     return

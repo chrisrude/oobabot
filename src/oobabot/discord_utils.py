@@ -47,10 +47,8 @@ def discord_message_to_generic_message(
     }
     if isinstance(raw_message.channel, discord.DMChannel):
         return types.DirectMessage(**generic_args)
-    if (
-        isinstance(raw_message.channel, discord.TextChannel)
-        or isinstance(raw_message.channel, discord.GroupChannel)
-        or isinstance(raw_message.channel, discord.Thread)
+    if isinstance(
+        raw_message.channel, (discord.TextChannel, discord.GroupChannel, discord.Thread)
     ):
         return types.ChannelMessage(
             mentions=[mention.id for mention in raw_message.mentions],

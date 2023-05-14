@@ -68,7 +68,7 @@ class DiscordBot(discord.Client):
     async def on_ready(self) -> None:
         guilds = self.guilds
         num_guilds = len(guilds)
-        num_channels = sum([len(guild.channels) for guild in guilds])
+        num_channels = sum(len(guild.channels) for guild in guilds)
 
         if self.user:
             self.ai_user_id = self.user.id
@@ -77,10 +77,10 @@ class DiscordBot(discord.Client):
             user_id_str = "<unknown>"
 
         fancy_logger.get().info(
-            f"Connected to discord as {self.user} (ID: {user_id_str})"
+            "Connected to discord as %s (ID: %d)", user_id_str, self.ai_user_id
         )
         fancy_logger.get().debug(
-            f"monitoring {num_channels} channels across " + f"{num_guilds} server(s)"
+            "monitoring %d channels across %d server(s)", num_channels, num_guilds
         )
         if self.ignore_dms:
             fancy_logger.get().debug("Ignoring DMs")
@@ -97,11 +97,11 @@ class DiscordBot(discord.Client):
         else:
             fancy_logger.get().debug("Image generation: disabled")
 
-        fancy_logger.get().debug(f"AI name: {self.ai_name}")
-        fancy_logger.get().debug(f"AI persona: {self.persona}")
+        fancy_logger.get().debug("AI name: %s", self.ai_name)
+        fancy_logger.get().debug("AI persona: %s", self.persona)
 
         fancy_logger.get().debug(
-            f"History: {self.prompt_generator.history_lines} lines "
+            "History: %d lines ", self.prompt_generator.history_lines
         )
 
         str_wakewords = (
@@ -109,7 +109,7 @@ class DiscordBot(discord.Client):
             if self.decide_to_respond.wakewords
             else "<none>"
         )
-        fancy_logger.get().debug(f"Wakewords: {str_wakewords}")
+        fancy_logger.get().debug("Wakewords: %s", str_wakewords)
 
         # we do this at the very end because when you restart
         # the bot, it can take a while for the commands to
@@ -117,9 +117,9 @@ class DiscordBot(discord.Client):
         try:
             # register the commands
             await self.bot_commands.on_ready(self)
-        except Exception as e:
+        except discord.DiscordException as err:
             fancy_logger.get().warning(
-                f"Failed to register commands: {e} (continuing without commands)"
+                "Failed to register commands: %s (continuing without commands)", err
             )
 
     async def on_message(self, raw_message: discord.Message) -> None:
@@ -134,9 +134,9 @@ class DiscordBot(discord.Client):
             async with raw_message.channel.typing():
                 await self._handle_response(message, raw_message, is_summon)
 
-        except Exception as e:
+        except discord.DiscordException as err:
             fancy_logger.get().error(
-                f"Exception while processing message: {e}", exc_info=True
+                "Exception while processing message: %s", err, exc_info=True
             )
 
     async def _handle_response(
@@ -253,7 +253,7 @@ class DiscordBot(discord.Client):
 
     async def history_plus_thread_kickoff_message(
         self,
-        aiter: typing.AsyncIterator[discord.Message],
+        aiter_history: typing.AsyncIterator[discord.Message],
         limit: int,
     ) -> typing.AsyncIterator[types.GenericMessage]:
         """
@@ -268,7 +268,7 @@ class DiscordBot(discord.Client):
         """
         items = 0
         last_returned = None
-        async for item in aiter:
+        async for item in aiter_history:
             last_returned = item
             yield discord_utils.discord_message_to_generic_message(item)
             items += 1
@@ -299,7 +299,7 @@ class DiscordBot(discord.Client):
         response_channel: discord.abc.Messageable,
     ) -> None:
         fancy_logger.get().debug(
-            f"Request from {message.author_name} in {message.channel_name}"
+            "Request from %s in %s", message.author_name, message.channel_name
         )
 
         recent_messages = await self.recent_messages_following_thread(response_channel)
@@ -346,8 +346,8 @@ class DiscordBot(discord.Client):
 
                 this_response_stat.log_response_part()
 
-        except Exception as err:
-            fancy_logger.get().error(f"Error: {str(err)}")
+        except discord.DiscordException as err:
+            fancy_logger.get().error("Error: %s", err, exc_info=True)
             self.response_stats.log_response_failure()
             return
 
@@ -363,7 +363,7 @@ class DiscordBot(discord.Client):
             # the line instruction and continue
             if self.prompt_generator.bot_prompt_line == line:
                 fancy_logger.get().warning(
-                    f'Filtered out "{line}" from response, continuing'
+                    "Filtered out %s from response, continuing", line
                 )
                 continue
 
@@ -371,7 +371,7 @@ class DiscordBot(discord.Client):
             # continuing the conversation as someone else
             if line.endswith(" says:"):
                 fancy_logger.get().warning(
-                    f'Filtered out "{line}" from response, aborting'
+                    'Filtered out "%s" from response, aborting', line
                 )
                 break
 
