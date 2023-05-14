@@ -5,17 +5,12 @@
 import asyncio
 import base64
 import time
-from typing import Dict
+import typing
 
 import aiohttp
 
 from oobabot import fancy_logger
 from oobabot import http_client
-
-
-class StableDiffusionClientError(Exception):
-    pass
-
 
 # todo: response stats for SD client
 
@@ -26,7 +21,8 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     API.  Takes a prompt and returns image binary data in PNG format.
     """
 
-    LOG_PREFIX = "Stable Diffusion: "
+    SERVICE_NAME = "Stable Diffusion"
+    LOG_PREFIX = SERVICE_NAME + ": "
     STABLE_DIFFUSION_API_URI_PATH: str = "/sdapi/v1/"
 
     API_COMMAND_URLS = {
@@ -55,9 +51,9 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         image_width: int,
         image_height: int,
         steps: int,
-        desired_sampler: str | None = None,
+        desired_sampler: typing.Optional[str] = None,
     ):
-        super().__init__(base_url)
+        super().__init__(self.SERVICE_NAME, base_url)
 
         self.negative_prompt = negative_prompt
         self.negative_prompt_nsfw = negative_prompt_nsfw
@@ -74,7 +70,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     # to create content against the discord TOS
     # https://discord.com/guidelines
 
-    DEFAULT_REQUEST_PARAMS: Dict[str, bool | int | str] = {
+    DEFAULT_REQUEST_PARAMS: typing.Dict[str, typing.Union[bool, int, str]] = {
         # default values are commented out
         #
         # "do_not_save_samples": False,
@@ -132,7 +128,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         current_options = None
         async with self.get_session().get(url) as response:
             if response.status != 200:
-                raise StableDiffusionClientError(response)
+                raise http_client.OobaHttpClientError(response)
             current_options = await response.json()
 
         # now, set the options
@@ -157,14 +153,14 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
 
         async with self.get_session().post(url, json=options_to_set) as response:
             if response.status != 200:
-                raise StableDiffusionClientError(response)
+                raise http_client.OobaHttpClientError(response)
             await response.json()
 
-    async def get_samplers(self) -> list[str]:
+    async def get_samplers(self) -> typing.List[str]:
         url = self.API_COMMAND_URLS["get_samplers"]
         async with self.get_session().get(url) as response:
             if response.status != 200:
-                raise StableDiffusionClientError(response)
+                raise http_client.OobaHttpClientError(response)
             response = await response.json()
             samplers = [str(sampler["name"]) for sampler in response]
             return samplers
@@ -173,7 +169,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         self,
         prompt: str,
         is_channel_nsfw: bool = False,
-    ) -> asyncio.Task[bytes]:
+    ) -> "asyncio.Task[bytes]":
         # Purpose: Generate an image from a prompt.
         # Args:
         #     prompt: The prompt to generate an image from.
@@ -185,7 +181,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         # Returns:
         #     The image as bytes.
         # Raises:
-        #     OobaClientError, if the request fails.
+        #     OobaHttpClientError, if the request fails.
         request = self.DEFAULT_REQUEST_PARAMS.copy()
         negative_prompt = self.negative_prompt
         if is_channel_nsfw:
@@ -214,7 +210,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
                 json=request,
             ) as response:
                 if response.status != 200:
-                    raise StableDiffusionClientError(response)
+                    raise http_client.OobaHttpClientError(response)
                 duration = time.time() - start_time
                 json_body = await response.json()
                 bytes = base64.b64decode(json_body["images"][0])
@@ -270,7 +266,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             )
             self._sampler = None
 
-    async def setup(self):
+    async def _setup(self):
         await self.set_sampler()
         await self.set_options()
         fancy_logger.get().debug(

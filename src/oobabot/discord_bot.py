@@ -30,7 +30,7 @@ class DiscordBot(discord.Client):
         repetition_tracker: repetition_tracker.RepetitionTracker,
         response_stats: response_stats.AggregateResponseStats,
         bot_commands: bot_commands.BotCommands,
-        image_generator: image_generator.ImageGenerator | None,
+        image_generator: typing.Optional[image_generator.ImageGenerator],
         ai_name: str,
         persona: str,
         ignore_dms: bool,
@@ -150,15 +150,16 @@ class DiscordBot(discord.Client):
             # are we creating an image?
             image_prompt = self.image_generator.maybe_get_image_prompt(raw_message)
 
-        message_task, response_channel = await self.send_response(
+        result = await self.send_response(
             message=message,
             raw_message=raw_message,
             image_requested=image_prompt is not None,
         )
-        if response_channel is None:
+        if result is None:
             # we failed to create a thread that the user could
             # read our response in, so we're done here.  Abort!
             return
+        message_task, response_channel = result
 
         # log the mention, now that we know the channel we
         # want to montior later to continue to conversation
@@ -201,7 +202,7 @@ class DiscordBot(discord.Client):
         message: types.GenericMessage,
         raw_message: discord.Message,
         image_requested: bool,
-    ) -> typing.Tuple[asyncio.Task | None, discord.abc.Messageable | None]:
+    ) -> typing.Optional[typing.Tuple[asyncio.Task, discord.abc.Messageable]]:
         """
         Send a response to a message.
 
@@ -239,7 +240,7 @@ class DiscordBot(discord.Client):
                 # second user's response, and again for a third user,
                 # etc.
                 fancy_logger.get().debug("User can't create threads, not responding.")
-                return (None, None)
+                return None
 
         response_coro = self.send_response_in_channel(
             message=message,

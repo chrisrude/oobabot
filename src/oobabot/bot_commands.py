@@ -1,3 +1,5 @@
+import typing
+
 import discord
 
 from oobabot import decide_to_respond
@@ -27,7 +29,9 @@ class BotCommands:
         Register commands with Discord.
         """
 
-        async def fail(interaction: discord.Interaction, reason: str | None = None):
+        async def fail(
+            interaction: discord.Interaction, reason: typing.Optional[str] = None
+        ):
             msg = reason
             if msg is None:
                 command = "command"
@@ -44,11 +48,14 @@ class BotCommands:
         async def get_messageable(
             interaction: discord.Interaction,
         ) -> (
-            discord.TextChannel
-            | discord.Thread
-            | discord.DMChannel
-            | discord.GroupChannel
-            | None
+            typing.Optional[
+                typing.Union[
+                    discord.TextChannel,
+                    discord.Thread,
+                    discord.DMChannel,
+                    discord.GroupChannel,
+                ]
+            ]
         ):
             if interaction.channel_id is not None:
                 # find the current message in this channel

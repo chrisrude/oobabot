@@ -119,7 +119,7 @@ class PromptGenerator:
         self,
         ai_user_id: int,
         message_history: typing.AsyncIterator[types.GenericMessage],
-        stop_before_message_id: int | None,
+        stop_before_message_id: typing.Optional[int],
     ) -> str:
         # add on more history, but only if we have room
         # if we don't have room, we'll just truncate the history
@@ -200,7 +200,7 @@ class PromptGenerator:
     async def generate(
         self,
         ai_user_id: int,
-        message_history: typing.AsyncIterator[types.GenericMessage] | None,
+        message_history: typing.Optional[typing.AsyncIterator[types.GenericMessage]],
         image_requested: bool,
         throttle_message_id: int,
     ) -> str:

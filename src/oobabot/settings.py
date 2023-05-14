@@ -42,8 +42,8 @@ class Settings(argparse.ArgumentParser):
     # before the repetition tracker will take action
     REPETITION_TRACKER_THRESHOLD = 1
 
-    OOBABOOGA_DEFAULT_REQUEST_PARAMS: dict[
-        str, bool | float | int | str | typing.List[typing.Any]
+    OOBABOOGA_DEFAULT_REQUEST_PARAMS: typing.Dict[
+        str, typing.Union[bool, float, int, str, typing.List[typing.Any]]
     ] = {
         "max_new_tokens": OOBABOT_MAX_NEW_TOKENS,
         "do_sample": True,

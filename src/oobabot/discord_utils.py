@@ -1,4 +1,5 @@
 import re
+import typing
 
 import discord
 
@@ -30,7 +31,7 @@ def sanitize_string(raw_string: str) -> str:
 
 def discord_message_to_generic_message(
     raw_message: discord.Message,
-) -> types.GenericMessage | types.ChannelMessage | types.DirectMessage:
+) -> typing.Union[types.GenericMessage, types.ChannelMessage, types.DirectMessage]:
     """
     Convert a discord message to a GenericMessage or subclass thereof
     """

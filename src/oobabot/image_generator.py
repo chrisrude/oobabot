@@ -10,7 +10,7 @@ from oobabot import sd_client
 from oobabot import templates
 
 
-async def image_task_to_file(image_task: asyncio.Task[bytes], image_request: str):
+async def image_task_to_file(image_task: "asyncio.Task[bytes]", image_request: str):
     await image_task
     img_bytes = image_task.result()
     file_of_bytes = io.BytesIO(img_bytes)
@@ -242,7 +242,9 @@ class ImageGenerator:
         regen_view.image_message = image_message
         return image_message
 
-    def maybe_get_image_prompt(self, raw_message: discord.Message) -> str | None:
+    def maybe_get_image_prompt(
+        self, raw_message: discord.Message
+    ) -> typing.Optional[str]:
         image_prompt = None
         for image_pattern in self.image_patterns:
             match = image_pattern.search(raw_message.content)
@@ -259,7 +261,7 @@ class ImageGenerator:
         image_prompt: str,
         raw_message: discord.Message,
         response_channel: discord.abc.Messageable,
-    ) -> asyncio.Task[discord.Message] | None:
+    ) -> typing.Optional["asyncio.Task[discord.Message]"]:
         """
         If the message contains a photo word, kick off a task
         to generate an image, post it to the channel, and return

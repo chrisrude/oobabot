@@ -142,7 +142,7 @@ class TemplateStore:
         )
 
     def format(
-        self, template_name: Templates, format_args: dict[TemplateToken, str]
+        self, template_name: Templates, format_args: typing.Dict[TemplateToken, str]
     ) -> str:
         return self.templates[template_name].format(format_args)
 
@@ -161,7 +161,7 @@ class TemplateMessageFormatter:
         self.template = template
         self.allowed_tokens = allowed_tokens
 
-    def format(self, format_args: dict[TemplateToken, str]) -> str:
+    def format(self, format_args: typing.Dict[TemplateToken, str]) -> str:
         return self.template.format(**format_args)
 
     @staticmethod
