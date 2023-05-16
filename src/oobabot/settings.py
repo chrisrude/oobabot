@@ -354,7 +354,7 @@ class Settings(argparse.ArgumentParser):
             "--stable-diffusion-sampler",
             "--sd-sampler",
             type=str,
-            default=None,
+            default="",
             help="Sampler to use when generating images.  If not specified, the one "
             + "set on the AUTOMATIC1111 server will be used.",
         )
@@ -462,6 +462,9 @@ class Settings(argparse.ArgumentParser):
     ) -> typing.Dict[str, typing.Union[bool, int, str]]:
         # todo: read from config file
 
+        if self._settings is None:
+            raise ValueError("Settings not loaded")
+
         if config_request_params is not None:
             request = {}.copy()
         else:
@@ -475,7 +478,10 @@ class Settings(argparse.ArgumentParser):
             ("stable_diffusion_sampler", "sampler"),
         ]:
             if key_in_settings in self._settings:
-                request[key_in_request] = self._settings.get(key_in_settings)
+                val = self._settings.get(key_in_settings)
+                if val is None:
+                    raise ValueError(f"None value for key {key_in_settings}")
+                request[key_in_request] = val
 
         return request
 
@@ -536,6 +542,10 @@ class SettingsConfigFile:
         yaml_map.yaml_set_start_comment(self.START_COMMENT)
 
         for argument_group in cli_settings.get_argument_groups():
+            if argument_group.title is None:
+                continue
+            if argument_group.title == "options":
+                continue
             if argument_group.title == "optional arguments":
                 continue
             if argument_group.title == "positional arguments":

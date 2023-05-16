@@ -18,13 +18,6 @@ class Templates(enum.Enum):
     PROMPT_HISTORY_LINE = "prompt_history_line"
     PROMPT_IMAGE_COMING = "prompt_image_coming"
 
-    def __iter__(self) -> typing.Iterator["Templates"]:
-        # on python 3.8 pylint thinks the base class doesn't
-        # have __iter__, but it does
-        # pylint: disable=W0246
-        return super().__iter__()
-        # pylint: enable=W0246
-
     def __str__(self) -> str:
         return self.value
 
