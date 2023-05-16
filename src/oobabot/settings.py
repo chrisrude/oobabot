@@ -324,8 +324,7 @@ class Settings(argparse.ArgumentParser):
         deprecated_group = self.add_argument_group(
             title=self.DEPRECATED,
             description="These settings are deprecated and will be removed in a "
-            + "future release.  Please move to using the config.yml file to set "
-            + "them instead.",
+            + "future release.  Please set them with config.yml instead.",
         )
         deprecated_group.add_argument(
             "--diffusion-steps",
@@ -376,8 +375,6 @@ class Settings(argparse.ArgumentParser):
 
     def load(self, args) -> None:
         self._settings = self.parse_args(args=args).__dict__
-        for key in self._settings:
-            setattr(self, key, self._settings[key])
 
         if not self.get_str("discord_token"):
             self.discord_token = self.DISCORD_TOKEN_ENV

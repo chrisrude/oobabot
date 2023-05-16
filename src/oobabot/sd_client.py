@@ -51,7 +51,6 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     ):
         super().__init__(self.SERVICE_NAME, base_url)
 
-        print("request_params", request_params)
         self.request_params = request_params
 
         # when we're in a "age restricted" channel, we'll swap
@@ -237,5 +236,5 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         await self.set_options()
         fancy_logger.get().debug(
             "Stable Diffusion: Using negative prompt: %s...",
-            self.request_params.get("negative_prompt")[:20],
+            str(self.request_params.get("negative_prompt", ""))[:20],
         )
