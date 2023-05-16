@@ -20,9 +20,6 @@ from oobabot import types
 
 
 class DiscordBot(discord.Client):
-    # seconds after which we'll lazily purge a channel
-    # from channel_last_direct_response
-
     def __init__(
         self,
         ooba_client: ooba_client.OobaClient,
@@ -35,8 +32,10 @@ class DiscordBot(discord.Client):
         discord_settings: dict,
         persona_settings: dict,
     ):
-        self.ooba_client = ooba_client
+        self.bot_commands = bot_commands
         self.decide_to_respond = decide_to_respond
+        self.image_generator = image_generator
+        self.ooba_client = ooba_client
         self.prompt_generator = prompt_generator
         self.repetition_tracker = repetition_tracker
         self.response_stats = response_stats
@@ -44,17 +43,12 @@ class DiscordBot(discord.Client):
         self.ai_name = persona_settings["ai_name"]
         self.persona = persona_settings["persona"]
         self.ai_user_id = -1
-        self.image_generator = image_generator
 
-        self.ignore_dms = discord_settings["ignore_dms"]
         self.dont_split_responses = discord_settings["dont_split_responses"]
-        self.stream_responses = discord_settings["stream_responses"]
+        self.ignore_dms = discord_settings["ignore_dms"]
         self.reply_in_thread = discord_settings["reply_in_thread"]
-
-        # a list of timestamps in which we last posted to a channel
-        self.channel_last_direct_response = {}
-
-        self.bot_commands = bot_commands
+        self.stop_markers = discord_settings["stop_markers"]
+        self.stream_responses = discord_settings["stream_responses"]
 
         intents = discord.Intents.default()
         intents.message_content = True
@@ -101,6 +95,10 @@ class DiscordBot(discord.Client):
 
         fancy_logger.get().debug(
             "History: %d lines ", self.prompt_generator.history_lines
+        )
+
+        fancy_logger.get().debug(
+            "Stop markers: %s", ", ".join(self.stop_markers) or "<none>"
         )
 
         str_wakewords = (
@@ -350,7 +348,9 @@ class DiscordBot(discord.Client):
         response_channel_id: int,
     ):
         async for sentence in response_iterator:
-            sentence = self.filter_immersion_breaking_lines(sentence)
+            (sentence, abort_response) = self.filter_immersion_breaking_lines(sentence)
+            if abort_response:
+                break
             if not sentence:
                 # we can't send an empty message
                 continue
@@ -379,7 +379,9 @@ class DiscordBot(discord.Client):
                 continue
 
             response += token
-            response = self.filter_immersion_breaking_lines(response)
+            (response, abort_response) = self.filter_immersion_breaking_lines(response)
+            if abort_response:
+                break
             if not response:
                 # we can't send an empty message
                 continue
@@ -401,10 +403,11 @@ class DiscordBot(discord.Client):
             response_channel_id, generic_response_message
         )
 
-    def filter_immersion_breaking_lines(self, sentence: str) -> str:
+    def filter_immersion_breaking_lines(self, sentence: str) -> typing.Tuple[str, bool]:
         lines = sentence.split("\n")
         good_lines = []
         previous_line = ""
+        abort_response = False
         for line in lines:
             # if the AI gives itself a second line, just ignore
             # the line instruction and continue
@@ -420,6 +423,14 @@ class DiscordBot(discord.Client):
                 fancy_logger.get().warning(
                     'Filtered out "%s" from response, aborting', line
                 )
+                abort_response = True
+                break
+
+            if line in self.stop_markers:
+                fancy_logger.get().warning(
+                    'Filtered out "%s" from response, aborting', line
+                )
+                abort_response = True
                 break
 
             if not line and not previous_line:
@@ -427,4 +438,4 @@ class DiscordBot(discord.Client):
                 continue
 
             good_lines.append(line)
-        return "\n".join(good_lines)
+        return ("\n".join(good_lines), abort_response)

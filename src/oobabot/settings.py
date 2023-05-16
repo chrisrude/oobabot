@@ -191,6 +191,7 @@ class Settings:
                         """
                     )
                 ],
+                show_default_in_yaml=False,
             )
         )
         self.persona_settings.add_setting(
@@ -206,6 +207,7 @@ class Settings:
                         """
                     )
                 ],
+                show_default_in_yaml=False,
             )
         )
         self.persona_settings.add_setting(
@@ -248,6 +250,7 @@ class Settings:
                     )
                 ],
                 cli_args=["--discord-token"],
+                show_default_in_yaml=False,
             )
         )
         self.discord_settings.add_setting(
@@ -303,6 +306,24 @@ class Settings:
                         """
                     )
                 ],
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[typing.List[str]](
+                name="stop_markers",
+                default=[
+                    "### End of Transcript ###<|endoftext|>",
+                    "<|endoftext|>",
+                ],
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        A list of strings that will cause the bot to stop
+                        generating a response when encountered.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
             )
         )
         self.discord_settings.add_setting(
