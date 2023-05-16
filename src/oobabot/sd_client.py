@@ -46,44 +46,19 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     def __init__(
         self,
         base_url: str,
-        negative_prompt: str,
+        request_params: typing.Dict[str, typing.Union[bool, int, str]],
         negative_prompt_nsfw: str,
-        image_width: int,
-        image_height: int,
-        steps: int,
-        desired_sampler: typing.Optional[str] = None,
     ):
         super().__init__(self.SERVICE_NAME, base_url)
 
-        self.negative_prompt = negative_prompt
+        print("request_params", request_params)
+        self.request_params = request_params
+
+        # when we're in a "age restricted" channel, we'll swap
+        # the "negative_prompt" in the request_params with this
+        # value.  Otherwise we'll use the one already in
+        # request_params["negative_prompt"]
         self.negative_prompt_nsfw = negative_prompt_nsfw
-
-        self._sampler = None
-        self.desired_sampler = desired_sampler
-
-        self.image_width = image_width
-        self.image_height = image_height
-
-        self._steps = steps
-
-    # set default negative prompts to make it more difficult
-    # to create content against the discord TOS
-    # https://discord.com/guidelines
-
-    DEFAULT_REQUEST_PARAMS: typing.Dict[str, typing.Union[bool, int, str]] = {
-        # default values are commented out
-        #
-        # "do_not_save_samples": False,
-        #    This is a privacy concern for the users of the service.
-        #    We don't want to save the generated images anyway, since they
-        #    are going to be on Discord.  Also, we don't want to use the
-        #    disk space.
-        "do_not_save_samples": True,
-        #
-        # "do_not_save_grid": False,
-        #    Sames as above.
-        "do_not_save_grid": True,
-    }
 
     DEFAULT_OPTIONS = {
         #
@@ -174,30 +149,16 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         # Purpose: Generate an image from a prompt.
         # Args:
         #     prompt: The prompt to generate an image from.
-        #     negative_prompt: The negative prompt to use.
-        #     sampler_name: The sampler to use.
-        #     steps: The number of steps to use.
-        #     width: The width of the image.
-        #     height: The height of the image.
+        #     is_channel_nsfw: Whether the channel is NSFW.
+        #     this will change the negative prompt.
         # Returns:
         #     The image as bytes.
         # Raises:
         #     OobaHttpClientError, if the request fails.
-        request = self.DEFAULT_REQUEST_PARAMS.copy()
-        negative_prompt = self.negative_prompt
+        request = self.request_params.copy()
+        request["prompt"] = prompt
         if is_channel_nsfw:
-            negative_prompt = self.negative_prompt_nsfw
-        request.update(
-            {
-                "prompt": prompt,
-                "negative_prompt": negative_prompt,
-                "steps": self._steps,
-                "width": self.image_width,
-                "height": self.image_height,
-            }
-        )
-        if self._sampler is not None:
-            request["sampler_name"] = self._sampler
+            request["negative_prompt"] = self.negative_prompt_nsfw
 
         async def do_post() -> bytes:
             fancy_logger.get().debug(
@@ -242,33 +203,39 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
 
         return asyncio.create_task(do_post_with_retry())
 
-    async def set_sampler(self):
-        """Sets the sampler to use, if it is available."""
+    async def verify_sampler_available(self):
+        """
+        Checks that the requested sampler is available on the server.
+        If it isn't, logs a warning and sets the sampler to the default.
+        """
         samplers = await self.get_samplers()
-        if self.desired_sampler is not None:
-            if self.desired_sampler in samplers:
-                fancy_logger.get().debug(
-                    "Stable Diffusion: Using desired sampler '%s'", self.desired_sampler
-                )
-                self._sampler = self.desired_sampler
-            else:
-                fancy_logger.get().warning(
-                    "Stable Diffusion: Desired sampler '%s' not available",
-                    self.desired_sampler,
-                )
-                self._sampler = None
-        if self._sampler is None:
+
+        desired_sampler = self.request_params.get("sampler")
+        if not desired_sampler:
             fancy_logger.get().debug(
                 "Stable Diffusion: Using default sampler on SD server"
             )
+            return
+
+        if desired_sampler in samplers:
             fancy_logger.get().debug(
-                "Stable Diffusion: Available samplers: %s", ", ".join(samplers)
+                "Stable Diffusion: Using desired sampler '%s'", desired_sampler
             )
-            self._sampler = None
+            return
+
+        fancy_logger.get().warning(
+            "Stable Diffusion: Desired sampler '%s' not available",
+            desired_sampler,
+        )
+        fancy_logger.get().info(
+            "Stable Diffusion: Available samplers: %s", ", ".join(samplers)
+        )
+        self.request_params["sampler"] = ""
 
     async def _setup(self):
-        await self.set_sampler()
+        await self.verify_sampler_available()
         await self.set_options()
         fancy_logger.get().debug(
-            "Stable Diffusion: Using negative prompt: %s...", self.negative_prompt[:20]
+            "Stable Diffusion: Using negative prompt: %s...",
+            self.request_params.get("negative_prompt")[:20],
         )

@@ -28,34 +28,24 @@ class OobaBot:
 
         self.settings = settings.Settings()
         self.settings.load(cli_args)
-        if not self.settings.discord_token:
-            msg = (
-                f"Please set the '{self.settings.DISCORD_TOKEN_ENV_VAR}' "
-                + "environment variable to your bot's discord token."
-            )
-            # will exit() after printing
-            self.settings.error(msg)
 
         ########################################################
         # Connect to Oobabooga
 
         self.ooba_client = ooba_client.OobaClient(
-            self.settings.base_url, self.settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS
+            self.settings.get_str("base_url"),
+            self.settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS,
         )
 
         ########################################################
         # Connect to Stable Diffusion, if configured
 
         self.stable_diffusion_client = None
-        if self.settings.stable_diffusion_url:
+        if self.settings.get_str("stable_diffusion_url"):
             self.stable_diffusion_client = sd_client.StableDiffusionClient(
-                base_url=self.settings.stable_diffusion_url,
-                negative_prompt=self.settings.sd_negative_prompt,
-                negative_prompt_nsfw=self.settings.sd_negative_prompt_nsfw,
-                image_width=self.settings.image_width,
-                image_height=self.settings.image_height,
-                steps=self.settings.diffusion_steps,
-                desired_sampler=self.settings.stable_diffusion_sampler,
+                base_url=self.settings.get_str("stable_diffusion_url"),
+                request_params=self.settings.sd_request_params,
+                negative_prompt_nsfw=self.settings.get_str("sd_negative_prompt"),
             )
 
         ########################################################
@@ -63,10 +53,10 @@ class OobaBot:
 
         # decides which messages the bot will respond to
         self.decide_to_respond = decide_to_respond.DecideToRespond(
-            self.settings.wakewords,
-            self.settings.ignore_dms,
-            self.settings.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
-            self.settings.DECIDE_TO_RESPOND_TIME_VS_RESPONSE_CHANCE,
+            wakewords=self.settings.get_str_list("wakewords"),
+            ignore_dms=self.settings.get_bool("ignore_dms"),
+            interrobang_bonus=self.settings.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
+            time_vs_response_chance=self.settings.TIME_VS_RESPONSE_CHANCE,
         )
 
         # templates used to generate prompts to send to the AI
@@ -76,12 +66,12 @@ class OobaBot:
         # once we decide to respond, this generates a prompt
         # to send to the AI, given a message history
         self.prompt_generator = prompt_generator.PromptGenerator(
-            ai_name=self.settings.ai_name,
+            ai_name=self.settings.get_str("ai_name"),
             persona=self.settings.persona,
-            history_lines=self.settings.history_lines,
+            history_lines=self.settings.get_int("history_lines"),
             token_space=self.settings.OOBABOT_MAX_AI_TOKEN_SPACE,
             template_store=self.template_store,
-            dont_split_responses=self.settings.dont_split_responses,
+            dont_split_responses=self.settings.get_bool("dont_split_responses"),
         )
 
         # tracks of the time spent on responding, success rate, etc.
@@ -95,7 +85,7 @@ class OobaBot:
         if self.stable_diffusion_client is not None:
             self.image_generator = image_generator.ImageGenerator(
                 stable_diffusion_client=self.stable_diffusion_client,
-                image_words=self.settings.image_words,
+                image_words=self.settings.get_str_list("image_words"),
                 template_store=self.template_store,
             )
 
@@ -108,10 +98,10 @@ class OobaBot:
         )
 
         self.bot_commands = bot_commands.BotCommands(
-            ai_name=self.settings.ai_name,
+            ai_name=self.settings.get_str("ai_name"),
             decide_to_respond=self.decide_to_respond,
             repetition_tracker=self.repetition_tracker,
-            reply_in_thread=self.settings.reply_in_thread,
+            reply_in_thread=self.settings.get_bool("reply_in_thread"),
             template_store=self.template_store,
         )
 
@@ -123,6 +113,22 @@ class OobaBot:
         signal.signal(signal.SIGINT, sigint_handler)
 
     def run(self):
+        if self.settings.get_bool("generate_config"):
+            yaml_config = settings.SettingsConfigFile(
+                self.settings, self.template_store
+            )
+            # yaml_config.load(self.settings.config_file_path)
+            yaml_config.dump(sys.stdout)
+            sys.exit(0)
+
+        if not self.settings.discord_token:
+            msg = (
+                f"Please set the '{self.settings.DISCORD_TOKEN_ENV_VAR}' "
+                + "environment variable to your bot's discord token."
+            )
+            # will exit() after printing
+            self.settings.error(msg)
+
         ########################################################
         # Test connection to services
         for client in [self.ooba_client, self.stable_diffusion_client]:
@@ -156,12 +162,12 @@ class OobaBot:
             response_stats=self.response_stats,
             image_generator=self.image_generator,
             bot_commands=self.bot_commands,
-            ai_name=self.settings.ai_name,
+            ai_name=self.settings.get_str("ai_name"),
             persona=self.settings.persona,
-            ignore_dms=self.settings.ignore_dms,
-            dont_split_responses=self.settings.dont_split_responses,
-            reply_in_thread=self.settings.reply_in_thread,
-            log_all_the_things=self.settings.log_all_the_things,
+            ignore_dms=self.settings.get_bool("ignore_dms"),
+            dont_split_responses=self.settings.get_bool("dont_split_responses"),
+            reply_in_thread=self.settings.get_bool("reply_in_thread"),
+            log_all_the_things=self.settings.get_bool("log_all_the_things"),
         )
 
         # opens http connections to our services,

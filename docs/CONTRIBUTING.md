@@ -25,6 +25,7 @@ This description flows pretty similarly to how the code is structured.  Below I'
 
 - `discord_bot.py` - connects to Discord, monitors for messages, sends replies
 
+- `bot_commands.py` - handles slash-commands from Discord
 - `image_generator.py` - generates images and posts them, UI to redo images
 - `decide_to_respond.py` - chooses which messages to reply to
 - `prompt_generator.py` - generates the prompt sent to Oobabooga
@@ -35,7 +36,6 @@ This description flows pretty similarly to how the code is structured.  Below I'
 - `http_client.py` - http client, used by both sd_client and ooba_client
 
 - `response_stats.py` - logs operational stats
-- `sentence_splitter.py` - splits a stream of tokens into sentences
 - `types.py` - defines generic versions messaging objects
 - `templates.py` - creates all UI messages and bot prompts
 
@@ -66,6 +66,8 @@ poetry run oobabot
 ```
 
 You'll need a machine running Python 3.9 or higher, and [poetry](https://python-poetry.org/) installed.  Then just clone the repo.
+
+Note: if you're using miniconda as your virtual environment, you'll need to explicitly add python to the environment before running `poetry install`.  See [the FAQ](FAQ.md) for more details.
 
 Once you have the code checked out, you can install the dependencies with `poetry install`.  This will install all the dependencies, including the dev dependencies.
 
