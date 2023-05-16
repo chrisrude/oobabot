@@ -46,13 +46,13 @@ class DecideToRespond:
 
     def __init__(
         self,
-        wakewords: typing.List[str],
-        ignore_dms: bool,
+        discord_settings: dict,
+        persona_settings: dict,
         interrobang_bonus: float,
         time_vs_response_chance: typing.List[typing.Tuple[float, float]],
     ):
-        self.wakewords = wakewords
-        self.ignore_dms = ignore_dms
+        self.wakewords = persona_settings["wakewords"]
+        self.ignore_dms = discord_settings["ignore_dms"]
         self.interrobang_bonus = interrobang_bonus
         self.time_vs_response_chance = time_vs_response_chance
 

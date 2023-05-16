@@ -32,13 +32,8 @@ class DiscordBot(discord.Client):
         response_stats: response_stats.AggregateResponseStats,
         bot_commands: bot_commands.BotCommands,
         image_generator: typing.Optional[image_generator.ImageGenerator],
-        ai_name: str,
-        persona: str,
-        ignore_dms: bool,
-        dont_split_responses: bool,
-        stream_responses: bool,
-        reply_in_thread: bool,
-        log_all_the_things: bool,
+        discord_settings: dict,
+        persona_settings: dict,
     ):
         self.ooba_client = ooba_client
         self.decide_to_respond = decide_to_respond
@@ -46,16 +41,15 @@ class DiscordBot(discord.Client):
         self.repetition_tracker = repetition_tracker
         self.response_stats = response_stats
 
-        self.ai_name = ai_name
-        self.persona = persona
+        self.ai_name = persona_settings["ai_name"]
+        self.persona = persona_settings["persona"]
         self.ai_user_id = -1
         self.image_generator = image_generator
 
-        self.ignore_dms = ignore_dms
-        self.dont_split_responses = dont_split_responses
-        self.stream_responses = stream_responses
-        self.reply_in_thread = reply_in_thread
-        self.log_all_the_things = log_all_the_things
+        self.ignore_dms = discord_settings["ignore_dms"]
+        self.dont_split_responses = discord_settings["dont_split_responses"]
+        self.stream_responses = discord_settings["stream_responses"]
+        self.reply_in_thread = discord_settings["reply_in_thread"]
 
         # a list of timestamps in which we last posted to a channel
         self.channel_last_direct_response = {}
@@ -321,10 +315,6 @@ class DiscordBot(discord.Client):
         )
 
         this_response_stat = self.response_stats.log_request_arrived(prompt_prefix)
-        if self.log_all_the_things:
-            print("prompt_prefix:\n----------\n")
-            print(prompt_prefix)
-            print("Response:\n----------\n")
 
         try:
             if self.stream_responses:
@@ -360,9 +350,6 @@ class DiscordBot(discord.Client):
         response_channel_id: int,
     ):
         async for sentence in response_iterator:
-            if self.log_all_the_things:
-                print(sentence)
-
             sentence = self.filter_immersion_breaking_lines(sentence)
             if not sentence:
                 # we can't send an empty message
@@ -388,9 +375,6 @@ class DiscordBot(discord.Client):
         response = ""
         last_message = None
         async for token in response_iterator:
-            if self.log_all_the_things:
-                print(token, end="", flush=True)
-
             if "" == token:
                 continue
 

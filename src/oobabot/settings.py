@@ -17,9 +17,17 @@ def console_wrapped(message):
     return "\n".join(textwrap.wrap(message, width))
 
 
-YAML_WIDTH = 60
+YAML_WIDTH = 88
 DIVIDER = "# " * (YAML_WIDTH >> 1)
-INDENT_UNIT = 4
+INDENT_UNIT = 2
+
+SettingDictType = typing.Dict[
+    str, typing.Union[bool, int, float, str, typing.List[str]]
+]
+
+SettingValueType = typing.Union[
+    bool, int, float, str, typing.List[str], SettingDictType
+]
 
 
 def format_yaml_comment(comment_lines: typing.List[str]) -> str:
@@ -45,12 +53,205 @@ def add_to_group(
 
 
 def make_template_help(
-    template: templates.TemplateMessageFormatter,
+    name: str,
+    tokens_desc_tuple: typing.Tuple[typing.List[templates.TemplateToken], str],
 ) -> typing.List[str]:
     return [
-        template.purpose,
-        f"Allowed tokens: {', '.join([str(t) for t in template.allowed_tokens])}",
+        f"Path to a file containing the {name} template.",
+        tokens_desc_tuple[1],
+        ".",
+        f"Allowed tokens: {', '.join([str(t) for t in tokens_desc_tuple[0]])}",
+        ".",
     ]
+
+
+T = typing.TypeVar("T", bound="SettingValueType")
+
+
+class ConfigSetting(typing.Generic[T]):
+    data_type: T
+    description_lines: typing.List[str]
+    cli_args: typing.List[str]
+    include_in_argparse: bool
+    include_in_yaml: bool
+    show_default_in_yaml: bool
+    fn_on_set: typing.Callable[[T], None]
+
+    def __init__(
+        self,
+        name: str,
+        default: T,
+        description_lines: typing.List[str],
+        cli_args: typing.Optional[typing.List[str]] = None,
+        include_in_argparse: bool = True,
+        include_in_yaml: bool = True,
+        show_default_in_yaml: bool = True,
+        fn_on_set: typing.Callable[[T], None] = lambda x: None,
+    ):
+        self.name = name
+        self.default = default
+        self.description_lines = [x.strip() for x in description_lines]
+        if cli_args is None:
+            cli_args = ["--" + name.replace("_", "-")]
+        self.cli_args = cli_args
+        self.value = default
+        self.include_in_argparse = include_in_argparse
+        self.include_in_yaml = include_in_yaml
+        self.show_default_in_yaml = show_default_in_yaml
+        self.fn_on_set = fn_on_set
+
+    def add_to_argparse(self, parser: argparse._ArgumentGroup):
+        if not self.include_in_argparse:
+            return
+
+        kwargs = {
+            "default": self.value,
+            "help": " ".join(self.description_lines),
+        }
+
+        # note: the other way to do this is with
+        #   typing.get_args(self.__orig_class__)[0]
+        # but that isn't officially supported, so
+        # let's do it the jankier way
+        if isinstance(self.default, str):
+            kwargs["type"] = str
+        elif isinstance(self.default, bool):
+            kwargs["action"] = "store_true"
+            if self.default:
+                kwargs["action"] = "store_false"
+        elif isinstance(self.default, int):
+            kwargs["type"] = int
+        elif isinstance(self.default, float):
+            kwargs["type"] = float
+        elif isinstance(self.default, list):
+            kwargs["type"] = str
+            kwargs["nargs"] = "*"
+
+        parser.add_argument(*self.cli_args, **kwargs)
+
+    def set_value_from_argparse(self, args: argparse.Namespace) -> None:
+        if not self.include_in_argparse:
+            return
+        if not hasattr(args, self.name):
+            raise ValueError(f"Namespace does not have attribute {self.name}")
+        self.set_value(getattr(args, self.name))
+
+    def add_to_yaml_group(self, group: ryaml.CommentedMap):
+        if not self.include_in_yaml:
+            return
+        add_to_group(
+            group,
+            key=self.name,
+            value=self.value,
+            comment_lines=self.make_yaml_comment(),
+            indent=INDENT_UNIT,
+        )
+
+    def make_yaml_comment(self) -> typing.List[str]:
+        comment_lines = self.description_lines.copy()
+
+        if self.show_default_in_yaml:
+            if self.default is not None:
+                comment_lines.append(f"  default: {str(self.default).lower()}")
+            else:
+                comment_lines.append("  default: None")
+        return comment_lines
+
+    def set_value_from_yaml(self, yaml: ryaml.CommentedMap) -> None:
+        if not self.include_in_yaml:
+            return
+        if self.name not in yaml:
+            return
+        self.set_value(yaml[self.name])
+
+    def set_value(self, value: T) -> None:
+        self.value = value
+        self.fn_on_set(value)
+
+    def get(self) -> T:
+        if isinstance(self.value, dict):
+            return self.value.copy()
+        return self.value
+
+
+class ConfigSettingGroup:
+    name: str
+    description: str
+    settings: typing.Dict[str, ConfigSetting]
+
+    def __init__(
+        self,
+        name: str,
+        description: str = "",
+        include_in_argparse: bool = True,
+        include_in_yaml: bool = True,
+    ):
+        self.name = name
+        self.description = description
+        self.settings = {}
+        self.include_in_argparse = include_in_argparse
+        self.include_in_yaml = include_in_yaml
+
+    def add_setting(self, setting: "ConfigSetting") -> None:
+        self.settings[setting.name] = setting
+
+    def add_to_argparse(self, parser: argparse.ArgumentParser):
+        if not self.include_in_argparse:
+            return
+        arg_group = parser.add_argument_group(self.name, self.description)
+        for setting in self.settings.values():
+            setting.add_to_argparse(arg_group)
+
+    def set_values_from_argparse(self, args: argparse.Namespace) -> None:
+        if not self.include_in_argparse:
+            return
+        for setting in self.settings.values():
+            setting.set_value_from_argparse(args)
+
+    def add_to_yaml(self, yaml: ryaml.CommentedMap):
+        if not self.include_in_yaml:
+            return
+        group_key = self.name.lower().replace(" ", "_")
+
+        group = ryaml.CommentedMap()
+        group.yaml_set_start_comment(f"{DIVIDER}\n# {self.name}\n{DIVIDER}\n")
+        for setting in self.settings.values():
+            setting.add_to_yaml_group(group)
+
+        add_to_group(
+            group=yaml,
+            key=group_key,
+            value=group,
+            comment_lines=[DIVIDER, group_key, "."],
+            indent=0,
+        )
+
+    def set_values_from_yaml(self, yaml: dict):
+        if not self.include_in_yaml:
+            return
+        if yaml is None:
+            return
+        group_key = self.name.lower().replace(" ", "_")
+        if group_key not in yaml:
+            return
+        group = yaml[group_key]
+        for setting in self.settings.values():
+            setting.set_value_from_yaml(group)
+
+    def get_setting(self, name: str) -> ConfigSetting:
+        return self.settings[name]
+
+    def get(self, name: str) -> SettingValueType:
+        return self.settings[name].value
+
+    def get_str(self, name: str) -> str:
+        return self.settings[name].value
+
+    def get_list(self, name: str) -> typing.List[SettingValueType]:
+        return self.settings[name].value
+
+    def get_all(self) -> typing.Dict[str, SettingValueType]:
+        return {name: setting.get() for (name, setting) in self.settings.items()}.copy()
 
 
 class Settings(argparse.ArgumentParser):
@@ -90,9 +291,7 @@ class Settings(argparse.ArgumentParser):
     # before the repetition tracker will take action
     REPETITION_TRACKER_THRESHOLD = 1
 
-    OOBABOOGA_DEFAULT_REQUEST_PARAMS: typing.Dict[
-        str, typing.Union[bool, float, int, str, typing.List[typing.Any]]
-    ] = {
+    OOBABOOGA_DEFAULT_REQUEST_PARAMS: SettingDictType = {
         "max_new_tokens": OOBABOT_MAX_NEW_TOKENS,
         "do_sample": True,
         "temperature": 1.3,
@@ -121,6 +320,45 @@ class Settings(argparse.ArgumentParser):
     # number lines back in the message history to include in the prompt
     DEFAULT_HISTORY_LINES_TO_SUPPLY = 7
 
+    # square image, 512x512
+    DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE: int = 512
+
+    # 30 steps of diffusion
+    DEFAULT_STABLE_DIFFUSION_STEPS: int = 30
+    # set default negative prompts to make it more difficult
+    # to create content against the discord TOS
+    # https://discord.com/guidelines
+
+    # use this prompt for "age_restricted" Discord channels
+    #  i.e. channel.nsfw is true
+    DEFAULT_SD_NEGATIVE_PROMPT_NSFW: str = "animal harm, suicide, loli"
+
+    # no default, just use what Stable Diffusion has on tap
+    DEFAULT_STABLE_DIFFUSION_SAMPLER = ""
+
+    # use this prompt for non-age-restricted channels
+    DEFAULT_SD_NEGATIVE_PROMPT: str = DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", nsfw"
+
+    DEFAULT_SD_REQUEST_PARAMS: typing.Dict[str, typing.Union[bool, int, str]] = {
+        # default values are commented out
+        #
+        # "do_not_save_samples": False,
+        #    This is a privacy concern for the users of the service.
+        #    We don't want to save the generated images anyway, since they
+        #    are going to be on Discord.  Also, we don't want to use the
+        #    disk space.
+        "do_not_save_samples": True,
+        #
+        # "do_not_save_grid": False,
+        #    Sames as above.
+        "do_not_save_grid": True,
+        "negative_prompt": DEFAULT_SD_NEGATIVE_PROMPT,
+        "negative_prompt_nsfw": DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
+        "steps": DEFAULT_STABLE_DIFFUSION_STEPS,
+        "width": DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
+        "height": DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
+        "sampler": DEFAULT_STABLE_DIFFUSION_SAMPLER,
+    }
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
     DEFAULT_IMAGE_WORDS: typing.List[str] = [
@@ -132,33 +370,14 @@ class Settings(argparse.ArgumentParser):
         "sketch",
     ]
 
-    # square image, 512x512
-    DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE: int = 512
-
-    # 30 steps of diffusion
-    DEFAULT_STABLE_DIFFUSION_STEPS: int = 30
-
     # ENVIRONMENT VARIABLES ####
 
     DISCORD_TOKEN_ENV_VAR: str = "DISCORD_TOKEN"
-    DISCORD_TOKEN_ENV: str = os.environ.get(DISCORD_TOKEN_ENV_VAR, "")
 
     OOBABOT_PERSONA_ENV_VAR: str = "OOBABOT_PERSONA"
-    OOBABOT_PERSONA: str = os.environ.get(OOBABOT_PERSONA_ENV_VAR, "")
 
     DEFAULT_WAKEWORDS: typing.List[str] = ["oobabot"]
     DEFAULT_URL: str = "ws://localhost:5005"
-
-    # set default negative prompts to make it more difficult
-    # to create content against the discord TOS
-    # https://discord.com/guidelines
-
-    # use this prompt for "age_restricted" Discord channels
-    #  i.e. channel.nsfw is true
-    DEFAULT_SD_NEGATIVE_PROMPT_NSFW: str = "animal harm, suicide, loli"
-
-    # use this prompt for non-age-restricted channels
-    DEFAULT_SD_NEGATIVE_PROMPT: str = DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", nsfw"
 
     DEPRECATED: str = "Deprecated"
 
@@ -171,145 +390,326 @@ class Settings(argparse.ArgumentParser):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             add_help=False,
         )
+        self.setting_groups: typing.List[ConfigSettingGroup] = []
 
         ###########################################################
         # General Settings
         #  won't be included in the config.yaml
 
-        # add our own help handler so that we can print an extra
-        # message at the end
-        self.add_argument(
-            "-h",
-            "--help",
-            action="store_true",
-            default=argparse.SUPPRESS,
+        self.general_settings = ConfigSettingGroup(
+            "General Settings", include_in_yaml=False
         )
+        self.setting_groups.append(self.general_settings)
 
-        self.add_argument(
-            "--generate-config",
-            default=False,
-            help="If set, oobabot will print its configuration "
-            "as a .yml file, then exit.  Any command-line settings "
-            "also passed will be reflected in this file.",
-            action="store_true",
+        self.general_settings.add_setting(
+            ConfigSetting[bool](
+                name="help",
+                default=False,
+                description_lines=[],
+                cli_args=["-h", "--help"],
+            )
+        )
+        self.general_settings.add_setting(
+            ConfigSetting[bool](
+                name="generate_config",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        If set, oobabot will print its configuration as a .yml file,
+                        then exit.  Any command-line settings also passed will be
+                        reflected in this file.
+                        """
+                    )
+                ],
+            )
         )
 
         ###########################################################
         # Persona Settings
 
-        persona_group = self.add_argument_group("Persona")
-        persona_group.add_argument(
-            "--ai-name",
-            type=str,
-            default="oobabot",
-            help="Name the AI will use to refer to itself",
+        self.persona_settings = ConfigSettingGroup("Persona")
+        self.setting_groups.append(self.persona_settings)
+
+        self.persona_settings.add_setting(
+            ConfigSetting[str](
+                name="ai_name",
+                default="oobabot",
+                description_lines=[
+                    "Name the AI will use to refer to itself",
+                ],
+            )
         )
-        persona_group.add_argument(
-            "--persona",
-            type=str,
-            help="This prefix will be added in front of every user-supplied "
-            + "request.  This is useful for setting up a 'character' for the "
-            + "bot to play.  Alternatively, this can be set with the "
-            + f"{self.OOBABOT_PERSONA_ENV_VAR} environment variable.",
+        self.persona_settings.add_setting(
+            ConfigSetting[str](
+                name="persona",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        f"""
+                        This prefix will be added in front of every user-supplied
+                        request.  This is useful for setting up a 'character' for the
+                        bot to play.  Alternatively, this can be set with the
+                        {self.OOBABOT_PERSONA_ENV_VAR} environment variable.
+                        """
+                    )
+                ],
+            )
         )
-        persona_group.add_argument(
-            "--wakewords",
-            type=str,
-            nargs="*",
-            default=self.DEFAULT_WAKEWORDS,
-            help="One or more words that the bot will listen for.\n "
-            + "The bot will listen in all discord channels can "
-            + "access for one of these words to be mentioned, then reply "
-            + "to any messages it sees with a matching word.  "
-            + "The bot will always reply to @-mentions and "
-            + "direct messages, even if no wakewords are supplied.",
+        self.persona_settings.add_setting(
+            ConfigSetting[str](
+                name="prompt",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        This prompt will be added to the beginning of every
+                        user-supplied request.  This is useful for setting up
+                        a 'character' for the bot to play.
+                        """
+                    )
+                ],
+            )
         )
+        self.persona_settings.add_setting(
+            ConfigSetting[typing.List[str]](
+                name="wakewords",
+                default=self.DEFAULT_WAKEWORDS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        One or more words that the bot will listen for.
+                        The bot will listen in all discord channels can
+                        access for one of these words to be mentioned, then reply
+                        to any messages it sees with a matching word.
+                        The bot will always reply to @-mentions and
+                        direct messages, even if no wakewords are supplied.
+                        """
+                    )
+                ],
+            )
+        )
+
         ###########################################################
         # Discord Settings
 
-        discord_group = self.add_argument_group("Discord")
-        discord_group.add_argument(
-            "--discord-token",
-            type=str,
-            help="Token to log into Discord with.  For security "
-            + "purposes it's strongly recommended that you set "
-            + f"this via the {self.DISCORD_TOKEN_ENV_VAR} environment "
-            + "variable instead, if possible.",
+        self.discord_settings = ConfigSettingGroup("Discord")
+        self.setting_groups.append(self.discord_settings)
+
+        self.discord_settings.add_setting(
+            ConfigSetting[str](
+                name="discord_token",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        f"""
+                        Token to log into Discord with.  For security purposes
+                        it's strongly recommended that you set this via the
+                        {self.DISCORD_TOKEN_ENV_VAR} environment variable
+                        instead, if possible.
+                        """
+                    )
+                ],
+                cli_args=["--discord-token"],
+            )
         )
-        discord_group.add_argument(
-            "--dont-split-responses",
-            default=False,
-            help="Post the entire response as a single "
-            + "message, rather than splitting it into seperate "
-            + "messages by sentence.",
-            action="store_true",
+        self.discord_settings.add_setting(
+            ConfigSetting[bool](
+                name="dont_split_responses",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Post the entire response as a single message, rather than
+                        splitting it into seperate messages by sentence.
+                        """
+                    )
+                ],
+            )
         )
-        discord_group.add_argument(
-            "--history-lines",
-            type=int,
-            default=self.DEFAULT_HISTORY_LINES_TO_SUPPLY,
-            help="Number of lines of chat history the AI will see "
-            + "when generating a response.",
+        self.discord_settings.add_setting(
+            ConfigSetting[int](
+                name="history_lines",
+                default=self.DEFAULT_HISTORY_LINES_TO_SUPPLY,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Number of lines of chat history the AI will see
+                        when generating a response.
+                        """
+                    )
+                ],
+            )
         )
-        discord_group.add_argument(
-            "--ignore-dms",
-            default=False,
-            help="Do not respond to direct messages.",
-            action="store_true",
+        self.discord_settings.add_setting(
+            ConfigSetting[bool](
+                name="ignore_dms",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        If set, the bot will not respond to direct messages.
+                        """
+                    )
+                ],
+            )
         )
-        discord_group.add_argument(
-            "--reply-in-thread",
-            default=False,
-            help="If not in a thread, generate one to respond into.",
-            action="store_true",
+        self.discord_settings.add_setting(
+            ConfigSetting[bool](
+                name="reply_in_thread",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        If set, the bot will generate a thread to respond in
+                        if it is not already in one.
+                        """
+                    )
+                ],
+            )
         )
-        discord_group.add_argument(
-            "--stream-responses",
-            default=False,
-            help="Stream responses into a single message as it is generated.",
-            action="store_true",
+        self.discord_settings.add_setting(
+            ConfigSetting[bool](
+                name="stream_responses",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Stream responses into a single message as they are generated.
+                        """
+                    )
+                ],
+            )
         )
 
         ###########################################################
         # Oobabooga Settings
 
-        oobabooga_group = self.add_argument_group("Oobabooga")
+        self.oobabooga_settings = ConfigSettingGroup("Oobabooga")
+        self.setting_groups.append(self.oobabooga_settings)
 
-        oobabooga_group.add_argument(
-            "--base-url",
-            type=str,
-            default=self.DEFAULT_URL,
-            help="Base URL for the oobabooga instance.  "
-            + "This should be ws://hostname[:port] for plain websocket "
-            + "connections, or wss://hostname[:port] for websocket "
-            + "connections over TLS.",
+        self.oobabooga_settings.add_setting(
+            ConfigSetting[str](
+                name="base_url",
+                default=self.DEFAULT_URL,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Base URL for the oobabooga instance.  This should be
+                        ws://hostname[:port] for plain websocket connections,
+                        or wss://hostname[:port] for websocket connections over TLS.
+                        """
+                    )
+                ],
+            )
         )
-        oobabooga_group.add_argument(
-            "--log-all-the-things",
-            default=False,
-            help="Prints all AI input and output to STDOUT",
-            action="store_true",
+        self.oobabooga_settings.add_setting(
+            ConfigSetting[bool](
+                name="log_all_the_things",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Print all AI input and output to STDOUT.
+                        """
+                    )
+                ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            ConfigSetting[SettingDictType](
+                name="request_params",
+                default=self.OOBABOOGA_DEFAULT_REQUEST_PARAMS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        A dictionary which will be passed straight through to
+                        Oobabooga on every request.  Feel free to add additional
+                        simple parameters here as Oobabooga's API evolves.
+                        See Oobabooga's documentation for what these parameters
+                        mean.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+                show_default_in_yaml=False,
+            )
         )
 
         ###########################################################
         # Stable Diffusion Settings
 
-        stable_diffusion_group = self.add_argument_group("Stable Diffusion")
-        stable_diffusion_group.add_argument(
-            "--image-words",
-            type=str,
-            nargs="*",
-            default=self.DEFAULT_IMAGE_WORDS,
-            help="When one of these words is used in a message, the bot will "
-            + "generate an image.",
+        self.stable_diffusion_settings = ConfigSettingGroup("Stable Diffusion")
+        self.setting_groups.append(self.stable_diffusion_settings)
+
+        self.stable_diffusion_settings.add_setting(
+            ConfigSetting[typing.List[str]](
+                name="image_words",
+                default=self.DEFAULT_IMAGE_WORDS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        When one of these words is used in a message, the bot will
+                        generate an image.
+                        """
+                    )
+                ],
+            )
         )
-        stable_diffusion_group.add_argument(
-            "--stable-diffusion-url",
-            "--sd-url",
-            type=str,
-            default=None,
-            help="URL for an AUTOMATIC1111 Stable Diffusion server",
+        self.stable_diffusion_settings.add_setting(
+            ConfigSetting[str](
+                name="stable_diffusion_url",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        URL for an AUTOMATIC1111 Stable Diffusion server.
+                        """
+                    )
+                ],
+            )
         )
+        self.stable_diffusion_settings.add_setting(
+            ConfigSetting[SettingDictType](
+                name="request_params",
+                default=self.DEFAULT_SD_REQUEST_PARAMS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        A dictionary which will be passed straight through to
+                        Stable Diffusion on every request.  Feel free to add additional
+                        simple parameters here as Stable Diffusion's API evolves.
+                        See Stable Diffusion's documentation for what these parameters
+                        mean.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+                show_default_in_yaml=False,
+            )
+        )
+
+        ###
+        # Template Settings
+
+        self.template_settings = ConfigSettingGroup(
+            "Template",
+            description="UI and AI request templates",
+            include_in_argparse=False,
+        )
+        self.setting_groups.append(self.template_settings)
+
+        for template, tokens_desc_tuple in templates.TemplateStore.TEMPLATES.items():
+            self.template_settings.add_setting(
+                ConfigSetting[str](
+                    name=str(template),
+                    default=templates.TemplateStore.DEFAULT_TEMPLATES[template],
+                    description_lines=make_template_help(
+                        str(template), tokens_desc_tuple
+                    ),
+                    show_default_in_yaml=False,
+                )
+            )
 
         ###########################################################
         # Deprecated Settings
@@ -327,72 +727,159 @@ class Settings(argparse.ArgumentParser):
         # The settings won't be written to the config.yaml template,
         # as they're already covered in the request_params section.
 
-        deprecated_group = self.add_argument_group(
-            title=self.DEPRECATED,
-            description="These settings are deprecated and will be removed in a "
-            + "future release.  Please set them with config.yml instead.",
+        def set_sd_parm(param: str, value: SettingValueType):
+            if not value:
+                return
+            self.stable_diffusion_settings.get_setting("request_params").get()[
+                param
+            ] = value
+
+        self.deprecated_settings = ConfigSettingGroup(
+            self.DEPRECATED,
+            include_in_yaml=False,
+            description="These settings are deprecated and will be removed in "
+            + "a future release.  Please set them with config.yml instead.",
         )
-        deprecated_group.add_argument(
-            "--diffusion-steps",
-            type=int,
-            default=self.DEFAULT_STABLE_DIFFUSION_STEPS,
-            help="Number of diffusion steps to take when generating an image.  "
-            + f"The default is {self.DEFAULT_STABLE_DIFFUSION_STEPS}.",
+        self.setting_groups.append(self.deprecated_settings)
+
+        self.deprecated_settings.add_setting(
+            ConfigSetting[int](
+                name="diffusion_steps",
+                default=0,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Number of diffusion steps to take when generating an image.
+                        """
+                    )
+                ],
+                fn_on_set=lambda x: set_sd_parm("steps", int(x)),
+            )
         )
-        deprecated_group.add_argument(
-            "--image-height",
-            type=int,
-            default=self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
-            help="Size of images to generate.  This is the height of the image "
-            + "in pixels.  The default is "
-            + f"{self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE}.",
+        self.deprecated_settings.add_setting(
+            ConfigSetting[int](
+                name="image_height",
+                default=0,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Size of images to generate.  This is the height of the image
+                        in pixels.
+                        """
+                    )
+                ],
+                fn_on_set=lambda x: set_sd_parm("height", int(x)),
+            )
         )
-        deprecated_group.add_argument(
-            "--image-width",
-            type=int,
-            default=self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
-            help="Size of images to generate.  This is the width of the image "
-            + "in pixels.  The default is "
-            + f"{self.DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE}.",
+        self.deprecated_settings.add_setting(
+            ConfigSetting[int](
+                name="image_width",
+                default=0,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Size of images to generate.  This is the width of the image
+                        in pixels.
+                        """
+                    )
+                ],
+                fn_on_set=lambda x: set_sd_parm("width", int(x)),
+            )
         )
-        deprecated_group.add_argument(
-            "--stable-diffusion-sampler",
-            "--sd-sampler",
-            type=str,
-            default="",
-            help="Sampler to use when generating images.  If not specified, the one "
-            + "set on the AUTOMATIC1111 server will be used.",
+        self.deprecated_settings.add_setting(
+            ConfigSetting[str](
+                name="stable_diffusion_sampler",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Sampler to use when generating images.  If not specified,
+                        the one set on the AUTOMATIC1111 server will be used.
+                        """
+                    )
+                ],
+                cli_args=["--stable-diffusion-sampler", "--sd-sampler"],
+                fn_on_set=lambda x: set_sd_parm("sampler", str(x)),
+            )
         )
-        deprecated_group.add_argument(
-            "--sd-negative-prompt",
-            type=str,
-            default=self.DEFAULT_SD_NEGATIVE_PROMPT,
-            help="Negative prompt to use when generating images.  This will discourage"
-            + " Stable Diffusion from generating images with the specified content.  "
-            + "By default, this is set to follow Discord's TOS.",
+        self.deprecated_settings.add_setting(
+            ConfigSetting[str](
+                name="sd_negative_prompt",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Negative prompt to use when generating images.  This will
+                        discourage Stable Diffusion from generating images with the
+                        specified content.  By default, this is set to follow
+                        Discord's TOS.
+                        """
+                    )
+                ],
+                fn_on_set=lambda x: set_sd_parm("negative_prompt", str(x)),
+            )
         )
-        deprecated_group.add_argument(
-            "--sd-negative-prompt-nsfw",
-            type=str,
-            default=self.DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
-            help="Negative prompt to use when generating images in a channel marked as "
-            + "'Age-Restricted'.",
+        self.deprecated_settings.add_setting(
+            ConfigSetting[str](
+                name="sd_negative_prompt_nsfw",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Negative prompt to use when generating images in a channel
+                        marked as 'Age-Restricted'.
+                        """
+                    )
+                ],
+                fn_on_set=lambda x: set_sd_parm("negative_prompt_nsfw", str(x)),
+            )
         )
+
+    def _load_yaml_settings(self) -> dict:
+        # todo: read from additional sources
+        filename = "config.yml"
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                yaml = ryaml.YAML(typ="rt")  # todo: use "safe"?
+                return yaml.load(f)
+        except FileNotFoundError:
+            print(f"Could not find {filename}.  Using defaults.")
+            return {}
 
     def load(self, args) -> None:
-        self._settings = self.parse_args(args=args).__dict__
+        # Load settings in this order.
+        # The later sources will overwrite the earlier ones.
+        #
+        #  1. config.yml
+        #  2. command line arguments
+        #  3. environment variables
+        #
+        self._yml_settings = self._load_yaml_settings()
+        for group in self.setting_groups:
+            group.set_values_from_yaml(self._yml_settings)
 
-        if not self.get_str("discord_token"):
-            self.discord_token = self.DISCORD_TOKEN_ENV
+        # we need to initialize argparse AFTER we read from
+        # the yaml file, so that the argparse defaults are
+        # set to the yaml-read values.
+        for group in self.setting_groups:
+            group.add_to_argparse(self)
 
-        if not self._settings.get("persona"):
-            self.persona = self.OOBABOT_PERSONA
+        self._cli_settings = self.parse_args(args=args)
 
-        # todo: pass in config file dict
-        self.sd_request_params = self._make_sd_request_params()
-        self.oobabooga_request_params = self.OOBABOOGA_DEFAULT_REQUEST_PARAMS
+        for group in self.setting_groups:
+            group.set_values_from_argparse(self._cli_settings)
 
-        if self._settings.get("help"):
+        discord_token_env = os.environ.get(self.DISCORD_TOKEN_ENV_VAR, None)
+        if discord_token_env:
+            self.discord_settings.get_setting("discord_token").set_value(
+                discord_token_env
+            )
+
+        persona_env = os.environ.get(self.OOBABOT_PERSONA_ENV_VAR, None)
+        if persona_env:
+            self.persona_settings.get_setting("persona").set_value(persona_env)
+
+        if self._cli_settings.help:
             helpstr = self.format_help()
             print(helpstr)
 
@@ -407,7 +894,7 @@ class Settings(argparse.ArgumentParser):
                 )
             )
 
-            if "" == self.discord_token:
+            if "" == self.discord_settings.get("discord_token"):
                 print(
                     "\n"
                     + console_wrapped(
@@ -420,91 +907,13 @@ class Settings(argparse.ArgumentParser):
 
             sys.exit(0)
 
-    def get_dict(self, key: str) -> typing.Dict[str, typing.Any]:
-        return self.get(key)
-
-    def get_int(self, key: str) -> int:
-        return self.get(key)
-
-    def get_str(self, key: str) -> str:
-        return self.get(key)
-
-    def get_bool(self, key: str) -> bool:
-        return self.get(key)
-
-    def get_str_list(self, key: str) -> typing.List[str]:
-        return self.get(key)
-
-    def get(self, key: str) -> typing.Any:
-        if self._settings is None:
-            raise ValueError("Settings not loaded")
-        if key not in self._settings:
-            raise ValueError(f"Setting {key} not found")
-        return self._settings.get(key, "")
-
-    DEFAULT_REQUEST_PARAMS: typing.Dict[str, typing.Union[bool, int, str]] = {
-        # default values are commented out
-        #
-        # "do_not_save_samples": False,
-        #    This is a privacy concern for the users of the service.
-        #    We don't want to save the generated images anyway, since they
-        #    are going to be on Discord.  Also, we don't want to use the
-        #    disk space.
-        "do_not_save_samples": True,
-        #
-        # "do_not_save_grid": False,
-        #    Sames as above.
-        "do_not_save_grid": True,
-    }
-
-    def _make_sd_request_params(
-        self,
-        config_request_params: typing.Optional[
-            typing.Dict[str, typing.Union[bool, int, str]]
-        ] = None,
-    ) -> typing.Dict[str, typing.Union[bool, int, str]]:
-        # todo: read from config file
-
-        if self._settings is None:
-            raise ValueError("Settings not loaded")
-
-        if config_request_params is not None:
-            request = {}.copy()
-        else:
-            request = self.DEFAULT_REQUEST_PARAMS.copy()
-
-        for key_in_settings, key_in_request in [
-            ("sd_negative_prompt", "negative_prompt"),
-            ("diffusion_steps", "steps"),
-            ("image_width", "width"),
-            ("image_height", "height"),
-            ("stable_diffusion_sampler", "sampler"),
-        ]:
-            if key_in_settings in self._settings:
-                val = self._settings.get(key_in_settings)
-                if val is None:
-                    raise ValueError(f"None value for key {key_in_settings}")
-                request[key_in_request] = val
-
-        return request
-
-    def get_argument_groups(self) -> typing.List[argparse._ArgumentGroup]:
-        return self._action_groups
-
-
-class SettingsConfigFile:
     START_COMMENT = textwrap.dedent(
         """
         # Welcome to Oobabot!
         #
         # This is the configuration file for Oobabot.  It is a YAML file, and
-        # comments are allowed.  The file is loaded from the following
-        # locations, in order:
-        #
-        #   1. the argument --config-yml {{filename}}
-        #   2. ./config.yml
-        #   3. ~/.config/oobabot/config.yml
-        #   4. /etc/oobabot/config.yml
+        # comments are allowed.  Oobabot attempts to load a file named
+        # "config.yml" from the current directory when it is run.
         #
         """
     )
@@ -514,155 +923,41 @@ class SettingsConfigFile:
         + "# " * 30
         + textwrap.dedent(
             """
-        # Please save this output into ~/.config/oobabot/config.yml
-        # edit it to your liking, then run the bot again.
-        #
-        #  e.g. oobabot --generate-config > config.yml
-        #       oobabot --config-yml ./config.yml
-        """
+            # Please save this output into ./config.yml
+            # edit it to your liking, then run the bot again.
+            #
+            #  e.g. oobabot --generate-config > config.yml
+            #       oobabot
+            """
         )
     )
 
-    OOBABOOGA_REQUEST_PARAMS_COMMENT = textwrap.dedent(
-        """
-        A dictionary which will be passed straight through to
-        Oobabooga on every request.  Feel free to add additional
-        simple parameters here as Oobabooga's API evolves.
-        See Oobabooga's documentation for what these parameters
-        mean.
-        """
-    )
-
-    def __init__(
-        self,
-        cli_settings: Settings,
-        template_store: templates.TemplateStore,
-    ) -> None:
-        if cli_settings._settings is None:
+    def write_sample_config(self, out_stream: typing.TextIO) -> None:
+        if self._cli_settings is None:
             raise ValueError("Settings have not been loaded yet.")
 
         yaml_map = ryaml.CommentedMap()
         yaml_map.yaml_set_start_comment(self.START_COMMENT)
 
-        for argument_group in cli_settings.get_argument_groups():
-            if argument_group.title is None:
-                continue
-            if argument_group.title == "options":
-                continue
-            if argument_group.title == "optional arguments":
-                continue
-            if argument_group.title == "positional arguments":
-                continue
-            if argument_group.title == cli_settings.DEPRECATED:
-                continue
-
-            group = self.make_yaml_from_argument_group(cli_settings, argument_group)
-
-            group_key = argument_group.title.lower().replace(" ", "_")
-
-            add_to_group(
-                group=yaml_map,
-                key=group_key,
-                value=group,
-                comment_lines=[DIVIDER, group_key, "."],
-                indent=0,
-            )
-
-        # stable diffusion request params
-        sd_request_params = cli_settings.sd_request_params.copy()
-        sd_request_params["negative_prompt_nsfw"] = cli_settings.get(
-            "sd_negative_prompt_nsfw"
-        )
-
-        add_to_group(
-            group=yaml_map["stable_diffusion"],
-            key="request_params",
-            value=sd_request_params,
-            comment_lines=["Request parameters for Stable Diffusion"],
-            indent=INDENT_UNIT,
-        )
-
-        add_to_group(
-            group=yaml_map["oobabooga"],
-            key="request_params",
-            value=cli_settings.oobabooga_request_params,
-            comment_lines=[
-                self.OOBABOOGA_REQUEST_PARAMS_COMMENT,
-            ],
-            indent=INDENT_UNIT,
-        )
-
-        template_group = ryaml.CommentedMap()
-        for template in template_store.templates:
-            add_to_group(
-                group=template_group,
-                key=str(template),
-                value=template_store.templates[template].template,
-                comment_lines=make_template_help(template_store.templates[template]),
-                indent=INDENT_UNIT,
-            )
-
         add_to_group(
             group=yaml_map,
-            key="templates",
-            value=template_group,
-            comment_lines=["UI and AI request templates"],
+            key="version",
+            value=oobabot.__version__,
+            comment_lines=[],
             indent=0,
         )
 
-        self._yaml_map = yaml_map
+        for group in self.setting_groups:
+            group.add_to_yaml(yaml_map)
 
-    def dump(self, out_stream: typing.IO) -> None:
         yaml = ryaml.YAML()
         yaml.default_flow_style = False
         yaml.allow_unicode = True
         yaml.indent(mapping=INDENT_UNIT, sequence=2 * INDENT_UNIT, offset=INDENT_UNIT)
 
-        yaml.dump(self._yaml_map, out_stream)
+        yaml.dump(yaml_map, out_stream)
 
         if sys.stdout.isatty():
             print(self.META_INSTRUCTION, file=sys.stderr)
         else:
             print("# oobabot: config.yml output successfully", file=sys.stderr)
-
-    def make_action_comments(self, action) -> typing.List[str]:
-        action_help = ""
-        if action.help:
-            action_help = action.help
-
-        default_comment = ""
-        if action.default:
-            default_comment = f"  default: {action.default}"
-        else:
-            if isinstance(action.default, bool):
-                default_comment = "  default: false"
-            elif action.type is str:
-                default_comment = "  default: ''"
-            elif action.type is int:
-                default_comment = "  default: 0"
-        return [action_help, default_comment]
-
-    def make_yaml_from_argument_group(
-        self,
-        cli_settings: Settings,
-        argument_group: argparse._ArgumentGroup,
-    ) -> ryaml.CommentedMap:
-        if cli_settings is None:
-            raise ValueError("Settings have not been loaded yet.")
-
-        group = ryaml.CommentedMap()
-
-        # pylint doesn't like this, can't really blame
-        # it but the class doesn't seem to change much
-        # pylint: disable=W0212
-        for action in argument_group._group_actions:
-            add_to_group(
-                group=group,
-                key=action.dest,
-                value=cli_settings.get(action.dest),
-                comment_lines=self.make_action_comments(action),
-                indent=INDENT_UNIT,
-            )
-        # pylint: enable=W0212
-
-        return group

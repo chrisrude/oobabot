@@ -13,16 +13,16 @@ from oobabot import templates
 class BotCommands:
     def __init__(
         self,
-        ai_name: str,
         decide_to_respond: decide_to_respond.DecideToRespond,
         repetition_tracker: repetition_tracker.RepetitionTracker,
-        reply_in_thread: bool,
+        persona_settings: dict,
+        discord_settings: dict,
         template_store: templates.TemplateStore,
     ):
-        self.ai_name = ai_name
+        self.ai_name = persona_settings["ai_name"]
         self.decide_to_respond = decide_to_respond
         self.repetition_tracker = repetition_tracker
-        self.reply_in_thread = reply_in_thread
+        self.reply_in_thread = discord_settings["reply_in_thread"]
         self.template_store = template_store
 
     async def on_ready(self, client: discord.Client):
@@ -147,7 +147,7 @@ class BotCommands:
             )
 
         fancy_logger.get().debug(
-            "Registering commands, this may take a while sometimes..."
+            "Registering commands, sometimes this takes a while..."
         )
 
         tree = discord.app_commands.CommandTree(client)
@@ -158,8 +158,3 @@ class BotCommands:
             fancy_logger.get().info(
                 "Registered command: %s: %s", command.name, command.description
             )
-        fancy_logger.get().debug(
-            "If you try to run any command within the first ~5 minutes of "
-            + "the bot starting, it will fail with the error: 'This command "
-            + "is outdated,...'."
-        )

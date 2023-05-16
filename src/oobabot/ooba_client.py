@@ -94,11 +94,13 @@ class OobaClient(http_client.SerializedHttpClient):
     OOBABOOGA_STREAMING_URI_PATH: str = "/api/v1/stream"
 
     def __init__(
-        self, base_url: str, default_oobabooga_params: typing.Dict[str, typing.Any]
+        self,
+        settings: typing.Dict[str, typing.Any],
     ):
-        super().__init__(self.SERVICE_NAME, base_url)
+        super().__init__(self.SERVICE_NAME, settings["base_url"])
         self.total_response_tokens = 0
-        self.default_oobabooga_params = default_oobabooga_params
+        self.request_params = settings["request_params"]
+        self.log_all_the_things = settings["log_all_the_things"]
 
     async def _setup(self):
         async with self.get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
@@ -154,11 +156,14 @@ class OobaClient(http_client.SerializedHttpClient):
         ] = {
             "prompt": prompt,
         }
-        request.update(self.default_oobabooga_params)
+        request.update(self.request_params)
 
         async with self.get_session().ws_connect(
             self.OOBABOOGA_STREAMING_URI_PATH
         ) as websocket:
+            if self.log_all_the_things:
+                print(f"Sending request:\n{request}")
+
             await websocket.send_json(request)
 
             async for msg in websocket:
@@ -181,6 +186,9 @@ class OobaClient(http_client.SerializedHttpClient):
                         self.total_response_tokens += 1
                         text = incoming_data["text"]
                         if text != SentenceSplitter.END_OF_INPUT:
+                            if self.log_all_the_things:
+                                print(text, end="", flush=True)
+
                             yield text
 
                     elif "stream_end" == incoming_data["event"]:

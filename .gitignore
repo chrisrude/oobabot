@@ -1,6 +1,7 @@
 # generated in test mode
 out.png
 .DS_Store
+config.yml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -39,19 +39,18 @@ class PromptGenerator:
 
     def __init__(
         self,
-        ai_name: str,
-        persona: str,
-        history_lines: int,
-        token_space: int,
+        discord_settings: dict,
+        oobabooga_settings: dict,
+        persona_settings: dict,
         template_store: templates.TemplateStore,
-        dont_split_responses: bool,
     ):
-        self.ai_name = ai_name
-        self.persona = persona
-        self.history_lines = history_lines
-        self.token_space = token_space
+        self.ai_name = persona_settings["ai_name"]
+        self.dont_split_responses = discord_settings["dont_split_responses"]
+        self.history_lines = discord_settings["history_lines"]
+        self.persona = persona_settings["persona"]
+        self.token_space = oobabooga_settings["request_params"]["truncation_length"]
+
         self.template_store = template_store
-        self.dont_split_responses = dont_split_responses
 
         # this will be also used when sending message
         # to suppress sending the prompt text to the user
@@ -69,6 +68,7 @@ class PromptGenerator:
                 templates.TemplateToken.AI_NAME: self.ai_name,
             },
         )
+
         self._init_history_available_chars()
 
     def _init_history_available_chars(self) -> None:

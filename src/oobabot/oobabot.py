@@ -29,23 +29,27 @@ class OobaBot:
         self.settings = settings.Settings()
         self.settings.load(cli_args)
 
+        # templates used to generate prompts to send to the AI
+        # as well as for some UI elements
+        self.template_store = templates.TemplateStore(
+            settings=self.settings.template_settings.get_all()
+        )
+
         ########################################################
         # Connect to Oobabooga
 
         self.ooba_client = ooba_client.OobaClient(
-            self.settings.get_str("base_url"),
-            self.settings.OOBABOOGA_DEFAULT_REQUEST_PARAMS,
+            settings=self.settings.oobabooga_settings.get_all(),
         )
 
         ########################################################
         # Connect to Stable Diffusion, if configured
 
         self.stable_diffusion_client = None
-        if self.settings.get_str("stable_diffusion_url"):
+        sd_settings = self.settings.stable_diffusion_settings.get_all()
+        if sd_settings["stable_diffusion_url"]:
             self.stable_diffusion_client = sd_client.StableDiffusionClient(
-                base_url=self.settings.get_str("stable_diffusion_url"),
-                request_params=self.settings.sd_request_params,
-                negative_prompt_nsfw=self.settings.get_str("sd_negative_prompt"),
+                settings=sd_settings,
             )
 
         ########################################################
@@ -53,25 +57,19 @@ class OobaBot:
 
         # decides which messages the bot will respond to
         self.decide_to_respond = decide_to_respond.DecideToRespond(
-            wakewords=self.settings.get_str_list("wakewords"),
-            ignore_dms=self.settings.get_bool("ignore_dms"),
+            discord_settings=self.settings.discord_settings.get_all(),
+            persona_settings=self.settings.persona_settings.get_all(),
             interrobang_bonus=self.settings.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
             time_vs_response_chance=self.settings.TIME_VS_RESPONSE_CHANCE,
         )
 
-        # templates used to generate prompts to send to the AI
-        # as well as for some UI elements
-        self.template_store = templates.TemplateStore()
-
         # once we decide to respond, this generates a prompt
         # to send to the AI, given a message history
         self.prompt_generator = prompt_generator.PromptGenerator(
-            ai_name=self.settings.get_str("ai_name"),
-            persona=self.settings.persona,
-            history_lines=self.settings.get_int("history_lines"),
-            token_space=self.settings.OOBABOT_MAX_AI_TOKEN_SPACE,
+            discord_settings=self.settings.discord_settings.get_all(),
+            oobabooga_settings=self.settings.oobabooga_settings.get_all(),
+            persona_settings=self.settings.persona_settings.get_all(),
             template_store=self.template_store,
-            dont_split_responses=self.settings.get_bool("dont_split_responses"),
         )
 
         # tracks of the time spent on responding, success rate, etc.
@@ -85,7 +83,12 @@ class OobaBot:
         if self.stable_diffusion_client is not None:
             self.image_generator = image_generator.ImageGenerator(
                 stable_diffusion_client=self.stable_diffusion_client,
-                image_words=self.settings.get_str_list("image_words"),
+                image_words=[
+                    str(w)
+                    for w in self.settings.stable_diffusion_settings.get_list(
+                        "image_words"
+                    )
+                ],
                 template_store=self.template_store,
             )
 
@@ -98,10 +101,10 @@ class OobaBot:
         )
 
         self.bot_commands = bot_commands.BotCommands(
-            ai_name=self.settings.get_str("ai_name"),
             decide_to_respond=self.decide_to_respond,
             repetition_tracker=self.repetition_tracker,
-            reply_in_thread=self.settings.get_bool("reply_in_thread"),
+            persona_settings=self.settings.persona_settings.get_all(),
+            discord_settings=self.settings.discord_settings.get_all(),
             template_store=self.template_store,
         )
 
@@ -113,15 +116,11 @@ class OobaBot:
         signal.signal(signal.SIGINT, sigint_handler)
 
     def run(self):
-        if self.settings.get_bool("generate_config"):
-            yaml_config = settings.SettingsConfigFile(
-                self.settings, self.template_store
-            )
-            # yaml_config.load(self.settings.config_file_path)
-            yaml_config.dump(sys.stdout)
+        if self.settings.general_settings.get("generate_config"):
+            self.settings.write_sample_config(out_stream=sys.stdout)
             sys.exit(0)
 
-        if not self.settings.discord_token:
+        if not self.settings.discord_settings.get("discord_token"):
             msg = (
                 f"Please set the '{self.settings.DISCORD_TOKEN_ENV_VAR}' "
                 + "environment variable to your bot's discord token."
@@ -162,13 +161,8 @@ class OobaBot:
             response_stats=self.response_stats,
             image_generator=self.image_generator,
             bot_commands=self.bot_commands,
-            ai_name=self.settings.get_str("ai_name"),
-            persona=self.settings.persona,
-            ignore_dms=self.settings.get_bool("ignore_dms"),
-            dont_split_responses=self.settings.get_bool("dont_split_responses"),
-            stream_responses=self.settings.get_bool("stream_responses"),
-            reply_in_thread=self.settings.get_bool("reply_in_thread"),
-            log_all_the_things=self.settings.get_bool("log_all_the_things"),
+            persona_settings=self.settings.persona_settings.get_all(),
+            discord_settings=self.settings.discord_settings.get_all(),
         )
 
         # opens http connections to our services,
@@ -183,7 +177,9 @@ class OobaBot:
                         await stack.enter_async_context(context_manager)
 
                 try:
-                    await bot.start(self.settings.discord_token)
+                    await bot.start(
+                        self.settings.discord_settings.get_str("discord_token")
+                    )
                 finally:
                     await bot.close()
 

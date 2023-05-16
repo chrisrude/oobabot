@@ -172,12 +172,13 @@ class TemplateStore:
         ),
     }
 
-    def __init__(self):
+    def __init__(self, settings: dict):
         self.templates: typing.Dict[Templates, TemplateMessageFormatter] = {}
         for template, (tokens, purpose) in self.TEMPLATES.items():
-            template_fmt = TemplateStore.DEFAULT_TEMPLATES.get(template)
+            template_name = str(template)
+            template_fmt = settings[template_name]
             if template_fmt is None:
-                raise ValueError(f"Template {template} has no default format")
+                raise ValueError(f"Template {template_name} has no default format")
             self.add_template(template, template_fmt, tokens, purpose)
 
     def add_template(

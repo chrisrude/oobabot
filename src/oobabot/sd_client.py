@@ -45,19 +45,17 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
 
     def __init__(
         self,
-        base_url: str,
-        request_params: typing.Dict[str, typing.Union[bool, int, str]],
-        negative_prompt_nsfw: str,
+        settings: typing.Dict[str, typing.Any],
     ):
-        super().__init__(self.SERVICE_NAME, base_url)
+        super().__init__(self.SERVICE_NAME, settings["stable_diffusion_url"])
 
-        self.request_params = request_params
+        self.request_params = settings["request_params"]
 
         # when we're in a "age restricted" channel, we'll swap
         # the "negative_prompt" in the request_params with this
         # value.  Otherwise we'll use the one already in
         # request_params["negative_prompt"]
-        self.negative_prompt_nsfw = negative_prompt_nsfw
+        self.negative_prompt_nsfw = self.request_params.pop("negative_prompt_nsfw", "")
 
     DEFAULT_OPTIONS = {
         #
