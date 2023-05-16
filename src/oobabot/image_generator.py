@@ -88,8 +88,8 @@ class StableDiffusionImageView(discord.ui.View):
                 btn_lock_in.disabled = True
                 btn_delete.disabled = True
 
-                await self.get_image_message().edit(view=self)
                 await interaction.response.defer()
+                await self.get_image_message().edit(view=self)
 
                 # generate a new image
                 regen_task = stable_diffusion_client.generate_image(
