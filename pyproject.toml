@@ -45,6 +45,7 @@ single_line_exclusions = ["typing", "typing_extensions"]
 
 [tool.pylint.'MAIN']
 py-version = '3.8.1'
+j = 8
 
 [tool.pylint.'MESSAGES CONTROL']
 max-line-length = 88
