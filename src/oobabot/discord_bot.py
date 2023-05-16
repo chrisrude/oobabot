@@ -36,6 +36,7 @@ class DiscordBot(discord.Client):
         persona: str,
         ignore_dms: bool,
         dont_split_responses: bool,
+        stream_responses: bool,
         reply_in_thread: bool,
         log_all_the_things: bool,
     ):
@@ -52,6 +53,7 @@ class DiscordBot(discord.Client):
 
         self.ignore_dms = ignore_dms
         self.dont_split_responses = dont_split_responses
+        self.stream_responses = stream_responses
         self.reply_in_thread = reply_in_thread
         self.log_all_the_things = log_all_the_things
 
@@ -88,6 +90,8 @@ class DiscordBot(discord.Client):
         else:
             fancy_logger.get().debug("listening to DMs")
 
+        if self.stream_responses:
+            fancy_logger.get().debug("Responses: streamed live")
         if self.dont_split_responses:
             fancy_logger.get().debug("Responses: returned as single messages")
         else:
@@ -245,9 +249,9 @@ class DiscordBot(discord.Client):
 
         response_coro = self.send_response_in_channel(
             message=message,
-            raw_message=raw_message,
             image_requested=image_requested,
             response_channel=response_channel,
+            response_channel_id=response_channel.id,
         )
         response_task = asyncio.create_task(response_coro)
         return (response_task, response_channel)
@@ -295,9 +299,9 @@ class DiscordBot(discord.Client):
     async def send_response_in_channel(
         self,
         message: types.GenericMessage,
-        raw_message: discord.Message,
         image_requested: bool,
         response_channel: discord.abc.Messageable,
+        response_channel_id: int,
     ) -> None:
         fancy_logger.get().debug(
             "Request from %s in %s", message.author_name, message.channel_name
@@ -306,7 +310,7 @@ class DiscordBot(discord.Client):
         recent_messages = await self.recent_messages_following_thread(response_channel)
 
         repeated_id = self.repetition_tracker.get_throttle_message_id(
-            raw_message.channel.id
+            response_channel_id
         )
 
         prompt_prefix = await self.prompt_generator.generate(
@@ -323,29 +327,22 @@ class DiscordBot(discord.Client):
             print("Response:\n----------\n")
 
         try:
-            if self.dont_split_responses:
-                generator = self.ooba_client.request_as_string(prompt_prefix)
+            if self.stream_responses:
+                generator = self.ooba_client.request_as_grouped_tokens(prompt_prefix)
+                await self.render_streaming_response(
+                    generator,
+                    this_response_stat,
+                    response_channel,
+                    response_channel_id,
+                )
             else:
-                generator = self.ooba_client.request_by_sentence(prompt_prefix)
-
-            async for sentence in generator:
-                if self.log_all_the_things:
-                    print(sentence)
-
-                sentence = self.filter_immersion_breaking_lines(sentence)
-                if not sentence:
-                    # we can't send an empty message
-                    continue
-
-                response_message = await response_channel.send(sentence)
-                generic_response_message = (
-                    discord_utils.discord_message_to_generic_message(response_message)
+                if self.dont_split_responses:
+                    generator = self.ooba_client.request_as_string(prompt_prefix)
+                else:
+                    generator = self.ooba_client.request_by_sentence(prompt_prefix)
+                await self.render_response(
+                    generator, this_response_stat, response_channel, response_channel_id
                 )
-                self.repetition_tracker.log_message(
-                    raw_message.channel.id, generic_response_message
-                )
-
-                this_response_stat.log_response_part()
 
         except discord.DiscordException as err:
             fancy_logger.get().error("Error: %s", err, exc_info=True)
@@ -354,6 +351,71 @@ class DiscordBot(discord.Client):
 
         this_response_stat.write_to_log(f"Response to {message.author_name} done!  ")
         self.response_stats.log_response_success(this_response_stat)
+
+    async def render_response(
+        self,
+        response_iterator: typing.AsyncIterator[str],
+        this_response_stat: response_stats.ResponseStats,
+        response_channel: discord.abc.Messageable,
+        response_channel_id: int,
+    ):
+        async for sentence in response_iterator:
+            if self.log_all_the_things:
+                print(sentence)
+
+            sentence = self.filter_immersion_breaking_lines(sentence)
+            if not sentence:
+                # we can't send an empty message
+                continue
+
+            response_message = await response_channel.send(sentence)
+            generic_response_message = discord_utils.discord_message_to_generic_message(
+                response_message
+            )
+            self.repetition_tracker.log_message(
+                response_channel_id, generic_response_message
+            )
+
+            this_response_stat.log_response_part()
+
+    async def render_streaming_response(
+        self,
+        response_iterator: typing.AsyncIterator[str],
+        this_response_stat: response_stats.ResponseStats,
+        response_channel: discord.abc.Messageable,
+        response_channel_id: int,
+    ):
+        response = ""
+        last_message = None
+        async for token in response_iterator:
+            if self.log_all_the_things:
+                print(token, end="")
+
+            if "" == token:
+                continue
+
+            response += token
+            response = self.filter_immersion_breaking_lines(response)
+            if not response:
+                # we can't send an empty message
+                continue
+
+            if last_message is None:
+                last_message = await response_channel.send(response)
+            else:
+                await last_message.edit(content=response)
+
+            this_response_stat.log_response_part()
+
+        if last_message is None:
+            raise discord.DiscordException("No response was generated")
+
+        generic_response_message = discord_utils.discord_message_to_generic_message(
+            last_message
+        )
+        self.repetition_tracker.log_message(
+            response_channel_id, generic_response_message
+        )
 
     def filter_immersion_breaking_lines(self, sentence: str) -> str:
         lines = sentence.split("\n")

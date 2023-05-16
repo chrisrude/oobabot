@@ -5,6 +5,7 @@
 
 # Purpose: Split a string into sentences, based on a set of terminators.
 #          This is a helper class for ooba_client.py.
+import time
 import typing
 
 import aiohttp
@@ -119,6 +120,30 @@ class OobaClient(http_client.SerializedHttpClient):
         """
         yield "".join([token async for token in self.request_by_token(prompt)])
 
+    async def request_as_grouped_tokens(
+        self,
+        prompt: str,
+        interval: float = 0.2,
+    ) -> typing.AsyncIterator[str]:
+        """
+        Yields the response as a series of tokens, grouped by time.
+        """
+
+        last_response = time.perf_counter()
+        tokens = ""
+        async for token in self.request_by_token(prompt):
+            if token == SentenceSplitter.END_OF_INPUT:
+                if tokens:
+                    yield tokens
+                break
+            tokens += token
+            now = time.perf_counter()
+            if now < (last_response + interval):
+                continue
+            yield tokens
+            tokens = ""
+            last_response = time.perf_counter()
+
     async def request_by_token(self, prompt: str) -> typing.AsyncIterator[str]:
         """
         Yields each token of the response as it arrives.
@@ -154,7 +179,9 @@ class OobaClient(http_client.SerializedHttpClient):
                     incoming_data = msg.json()
                     if "text_stream" == incoming_data["event"]:
                         self.total_response_tokens += 1
-                        yield incoming_data["text"]
+                        text = incoming_data["text"]
+                        if text != SentenceSplitter.END_OF_INPUT:
+                            yield text
 
                     elif "stream_end" == incoming_data["event"]:
                         # Make sure any unprinted text is flushed.

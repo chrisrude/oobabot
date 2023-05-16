@@ -166,6 +166,7 @@ class OobaBot:
             persona=self.settings.persona,
             ignore_dms=self.settings.get_bool("ignore_dms"),
             dont_split_responses=self.settings.get_bool("dont_split_responses"),
+            stream_responses=self.settings.get_bool("stream_responses"),
             reply_in_thread=self.settings.get_bool("reply_in_thread"),
             log_all_the_things=self.settings.get_bool("log_all_the_things"),
         )

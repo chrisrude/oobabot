@@ -263,6 +263,12 @@ class Settings(argparse.ArgumentParser):
             help="If not in a thread, generate one to respond into.",
             action="store_true",
         )
+        discord_group.add_argument(
+            "--stream-responses",
+            default=False,
+            help="Stream responses into a single message as it is generated.",
+            action="store_true",
+        )
 
         ###########################################################
         # Oobabooga Settings
