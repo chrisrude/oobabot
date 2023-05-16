@@ -389,7 +389,7 @@ class DiscordBot(discord.Client):
         last_message = None
         async for token in response_iterator:
             if self.log_all_the_things:
-                print(token, end="")
+                print(token, end="", flush=True)
 
             if "" == token:
                 continue
