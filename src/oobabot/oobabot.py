@@ -125,8 +125,8 @@ class OobaBot:
                 f"Please set the '{self.settings.DISCORD_TOKEN_ENV_VAR}' "
                 + "environment variable to your bot's discord token."
             )
-            # will exit() after printing
-            self.settings.error(msg)
+            print(msg, file=sys.stderr)
+            sys.exit(1)
 
         ########################################################
         # Test connection to services

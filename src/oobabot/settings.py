@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
-import argparse
 import os
 import shutil
 import sys
 import textwrap
 import typing
 
-import ruamel.yaml as ryaml
-
-import oobabot
 from oobabot import templates
+import oobabot.overengineered_settings_parser as oesp
 
 
 def console_wrapped(message):
@@ -17,42 +14,7 @@ def console_wrapped(message):
     return "\n".join(textwrap.wrap(message, width))
 
 
-YAML_WIDTH = 88
-DIVIDER = "# " * (YAML_WIDTH >> 1)
-INDENT_UNIT = 2
-
-SettingDictType = typing.Dict[
-    str, typing.Union[bool, int, float, str, typing.List[str]]
-]
-
-SettingValueType = typing.Union[
-    bool, int, float, str, typing.List[str], SettingDictType
-]
-
-
-def format_yaml_comment(comment_lines: typing.List[str]) -> str:
-    out = []
-    for line in comment_lines:
-        out.append("\n".join(textwrap.wrap(line, width=YAML_WIDTH)))
-    return "\n" + "\n".join(out)
-
-
-def add_to_group(
-    group: ryaml.CommentedMap,
-    key: str,
-    value: typing.Any,
-    comment_lines: typing.List[str],
-    indent: int,
-) -> None:
-    group[key] = value
-    group.yaml_set_comment_before_after_key(
-        key,
-        before=format_yaml_comment(comment_lines),
-        indent=indent,
-    )
-
-
-def make_template_help(
+def make_template_comment(
     name: str,
     tokens_desc_tuple: typing.Tuple[typing.List[templates.TemplateToken], str],
 ) -> typing.List[str]:
@@ -65,196 +27,7 @@ def make_template_help(
     ]
 
 
-T = typing.TypeVar("T", bound="SettingValueType")
-
-
-class ConfigSetting(typing.Generic[T]):
-    data_type: T
-    description_lines: typing.List[str]
-    cli_args: typing.List[str]
-    include_in_argparse: bool
-    include_in_yaml: bool
-    show_default_in_yaml: bool
-    fn_on_set: typing.Callable[[T], None]
-
-    def __init__(
-        self,
-        name: str,
-        default: T,
-        description_lines: typing.List[str],
-        cli_args: typing.Optional[typing.List[str]] = None,
-        include_in_argparse: bool = True,
-        include_in_yaml: bool = True,
-        show_default_in_yaml: bool = True,
-        fn_on_set: typing.Callable[[T], None] = lambda x: None,
-    ):
-        self.name = name
-        self.default = default
-        self.description_lines = [x.strip() for x in description_lines]
-        if cli_args is None:
-            cli_args = ["--" + name.replace("_", "-")]
-        self.cli_args = cli_args
-        self.value = default
-        self.include_in_argparse = include_in_argparse
-        self.include_in_yaml = include_in_yaml
-        self.show_default_in_yaml = show_default_in_yaml
-        self.fn_on_set = fn_on_set
-
-    def add_to_argparse(self, parser: argparse._ArgumentGroup):
-        if not self.include_in_argparse:
-            return
-
-        kwargs = {
-            "default": self.value,
-            "help": " ".join(self.description_lines),
-        }
-
-        # note: the other way to do this is with
-        #   typing.get_args(self.__orig_class__)[0]
-        # but that isn't officially supported, so
-        # let's do it the jankier way
-        if isinstance(self.default, str):
-            kwargs["type"] = str
-        elif isinstance(self.default, bool):
-            kwargs["action"] = "store_true"
-            if self.default:
-                kwargs["action"] = "store_false"
-        elif isinstance(self.default, int):
-            kwargs["type"] = int
-        elif isinstance(self.default, float):
-            kwargs["type"] = float
-        elif isinstance(self.default, list):
-            kwargs["type"] = str
-            kwargs["nargs"] = "*"
-
-        parser.add_argument(*self.cli_args, **kwargs)
-
-    def set_value_from_argparse(self, args: argparse.Namespace) -> None:
-        if not self.include_in_argparse:
-            return
-        if not hasattr(args, self.name):
-            raise ValueError(f"Namespace does not have attribute {self.name}")
-        self.set_value(getattr(args, self.name))
-
-    def add_to_yaml_group(self, group: ryaml.CommentedMap):
-        if not self.include_in_yaml:
-            return
-        add_to_group(
-            group,
-            key=self.name,
-            value=self.value,
-            comment_lines=self.make_yaml_comment(),
-            indent=INDENT_UNIT,
-        )
-
-    def make_yaml_comment(self) -> typing.List[str]:
-        comment_lines = self.description_lines.copy()
-
-        if self.show_default_in_yaml:
-            if self.default is not None:
-                comment_lines.append(f"  default: {str(self.default).lower()}")
-            else:
-                comment_lines.append("  default: None")
-        return comment_lines
-
-    def set_value_from_yaml(self, yaml: ryaml.CommentedMap) -> None:
-        if not self.include_in_yaml:
-            return
-        if self.name not in yaml:
-            return
-        self.set_value(yaml[self.name])
-
-    def set_value(self, value: T) -> None:
-        self.value = value
-        self.fn_on_set(value)
-
-    def get(self) -> T:
-        if isinstance(self.value, dict):
-            return self.value.copy()
-        return self.value
-
-
-class ConfigSettingGroup:
-    name: str
-    description: str
-    settings: typing.Dict[str, ConfigSetting]
-
-    def __init__(
-        self,
-        name: str,
-        description: str = "",
-        include_in_argparse: bool = True,
-        include_in_yaml: bool = True,
-    ):
-        self.name = name
-        self.description = description
-        self.settings = {}
-        self.include_in_argparse = include_in_argparse
-        self.include_in_yaml = include_in_yaml
-
-    def add_setting(self, setting: "ConfigSetting") -> None:
-        self.settings[setting.name] = setting
-
-    def add_to_argparse(self, parser: argparse.ArgumentParser):
-        if not self.include_in_argparse:
-            return
-        arg_group = parser.add_argument_group(self.name, self.description)
-        for setting in self.settings.values():
-            setting.add_to_argparse(arg_group)
-
-    def set_values_from_argparse(self, args: argparse.Namespace) -> None:
-        if not self.include_in_argparse:
-            return
-        for setting in self.settings.values():
-            setting.set_value_from_argparse(args)
-
-    def add_to_yaml(self, yaml: ryaml.CommentedMap):
-        if not self.include_in_yaml:
-            return
-        group_key = self.name.lower().replace(" ", "_")
-
-        group = ryaml.CommentedMap()
-        group.yaml_set_start_comment(f"{DIVIDER}\n# {self.name}\n{DIVIDER}\n")
-        for setting in self.settings.values():
-            setting.add_to_yaml_group(group)
-
-        add_to_group(
-            group=yaml,
-            key=group_key,
-            value=group,
-            comment_lines=[DIVIDER, group_key, "."],
-            indent=0,
-        )
-
-    def set_values_from_yaml(self, yaml: dict):
-        if not self.include_in_yaml:
-            return
-        if yaml is None:
-            return
-        group_key = self.name.lower().replace(" ", "_")
-        if group_key not in yaml:
-            return
-        group = yaml[group_key]
-        for setting in self.settings.values():
-            setting.set_value_from_yaml(group)
-
-    def get_setting(self, name: str) -> ConfigSetting:
-        return self.settings[name]
-
-    def get(self, name: str) -> SettingValueType:
-        return self.settings[name].value
-
-    def get_str(self, name: str) -> str:
-        return self.settings[name].value
-
-    def get_list(self, name: str) -> typing.List[SettingValueType]:
-        return self.settings[name].value
-
-    def get_all(self) -> typing.Dict[str, SettingValueType]:
-        return {name: setting.get() for (name, setting) in self.settings.items()}.copy()
-
-
-class Settings(argparse.ArgumentParser):
+class Settings:
     """
     User=customizable settings for the bot.  Reads from
     environment variables and command line arguments.
@@ -263,14 +36,6 @@ class Settings(argparse.ArgumentParser):
     ############################################################
     # This section is for constants which are not yet
     # customizable by the user.
-
-    # this is the number of tokens we reserve for the AI
-    # to respond with.
-    OOBABOT_MAX_NEW_TOKENS: int = 250
-
-    # this is the number of tokens the AI has available
-    # across its entire request + response
-    OOBABOT_MAX_AI_TOKEN_SPACE: int = 730
 
     # This is a table of the probability that the bot will respond
     # in an unsolicited manner (i.e. it isn't specifically pinged)
@@ -291,8 +56,8 @@ class Settings(argparse.ArgumentParser):
     # before the repetition tracker will take action
     REPETITION_TRACKER_THRESHOLD = 1
 
-    OOBABOOGA_DEFAULT_REQUEST_PARAMS: SettingDictType = {
-        "max_new_tokens": OOBABOT_MAX_NEW_TOKENS,
+    OOBABOOGA_DEFAULT_REQUEST_PARAMS: oesp.SettingDictType = {
+        "max_new_tokens": 250,
         "do_sample": True,
         "temperature": 1.3,
         "top_p": 0.1,
@@ -307,24 +72,12 @@ class Settings(argparse.ArgumentParser):
         "early_stopping": False,
         "seed": -1,
         "add_bos_token": True,
-        "truncation_length": OOBABOT_MAX_AI_TOKEN_SPACE,
+        "truncation_length": 730,
         "ban_eos_token": False,
         "skip_special_tokens": True,
         "stopping_strings": [],
     }
 
-    ############################################################
-    # These are the default settings for the bot.  They can be
-    # overridden by environment variables or command line arguments.
-
-    # number lines back in the message history to include in the prompt
-    DEFAULT_HISTORY_LINES_TO_SUPPLY = 7
-
-    # square image, 512x512
-    DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE: int = 512
-
-    # 30 steps of diffusion
-    DEFAULT_STABLE_DIFFUSION_STEPS: int = 30
     # set default negative prompts to make it more difficult
     # to create content against the discord TOS
     # https://discord.com/guidelines
@@ -332,9 +85,6 @@ class Settings(argparse.ArgumentParser):
     # use this prompt for "age_restricted" Discord channels
     #  i.e. channel.nsfw is true
     DEFAULT_SD_NEGATIVE_PROMPT_NSFW: str = "animal harm, suicide, loli"
-
-    # no default, just use what Stable Diffusion has on tap
-    DEFAULT_STABLE_DIFFUSION_SAMPLER = ""
 
     # use this prompt for non-age-restricted channels
     DEFAULT_SD_NEGATIVE_PROMPT: str = DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", nsfw"
@@ -354,10 +104,10 @@ class Settings(argparse.ArgumentParser):
         "do_not_save_grid": True,
         "negative_prompt": DEFAULT_SD_NEGATIVE_PROMPT,
         "negative_prompt_nsfw": DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
-        "steps": DEFAULT_STABLE_DIFFUSION_STEPS,
-        "width": DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
-        "height": DEFAULT_STABLE_DIFFUSION_IMAGE_SIZE,
-        "sampler": DEFAULT_STABLE_DIFFUSION_SAMPLER,
+        "steps": 30,
+        "width": 512,
+        "height": 512,
+        "sampler": "",
     }
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
@@ -371,38 +121,25 @@ class Settings(argparse.ArgumentParser):
     ]
 
     # ENVIRONMENT VARIABLES ####
-
     DISCORD_TOKEN_ENV_VAR: str = "DISCORD_TOKEN"
-
     OOBABOT_PERSONA_ENV_VAR: str = "OOBABOT_PERSONA"
-
-    DEFAULT_WAKEWORDS: typing.List[str] = ["oobabot"]
-    DEFAULT_URL: str = "ws://localhost:5005"
-
-    DEPRECATED: str = "Deprecated"
 
     def __init__(self):
         self._settings = None
 
-        super().__init__(
-            description=f"oobabot v{oobabot.__version__}: Discord bot for "
-            + "oobabooga's text-generation-webui",
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            add_help=False,
-        )
-        self.setting_groups: typing.List[ConfigSettingGroup] = []
+        self.setting_groups: typing.List[oesp.ConfigSettingGroup] = []
 
         ###########################################################
         # General Settings
         #  won't be included in the config.yaml
 
-        self.general_settings = ConfigSettingGroup(
+        self.general_settings = oesp.ConfigSettingGroup(
             "General Settings", include_in_yaml=False
         )
         self.setting_groups.append(self.general_settings)
 
         self.general_settings.add_setting(
-            ConfigSetting[bool](
+            oesp.ConfigSetting[bool](
                 name="help",
                 default=False,
                 description_lines=[],
@@ -410,7 +147,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.general_settings.add_setting(
-            ConfigSetting[bool](
+            oesp.ConfigSetting[bool](
                 name="generate_config",
                 default=False,
                 description_lines=[
@@ -428,11 +165,11 @@ class Settings(argparse.ArgumentParser):
         ###########################################################
         # Persona Settings
 
-        self.persona_settings = ConfigSettingGroup("Persona")
+        self.persona_settings = oesp.ConfigSettingGroup("Persona")
         self.setting_groups.append(self.persona_settings)
 
         self.persona_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="ai_name",
                 default="oobabot",
                 description_lines=[
@@ -441,9 +178,9 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.persona_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="persona",
-                default="",
+                default=os.environ.get(self.OOBABOT_PERSONA_ENV_VAR, ""),
                 description_lines=[
                     textwrap.dedent(
                         f"""
@@ -457,7 +194,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.persona_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="prompt",
                 default="",
                 description_lines=[
@@ -472,9 +209,9 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.persona_settings.add_setting(
-            ConfigSetting[typing.List[str]](
+            oesp.ConfigSetting[typing.List[str]](
                 name="wakewords",
-                default=self.DEFAULT_WAKEWORDS,
+                default=["oobabot"],
                 description_lines=[
                     textwrap.dedent(
                         """
@@ -493,13 +230,13 @@ class Settings(argparse.ArgumentParser):
         ###########################################################
         # Discord Settings
 
-        self.discord_settings = ConfigSettingGroup("Discord")
+        self.discord_settings = oesp.ConfigSettingGroup("Discord")
         self.setting_groups.append(self.discord_settings)
 
         self.discord_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="discord_token",
-                default="",
+                default=os.environ.get(self.DISCORD_TOKEN_ENV_VAR, ""),
                 description_lines=[
                     textwrap.dedent(
                         f"""
@@ -514,7 +251,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.discord_settings.add_setting(
-            ConfigSetting[bool](
+            oesp.ConfigSetting[bool](
                 name="dont_split_responses",
                 default=False,
                 description_lines=[
@@ -528,9 +265,9 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.discord_settings.add_setting(
-            ConfigSetting[int](
+            oesp.ConfigSetting[int](
                 name="history_lines",
-                default=self.DEFAULT_HISTORY_LINES_TO_SUPPLY,
+                default=7,
                 description_lines=[
                     textwrap.dedent(
                         """
@@ -542,7 +279,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.discord_settings.add_setting(
-            ConfigSetting[bool](
+            oesp.ConfigSetting[bool](
                 name="ignore_dms",
                 default=False,
                 description_lines=[
@@ -555,7 +292,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.discord_settings.add_setting(
-            ConfigSetting[bool](
+            oesp.ConfigSetting[bool](
                 name="reply_in_thread",
                 default=False,
                 description_lines=[
@@ -569,7 +306,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.discord_settings.add_setting(
-            ConfigSetting[bool](
+            oesp.ConfigSetting[bool](
                 name="stream_responses",
                 default=False,
                 description_lines=[
@@ -585,13 +322,13 @@ class Settings(argparse.ArgumentParser):
         ###########################################################
         # Oobabooga Settings
 
-        self.oobabooga_settings = ConfigSettingGroup("Oobabooga")
+        self.oobabooga_settings = oesp.ConfigSettingGroup("Oobabooga")
         self.setting_groups.append(self.oobabooga_settings)
 
         self.oobabooga_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="base_url",
-                default=self.DEFAULT_URL,
+                default="ws://localhost:5005",
                 description_lines=[
                     textwrap.dedent(
                         """
@@ -604,7 +341,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.oobabooga_settings.add_setting(
-            ConfigSetting[bool](
+            oesp.ConfigSetting[bool](
                 name="log_all_the_things",
                 default=False,
                 description_lines=[
@@ -617,7 +354,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.oobabooga_settings.add_setting(
-            ConfigSetting[SettingDictType](
+            oesp.ConfigSetting[oesp.SettingDictType](
                 name="request_params",
                 default=self.OOBABOOGA_DEFAULT_REQUEST_PARAMS,
                 description_lines=[
@@ -639,11 +376,11 @@ class Settings(argparse.ArgumentParser):
         ###########################################################
         # Stable Diffusion Settings
 
-        self.stable_diffusion_settings = ConfigSettingGroup("Stable Diffusion")
+        self.stable_diffusion_settings = oesp.ConfigSettingGroup("Stable Diffusion")
         self.setting_groups.append(self.stable_diffusion_settings)
 
         self.stable_diffusion_settings.add_setting(
-            ConfigSetting[typing.List[str]](
+            oesp.ConfigSetting[typing.List[str]](
                 name="image_words",
                 default=self.DEFAULT_IMAGE_WORDS,
                 description_lines=[
@@ -657,7 +394,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.stable_diffusion_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="stable_diffusion_url",
                 default="",
                 description_lines=[
@@ -670,7 +407,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.stable_diffusion_settings.add_setting(
-            ConfigSetting[SettingDictType](
+            oesp.ConfigSetting[oesp.SettingDictType](
                 name="request_params",
                 default=self.DEFAULT_SD_REQUEST_PARAMS,
                 description_lines=[
@@ -689,10 +426,10 @@ class Settings(argparse.ArgumentParser):
             )
         )
 
-        ###
+        ###########################################################
         # Template Settings
 
-        self.template_settings = ConfigSettingGroup(
+        self.template_settings = oesp.ConfigSettingGroup(
             "Template",
             description="UI and AI request templates",
             include_in_argparse=False,
@@ -701,10 +438,10 @@ class Settings(argparse.ArgumentParser):
 
         for template, tokens_desc_tuple in templates.TemplateStore.TEMPLATES.items():
             self.template_settings.add_setting(
-                ConfigSetting[str](
+                oesp.ConfigSetting[str](
                     name=str(template),
                     default=templates.TemplateStore.DEFAULT_TEMPLATES[template],
-                    description_lines=make_template_help(
+                    description_lines=make_template_comment(
                         str(template), tokens_desc_tuple
                     ),
                     show_default_in_yaml=False,
@@ -727,15 +464,15 @@ class Settings(argparse.ArgumentParser):
         # The settings won't be written to the config.yaml template,
         # as they're already covered in the request_params section.
 
-        def set_sd_parm(param: str, value: SettingValueType):
+        def set_sd_parm(param: str, value: oesp.SettingValueType):
             if not value:
                 return
             self.stable_diffusion_settings.get_setting("request_params").get()[
                 param
             ] = value
 
-        self.deprecated_settings = ConfigSettingGroup(
-            self.DEPRECATED,
+        self.deprecated_settings = oesp.ConfigSettingGroup(
+            "Deprecated Settings",
             include_in_yaml=False,
             description="These settings are deprecated and will be removed in "
             + "a future release.  Please set them with config.yml instead.",
@@ -743,7 +480,7 @@ class Settings(argparse.ArgumentParser):
         self.setting_groups.append(self.deprecated_settings)
 
         self.deprecated_settings.add_setting(
-            ConfigSetting[int](
+            oesp.ConfigSetting[int](
                 name="diffusion_steps",
                 default=0,
                 description_lines=[
@@ -757,7 +494,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.deprecated_settings.add_setting(
-            ConfigSetting[int](
+            oesp.ConfigSetting[int](
                 name="image_height",
                 default=0,
                 description_lines=[
@@ -772,7 +509,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.deprecated_settings.add_setting(
-            ConfigSetting[int](
+            oesp.ConfigSetting[int](
                 name="image_width",
                 default=0,
                 description_lines=[
@@ -787,7 +524,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.deprecated_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="stable_diffusion_sampler",
                 default="",
                 description_lines=[
@@ -803,7 +540,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.deprecated_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="sd_negative_prompt",
                 default="",
                 description_lines=[
@@ -820,7 +557,7 @@ class Settings(argparse.ArgumentParser):
             )
         )
         self.deprecated_settings.add_setting(
-            ConfigSetting[str](
+            oesp.ConfigSetting[str](
                 name="sd_negative_prompt_nsfw",
                 default="",
                 description_lines=[
@@ -835,52 +572,35 @@ class Settings(argparse.ArgumentParser):
             )
         )
 
-    def _load_yaml_settings(self) -> dict:
-        # todo: read from additional sources
-        filename = "config.yml"
-        try:
-            with open(filename, "r", encoding="utf-8") as f:
-                yaml = ryaml.YAML(typ="rt")  # todo: use "safe"?
-                return yaml.load(f)
-        except FileNotFoundError:
-            print(f"Could not find {filename}.  Using defaults.")
-            return {}
+    META_INSTRUCTION = (
+        "\n\n"
+        + "# " * 30
+        + textwrap.dedent(
+            """
+            # Please save this output into ./config.yml
+            # edit it to your liking, then run the bot again.
+            #
+            #  e.g. oobabot --generate-config > config.yml
+            #       oobabot
+            """
+        )
+    )
+
+    def write_sample_config(self, out_stream) -> None:
+        oesp.write_sample_config(self.setting_groups, out_stream)
+        if sys.stdout.isatty():
+            print(self.META_INSTRUCTION, file=sys.stderr)
+        else:
+            print("# oobabot: config.yml output successfully", file=sys.stderr)
 
     def load(self, args) -> None:
-        # Load settings in this order.
-        # The later sources will overwrite the earlier ones.
-        #
-        #  1. config.yml
-        #  2. command line arguments
-        #  3. environment variables
-        #
-        self._yml_settings = self._load_yaml_settings()
-        for group in self.setting_groups:
-            group.set_values_from_yaml(self._yml_settings)
+        argparser = oesp.load(
+            args=args,
+            setting_groups=self.setting_groups,
+        )
 
-        # we need to initialize argparse AFTER we read from
-        # the yaml file, so that the argparse defaults are
-        # set to the yaml-read values.
-        for group in self.setting_groups:
-            group.add_to_argparse(self)
-
-        self._cli_settings = self.parse_args(args=args)
-
-        for group in self.setting_groups:
-            group.set_values_from_argparse(self._cli_settings)
-
-        discord_token_env = os.environ.get(self.DISCORD_TOKEN_ENV_VAR, None)
-        if discord_token_env:
-            self.discord_settings.get_setting("discord_token").set_value(
-                discord_token_env
-            )
-
-        persona_env = os.environ.get(self.OOBABOT_PERSONA_ENV_VAR, None)
-        if persona_env:
-            self.persona_settings.get_setting("persona").set_value(persona_env)
-
-        if self._cli_settings.help:
-            helpstr = self.format_help()
+        if self.general_settings.get("help"):
+            helpstr = argparser.format_help()
             print(helpstr)
 
             print(
@@ -906,58 +626,3 @@ class Settings(argparse.ArgumentParser):
                 )
 
             sys.exit(0)
-
-    START_COMMENT = textwrap.dedent(
-        """
-        # Welcome to Oobabot!
-        #
-        # This is the configuration file for Oobabot.  It is a YAML file, and
-        # comments are allowed.  Oobabot attempts to load a file named
-        # "config.yml" from the current directory when it is run.
-        #
-        """
-    )
-
-    META_INSTRUCTION = (
-        "\n\n"
-        + "# " * 30
-        + textwrap.dedent(
-            """
-            # Please save this output into ./config.yml
-            # edit it to your liking, then run the bot again.
-            #
-            #  e.g. oobabot --generate-config > config.yml
-            #       oobabot
-            """
-        )
-    )
-
-    def write_sample_config(self, out_stream: typing.TextIO) -> None:
-        if self._cli_settings is None:
-            raise ValueError("Settings have not been loaded yet.")
-
-        yaml_map = ryaml.CommentedMap()
-        yaml_map.yaml_set_start_comment(self.START_COMMENT)
-
-        add_to_group(
-            group=yaml_map,
-            key="version",
-            value=oobabot.__version__,
-            comment_lines=[],
-            indent=0,
-        )
-
-        for group in self.setting_groups:
-            group.add_to_yaml(yaml_map)
-
-        yaml = ryaml.YAML()
-        yaml.default_flow_style = False
-        yaml.allow_unicode = True
-        yaml.indent(mapping=INDENT_UNIT, sequence=2 * INDENT_UNIT, offset=INDENT_UNIT)
-
-        yaml.dump(yaml_map, out_stream)
-
-        if sys.stdout.isatty():
-            print(self.META_INSTRUCTION, file=sys.stderr)
-        else:
-            print("# oobabot: config.yml output successfully", file=sys.stderr)
