@@ -10,6 +10,7 @@ class GenericMessage:
         channel_id: int,
         channel_name: str,
         message_id: int,
+        reference_message_id,
         body_text: str,
         author_is_bot: bool,
         send_timestamp: float,
@@ -19,6 +20,7 @@ class GenericMessage:
         self.message_id = message_id
         self.body_text = body_text
         self.author_is_bot = author_is_bot
+        self.reference_message_id = reference_message_id
         self.send_timestamp = send_timestamp
         self.channel_id = channel_id
         self.channel_name = channel_name

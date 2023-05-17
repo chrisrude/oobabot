@@ -45,6 +45,9 @@ def discord_message_to_generic_message(
         "body_text": sanitize_string(raw_message.content),
         "author_is_bot": raw_message.author.bot,
         "send_timestamp": raw_message.created_at.timestamp(),
+        "reference_message_id": raw_message.reference.message_id
+        if raw_message.reference
+        else "",
     }
     if isinstance(raw_message.channel, discord.DMChannel):
         return types.DirectMessage(**generic_args)

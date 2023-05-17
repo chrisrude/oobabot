@@ -148,10 +148,10 @@ class PromptGenerator:
                 # has it under a different account name
                 adjusted_author_name = self.ai_name
 
-                # hack: if the message includes the text
-                # "tried to make an image with the prompt",
-                # ignore it
-                if "tried to make an image with the prompt" in message.body_text:
+                # we'll ignore any messages we generate which refer
+                # another message, since those are ones our image
+                # generation code generated
+                if message.reference_message_id:
                     continue
 
             if not message.body_text:

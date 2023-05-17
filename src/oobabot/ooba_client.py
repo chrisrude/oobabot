@@ -5,6 +5,7 @@
 
 # Purpose: Split a string into sentences, based on a set of terminators.
 #          This is a helper class for ooba_client.py.
+import json
 import time
 import typing
 
@@ -161,10 +162,10 @@ class OobaClient(http_client.SerializedHttpClient):
         async with self.get_session().ws_connect(
             self.OOBABOOGA_STREAMING_URI_PATH
         ) as websocket:
-            if self.log_all_the_things:
-                print(f"Sending request:\n{request}")
-
             await websocket.send_json(request)
+            if self.log_all_the_things:
+                print(f"Sent request:\n{json.dumps(request, indent=1)}")
+                print(f"Prompt:\n{request['prompt']}")
 
             async for msg in websocket:
                 # we expect a series of text messages in JSON encoding,

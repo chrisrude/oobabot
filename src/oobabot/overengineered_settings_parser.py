@@ -230,7 +230,10 @@ class ConfigSettingGroup:
         return {name: setting.get() for (name, setting) in self.settings.items()}.copy()
 
 
-def load_from_yaml(filename: str, setting_groups: list[ConfigSettingGroup]) -> None:
+def load_from_yaml(
+    filename: str,
+    setting_groups: typing.List["ConfigSettingGroup"],
+) -> None:
     try:
         with open(filename, "r", encoding="utf-8") as f:
             yaml = ryaml.YAML(typ="safe")
@@ -243,7 +246,8 @@ def load_from_yaml(filename: str, setting_groups: list[ConfigSettingGroup]) -> N
 
 
 def load_from_cli(
-    args, setting_groups: list[ConfigSettingGroup]
+    args,
+    setting_groups: typing.List["ConfigSettingGroup"],
 ) -> argparse.ArgumentParser:
     cli_parser = argparse.ArgumentParser(
         description=f"oobabot v{oobabot.__version__}: Discord bot for "
@@ -267,7 +271,7 @@ def load_from_cli(
 
 def load(
     args,
-    setting_groups: list[ConfigSettingGroup],
+    setting_groups: typing.List["ConfigSettingGroup"],
     filename: str = "config.yml",
 ) -> argparse.ArgumentParser:
     # Load settings in this order.
@@ -296,7 +300,7 @@ START_COMMENT = textwrap.dedent(
 
 
 def write_sample_config(
-    setting_groups: list[ConfigSettingGroup],
+    setting_groups: typing.List["ConfigSettingGroup"],
     out_stream: typing.TextIO,
 ) -> None:
     yaml_map = ryaml.CommentedMap()

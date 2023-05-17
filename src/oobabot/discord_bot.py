@@ -194,6 +194,20 @@ class DiscordBot(discord.Client):
         ]
         await asyncio.wait(response_tasks)
 
+        # there may be more than one exception, so be sure to log
+        # them all before raising either of them
+        raise_later = None
+        for task in response_tasks:
+            if task.exception() is not None:
+                fancy_logger.get().error(
+                    f"Exception while running {task.get_coro()} "
+                    + f"response: {task.exception()}",
+                    stack_info=True,
+                )
+                raise_later = task.exception()
+        if raise_later is not None:
+            raise raise_later
+
     async def send_response(
         self,
         message: types.GenericMessage,
