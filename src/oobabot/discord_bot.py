@@ -401,7 +401,10 @@ class DiscordBot(discord.Client):
                 continue
 
             if last_message is None:
-                last_message = await response_channel.send(response)
+                # when we send the first message, we don't want to send a notification,
+                # as it will only include the first token of the response.  This will
+                # not be very useful to anyone.
+                last_message = await response_channel.send(response, silent=True)
             else:
                 await last_message.edit(content=response)
 
