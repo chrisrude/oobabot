@@ -214,6 +214,13 @@ class ConfigSettingGroup:
         for setting in self.settings.values():
             setting.set_value_from_yaml(group)
 
+    def set_values_from_dict(self, main_dict: dict):
+        group_dict = main_dict.get(self.name.lower().replace(" ", "_"), {})
+        for setting in self.settings.values():
+            if setting.name in group_dict:
+                val = group_dict[setting.name]
+                setting.set_value(val)
+
     def get_setting(self, name: str) -> ConfigSetting:
         return self.settings[name]
 
@@ -267,6 +274,15 @@ def load_from_cli(
         group.set_values_from_argparse(cli_settings)
 
     return cli_parser
+
+
+def load_from_dict(
+    setting_groups: typing.List["ConfigSettingGroup"],
+    settings_dict: dict,
+) -> None:
+    print(f"settings_dict: {settings_dict}")
+    for group in setting_groups:
+        group.set_values_from_dict(settings_dict)
 
 
 def load(

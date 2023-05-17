@@ -25,11 +25,18 @@ from oobabot import templates
 
 
 class OobaBot:
-    def __init__(self, cli_args: typing.List[str]):
+    def __init__(
+        self,
+        cli_args: typing.List[str],
+        settings_dict: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ):
         fancy_logger.init_logging()
 
         self.settings = settings.Settings()
-        self.settings.load(cli_args)
+        if settings_dict is not None:
+            self.settings.load_from_dict(settings_dict)
+        else:
+            self.settings.load(cli_args)
 
         # templates used to generate prompts to send to the AI
         # as well as for some UI elements

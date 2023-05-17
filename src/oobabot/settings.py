@@ -653,6 +653,9 @@ class Settings:
         else:
             print("# oobabot: config.yml output successfully", file=sys.stderr)
 
+    def load_from_dict(self, config_dict: dict) -> None:
+        oesp.load_from_dict(self.setting_groups, config_dict)
+
     def load(self, args) -> None:
         # we need to hack this in here because we want to know the filename
         # before we parse the args, so that we can load the config file
