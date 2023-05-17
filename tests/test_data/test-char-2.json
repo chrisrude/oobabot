@@ -1,0 +1,7 @@
+{
+    "char_name": "...name...",
+    "char_persona": "...persona...",
+    "char_greeting": "...greeting...",
+    "world_scenario": "...world...",
+    "example_dialogue": "{{user}}: ...dialog..."
+}

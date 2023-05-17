@@ -4,6 +4,7 @@
 import typing
 
 from oobabot import fancy_logger
+from oobabot import persona
 from oobabot import templates
 from oobabot import types
 
@@ -41,15 +42,14 @@ class PromptGenerator:
         self,
         discord_settings: dict,
         oobabooga_settings: dict,
-        persona_settings: dict,
+        persona: persona.Persona,
         template_store: templates.TemplateStore,
     ):
-        self.ai_name = persona_settings["ai_name"]
         self.dont_split_responses = discord_settings["dont_split_responses"]
         self.history_lines = discord_settings["history_lines"]
-        self.persona = persona_settings["persona"]
         self.token_space = oobabooga_settings["request_params"]["truncation_length"]
 
+        self.persona = persona
         self.template_store = template_store
 
         # this will be also used when sending message
@@ -57,7 +57,7 @@ class PromptGenerator:
         self.bot_prompt_line = self.template_store.format(
             templates.Templates.PROMPT_HISTORY_LINE,
             {
-                templates.TemplateToken.USER_NAME: self.ai_name,
+                templates.TemplateToken.USER_NAME: self.persona.ai_name,
                 templates.TemplateToken.USER_MESSAGE: "",
             },
         ).strip()
@@ -65,7 +65,7 @@ class PromptGenerator:
         self.image_request_made = self.template_store.format(
             templates.Templates.PROMPT_IMAGE_COMING,
             {
-                templates.TemplateToken.AI_NAME: self.ai_name,
+                templates.TemplateToken.AI_NAME: self.persona.ai_name,
             },
         )
 
@@ -146,7 +146,7 @@ class PromptGenerator:
                 # make sure the AI always sees its persona name
                 # in the transcript, even if the chat program
                 # has it under a different account name
-                adjusted_author_name = self.ai_name
+                adjusted_author_name = self.persona.ai_name
 
                 # we'll ignore any messages we generate which refer
                 # another message, since those are ones our image
@@ -187,8 +187,8 @@ class PromptGenerator:
         prompt = self.template_store.format(
             templates.Templates.PROMPT,
             {
-                templates.TemplateToken.AI_NAME: self.ai_name,
-                templates.TemplateToken.PERSONA: self.persona,
+                templates.TemplateToken.AI_NAME: self.persona.ai_name,
+                templates.TemplateToken.PERSONA: self.persona.persona,
                 templates.TemplateToken.MESSAGE_HISTORY: message_history_txt,
                 templates.TemplateToken.IMAGE_COMING: image_coming,
             },

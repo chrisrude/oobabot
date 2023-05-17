@@ -1,0 +1,11 @@
+{
+    "avatar": "...avatar...",
+    "chat": "...chat...",
+    "create_date": "...create_date...",
+    "description": "{{char}} ...description...",
+    "first_mes": "...first_mes...",
+    "mes_example": "<START>\r\n{{char}}: ...mes_example...\r\n",
+    "name": "...name...",
+    "personality": "...personality...",
+    "scenario": "...scenario..."
+}

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import random
-import re
 import typing
 
 from oobabot import fancy_logger
+from oobabot import persona
 from oobabot import types
 
 
@@ -47,23 +47,17 @@ class DecideToRespond:
     def __init__(
         self,
         discord_settings: dict,
-        persona_settings: dict,
+        persona: persona.Persona,
         interrobang_bonus: float,
         time_vs_response_chance: typing.List[typing.Tuple[float, float]],
     ):
-        self.wakewords = persona_settings["wakewords"]
         self.ignore_dms = discord_settings["ignore_dms"]
         self.interrobang_bonus = interrobang_bonus
+        self.persona = persona
         self.time_vs_response_chance = time_vs_response_chance
 
         last_reply_cache_timeout = max(time for time, _ in time_vs_response_chance)
         self.last_reply_times = LastReplyTimes(last_reply_cache_timeout)
-
-        # match messages that include any `wakeword`, but not as part of
-        # another word
-        self.wakeword_patterns = [
-            re.compile(rf"\b{wakeword}\b", re.IGNORECASE) for wakeword in self.wakewords
-        ]
 
     def is_directly_mentioned(
         self, our_user_id: int, message: types.GenericMessage
@@ -85,9 +79,8 @@ class DecideToRespond:
                 return True
 
         # reply to all messages that include a wakeword
-        for wakeword_pattern in self.wakeword_patterns:
-            if wakeword_pattern.search(message.body_text):
-                return True
+        if self.persona.contains_wakeword(message.body_text):
+            return True
 
         return False
 

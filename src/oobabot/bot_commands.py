@@ -6,6 +6,7 @@ import discord
 from oobabot import decide_to_respond
 from oobabot import discord_utils
 from oobabot import fancy_logger
+from oobabot import persona
 from oobabot import repetition_tracker
 from oobabot import templates
 
@@ -15,13 +16,13 @@ class BotCommands:
         self,
         decide_to_respond: decide_to_respond.DecideToRespond,
         repetition_tracker: repetition_tracker.RepetitionTracker,
-        persona_settings: dict,
+        persona: persona.Persona,
         discord_settings: dict,
         template_store: templates.TemplateStore,
     ):
-        self.ai_name = persona_settings["ai_name"]
         self.decide_to_respond = decide_to_respond
         self.repetition_tracker = repetition_tracker
+        self.persona = persona
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.template_store = template_store
 
@@ -76,11 +77,11 @@ class BotCommands:
 
         @discord.app_commands.command(
             name="say",
-            description=f"Force {self.ai_name} to say the provided message.",
+            description=f"Force {self.persona.ai_name} to say the provided message.",
         )
         @discord.app_commands.rename(text_to_send="message")
         @discord.app_commands.describe(
-            text_to_send=f"Message to force {self.ai_name} to say."
+            text_to_send=f"Message to force {self.persona.ai_name} to say."
         )
         async def say(interaction: discord.Interaction, text_to_send: str):
             if interaction.channel_id is None:
@@ -92,7 +93,9 @@ class BotCommands:
             if self.reply_in_thread:
                 channel = await get_messageable(interaction)
                 if channel is None or isinstance(channel, discord.TextChannel):
-                    await fail(interaction, f"{self.ai_name} may only speak in threads")
+                    await fail(
+                        interaction, f"{self.persona.ai_name} may only speak in threads"
+                    )
                     return
 
             fancy_logger.get().debug(
@@ -110,7 +113,7 @@ class BotCommands:
 
         @discord.app_commands.command(
             name="lobotomize",
-            description=f"Erase {self.ai_name}'s memory of any message "
+            description=f"Erase {self.persona.ai_name}'s memory of any message "
             + "before now in this channel.",
         )
         async def lobotomize(interaction: discord.Interaction):
@@ -137,7 +140,7 @@ class BotCommands:
             response = self.template_store.format(
                 template_name=templates.Templates.COMMAND_LOBOTOMIZE_RESPONSE,
                 format_args={
-                    templates.TemplateToken.AI_NAME: self.ai_name,
+                    templates.TemplateToken.AI_NAME: self.persona.ai_name,
                     templates.TemplateToken.USER_NAME: interaction.user.name,
                 },
             )

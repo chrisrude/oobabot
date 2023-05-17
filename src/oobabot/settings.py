@@ -206,6 +206,29 @@ class Settings:
                 show_default_in_yaml=False,
             )
         )
+        # path to a json or txt file containing persona
+        self.persona_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="persona_file",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Path to a file containing a persona.  This can be just a
+                        single string, a json file in the common "tavern" formats,
+                        or a yaml file in the Oobabooga format.
+
+                        With a single string, the persona will be set to that string.
+
+                        Otherwise, the ai_name and persona will be overwritten with
+                        the values in the file.  Also, the wakewords will be
+                        extended to include the character's own name.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
         self.persona_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
                 name="wakewords",

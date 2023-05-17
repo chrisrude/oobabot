@@ -15,6 +15,7 @@ from oobabot import fancy_logger
 from oobabot import http_client
 from oobabot import image_generator
 from oobabot import ooba_client
+from oobabot import persona
 from oobabot import prompt_generator
 from oobabot import repetition_tracker
 from oobabot import response_stats
@@ -56,10 +57,14 @@ class OobaBot:
         ########################################################
         # Bot logic
 
+        self.persona = persona.Persona(
+            persona_settings=self.settings.persona_settings.get_all()
+        )
+
         # decides which messages the bot will respond to
         self.decide_to_respond = decide_to_respond.DecideToRespond(
             discord_settings=self.settings.discord_settings.get_all(),
-            persona_settings=self.settings.persona_settings.get_all(),
+            persona=self.persona,
             interrobang_bonus=self.settings.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
             time_vs_response_chance=self.settings.TIME_VS_RESPONSE_CHANCE,
         )
@@ -69,7 +74,7 @@ class OobaBot:
         self.prompt_generator = prompt_generator.PromptGenerator(
             discord_settings=self.settings.discord_settings.get_all(),
             oobabooga_settings=self.settings.oobabooga_settings.get_all(),
-            persona_settings=self.settings.persona_settings.get_all(),
+            persona=self.persona,
             template_store=self.template_store,
         )
 
@@ -104,7 +109,7 @@ class OobaBot:
         self.bot_commands = bot_commands.BotCommands(
             decide_to_respond=self.decide_to_respond,
             repetition_tracker=self.repetition_tracker,
-            persona_settings=self.settings.persona_settings.get_all(),
+            persona=self.persona,
             discord_settings=self.settings.discord_settings.get_all(),
             template_store=self.template_store,
         )
@@ -157,12 +162,12 @@ class OobaBot:
         bot = discord_bot.DiscordBot(
             self.ooba_client,
             decide_to_respond=self.decide_to_respond,
+            persona=self.persona,
             prompt_generator=self.prompt_generator,
             repetition_tracker=self.repetition_tracker,
             response_stats=self.response_stats,
             image_generator=self.image_generator,
             bot_commands=self.bot_commands,
-            persona_settings=self.settings.persona_settings.get_all(),
             discord_settings=self.settings.discord_settings.get_all(),
         )
 

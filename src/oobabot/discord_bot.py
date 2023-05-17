@@ -13,6 +13,7 @@ from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import image_generator
 from oobabot import ooba_client
+from oobabot import persona
 from oobabot import prompt_generator
 from oobabot import repetition_tracker
 from oobabot import response_stats
@@ -24,24 +25,23 @@ class DiscordBot(discord.Client):
         self,
         ooba_client: ooba_client.OobaClient,
         decide_to_respond: decide_to_respond.DecideToRespond,
+        persona: persona.Persona,
         prompt_generator: prompt_generator.PromptGenerator,
         repetition_tracker: repetition_tracker.RepetitionTracker,
         response_stats: response_stats.AggregateResponseStats,
         bot_commands: bot_commands.BotCommands,
         image_generator: typing.Optional[image_generator.ImageGenerator],
         discord_settings: dict,
-        persona_settings: dict,
     ):
         self.bot_commands = bot_commands
         self.decide_to_respond = decide_to_respond
         self.image_generator = image_generator
         self.ooba_client = ooba_client
+        self.persona = persona
         self.prompt_generator = prompt_generator
         self.repetition_tracker = repetition_tracker
         self.response_stats = response_stats
 
-        self.ai_name = persona_settings["ai_name"]
-        self.persona = persona_settings["persona"]
         self.ai_user_id = -1
 
         self.dont_split_responses = discord_settings["dont_split_responses"]
@@ -90,8 +90,8 @@ class DiscordBot(discord.Client):
         else:
             fancy_logger.get().debug("Image generation: disabled")
 
-        fancy_logger.get().debug("AI name: %s", self.ai_name)
-        fancy_logger.get().debug("AI persona: %s", self.persona)
+        fancy_logger.get().debug("AI name: %s", self.persona.ai_name)
+        fancy_logger.get().debug("AI persona: %s", self.persona.persona)
 
         fancy_logger.get().debug(
             "History: %d lines ", self.prompt_generator.history_lines
@@ -102,9 +102,7 @@ class DiscordBot(discord.Client):
         )
 
         str_wakewords = (
-            ", ".join(self.decide_to_respond.wakewords)
-            if self.decide_to_respond.wakewords
-            else "<none>"
+            ", ".join(self.persona.wakewords) if self.persona.wakewords else "<none>"
         )
         fancy_logger.get().debug("Wakewords: %s", str_wakewords)
 
@@ -234,7 +232,7 @@ class DiscordBot(discord.Client):
             perms = raw_message.channel.permissions_for(raw_message.author)
             if perms.create_public_threads:
                 response_channel = await raw_message.create_thread(
-                    name=f"{self.ai_name}, replying to "
+                    name=f"{self.persona.ai_name}, replying to "
                     + f"{raw_message.author.display_name}",
                 )
                 fancy_logger.get().debug(

@@ -1,0 +1,24 @@
+{
+    "char_name": "...char_name...",
+    "char_persona": "...char_persona...",
+    "world_scenario": "...world_scenario...",
+    "char_greeting": "...char_greeting...",
+    "example_dialogue": "...example_dialogue...",
+    "name": "...name...",
+    "description": "...description...",
+    "personality": "...personality...",
+    "scenario": "...scenario...",
+    "first_mes": "...first_mes...",
+    "mes_example": "...mes_example...",
+    "metadata": {
+        "version": 1,
+        "created": 100,
+        "modified": 101,
+        "source": null,
+        "tool": {
+            "name": "...tool_name...",
+            "version": "0.1.2",
+            "url": "http://example.com"
+        }
+    }
+}
