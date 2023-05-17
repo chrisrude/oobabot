@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import signal
 import sys
+import typing
 
 from oobabot import bot_commands
 from oobabot import decide_to_respond
@@ -23,7 +24,7 @@ from oobabot import templates
 
 
 class OobaBot:
-    def __init__(self, cli_args=None):
+    def __init__(self, cli_args: typing.List[str]):
         fancy_logger.init_logging()
 
         self.settings = settings.Settings()
@@ -187,5 +188,5 @@ class OobaBot:
 
 
 def main():
-    oobabot = OobaBot()
+    oobabot = OobaBot(sys.argv[1:])
     oobabot.run()

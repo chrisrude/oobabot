@@ -242,7 +242,8 @@ def load_from_yaml(
                 group.set_values_from_yaml(yaml_settings)
 
     except FileNotFoundError:
-        print(f"Could not find {filename}.  Using defaults.")
+        if not "config.yml" == filename:
+            print(f"Could not find {filename}.  Using defaults.")
 
 
 def load_from_cli(
@@ -270,9 +271,9 @@ def load_from_cli(
 
 
 def load(
-    args,
+    args: typing.List[str],
     setting_groups: typing.List["ConfigSettingGroup"],
-    filename: str = "config.yml",
+    filename: str,
 ) -> argparse.ArgumentParser:
     # Load settings in this order.
     # The later sources will overwrite the earlier ones.

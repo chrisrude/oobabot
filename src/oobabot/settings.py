@@ -146,6 +146,18 @@ class Settings:
                 cli_args=["-h", "--help"],
             )
         )
+        # read a path to a config file from the command line
+        self.general_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="config",
+                default="",
+                description_lines=[
+                    "Path to a config file to read settings from.",
+                    "Command line settings will override settings in this file.",
+                ],
+                cli_args=["-c", "--config"],
+            )
+        )
         self.general_settings.add_setting(
             oesp.ConfigSetting[bool](
                 name="generate_config",
@@ -615,9 +627,24 @@ class Settings:
             print("# oobabot: config.yml output successfully", file=sys.stderr)
 
     def load(self, args) -> None:
+        # we need to hack this in here because we want to know the filename
+        # before we parse the args, so that we can load the config file
+        # first and then have the arguments ovewrite the config file.
+        config_setting = self.general_settings.get_setting("config")
+        config_filename = config_setting.default
+        if args is not None:
+            for config_flag in config_setting.cli_args:
+                # find the element after config_flag in args
+                try:
+                    config_filename = args[args.index(config_flag) + 1]
+                    break
+                except ValueError:
+                    continue
+
         argparser = oesp.load(
             args=args,
             setting_groups=self.setting_groups,
+            filename=config_filename,
         )
 
         if self.general_settings.get("help"):
