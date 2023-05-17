@@ -500,9 +500,13 @@ class Settings:
         def set_sd_parm(param: str, value: oesp.SettingValueType):
             if not value:
                 return
-            self.stable_diffusion_settings.get_setting("request_params").get()[
-                param
-            ] = value
+            setting = self.stable_diffusion_settings.get_setting("request_params")
+
+            # get returns a copy of the settings dict, so we need to
+            # push it back after we make a change
+            setting_dict = setting.get()
+            setting_dict[param] = value
+            setting.set_value(setting_dict)
 
         self.deprecated_settings = oesp.ConfigSettingGroup(
             "Deprecated Settings",
