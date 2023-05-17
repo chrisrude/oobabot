@@ -242,8 +242,7 @@ def load_from_yaml(
                 group.set_values_from_yaml(yaml_settings)
 
     except FileNotFoundError:
-        if not "config.yml" == filename:
-            print(f"Could not find {filename}.  Using defaults.")
+        pass
 
 
 def load_from_cli(

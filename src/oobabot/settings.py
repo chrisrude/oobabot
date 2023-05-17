@@ -150,7 +150,7 @@ class Settings:
         self.general_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="config",
-                default="",
+                default="config.yml",
                 description_lines=[
                     "Path to a config file to read settings from.",
                     "Command line settings will override settings in this file.",
@@ -200,22 +200,6 @@ class Settings:
                         request.  This is useful for setting up a 'character' for the
                         bot to play.  Alternatively, this can be set with the
                         {self.OOBABOT_PERSONA_ENV_VAR} environment variable.
-                        """
-                    )
-                ],
-                show_default_in_yaml=False,
-            )
-        )
-        self.persona_settings.add_setting(
-            oesp.ConfigSetting[str](
-                name="prompt",
-                default="",
-                description_lines=[
-                    textwrap.dedent(
-                        """
-                        This prompt will be added to the beginning of every
-                        user-supplied request.  This is useful for setting up
-                        a 'character' for the bot to play.
                         """
                     )
                 ],
