@@ -73,85 +73,87 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 You should now be able to run oobabot from wherever pip installed it.
 
 ```none
-usage: oobabot [-h] [--discord-token] [--dont-split-responses]
-               [--history-lines HISTORY_LINES] [--ignore-dms] [--wakewords [WAKEWORDS ...]]
-               [--ai-name AI_NAME] [--base-url BASE_URL] [--log-all-the-things]
-               [--persona PERSONA] [--reply-in-thread] [--diffusion-steps DIFFUSION_STEPS]
-               [--image-height IMAGE_HEIGHT] [--image-width IMAGE_WIDTH]
-               [--image-words [IMAGE_WORDS ...]]
-               [--stable-diffusion-sampler STABLE_DIFFUSION_SAMPLER]
+usage: oobabot [-h] [-c CONFIG] [--generate-config] [--ai-name AI_NAME] [--persona PERSONA]
+               [--wakewords [WAKEWORDS ...]] [--discord-token DISCORD_TOKEN]
+               [--dont-split-responses] [--history-lines HISTORY_LINES] [--ignore-dms]
+               [--reply-in-thread] [--stream-responses] [--base-url BASE_URL]
+               [--log-all-the-things] [--image-words [IMAGE_WORDS ...]]
                [--stable-diffusion-url STABLE_DIFFUSION_URL]
-               [--sd-negative-prompt SD_NEGATIVE_PROMPT]
-               [--sd-negative-prompt-nsfw SD_NEGATIVE_PROMPT_NSFW]
+               [--extra-prompt-text EXTRA_PROMPT_TEXT]
 
-Discord bot for oobabooga's text-generation-webui
+oobabot v0.1.7: Discord bot for oobabooga's text-generation-webui
 
-options:
-  -h, --help            show this help message and exit
+General Settings:
 
-Discord Settings:
-  --discord-token       Token to log into Discord with. For security purposes it's strongly
-                        recommended that you set this via the DISCORD_TOKEN environment
-                        variable instead, if possible.
-  --dont-split-responses
-                        If set, the bot post its entire response as a single message,
-                        rather than splitting it into seperate messages by sentence.
-  --history-lines HISTORY_LINES
-                        Number of lines of chat history the AI will see when generating a
-                        response. The default is 15.
-  --ignore-dms          If set, the bot will ignore direct messages.
+  -h, --help
+  -c CONFIG, --config CONFIG
+                        Path to a config file to read settings from. Command line settings
+                        will override settings in this file. (default: config.yml)
+  --generate-config     If set, oobabot will print its configuration as a .yml file, then
+                        exit. Any command-line settings also passed will be reflected in
+                        this file. (default: False)
+
+Persona:
+
+  --ai-name AI_NAME     Name the AI will use to refer to itself (default: oobabot)
+  --persona PERSONA     This prefix will be added in front of every user-supplied request.
+                        This is useful for setting up a 'character' for the bot to play.
+                        Alternatively, this can be set with the OOBABOT_PERSONA environment
+                        variable. (default: )
   --wakewords [WAKEWORDS ...]
                         One or more words that the bot will listen for. The bot will listen
                         in all discord channels can access for one of these words to be
                         mentioned, then reply to any messages it sees with a matching word.
                         The bot will always reply to @-mentions and direct messages, even
-                        if no wakewords are supplied.
+                        if no wakewords are supplied. (default: ['oobabot'])
 
-Oobabooga Seetings:
-  --ai-name AI_NAME     Name of the AI to use for requests. This can be whatever you want,
-                        but might make sense to be the name of the bot in Discord.
+Discord:
+
+  --discord-token DISCORD_TOKEN
+                        Token to log into Discord with. For security purposes it's strongly
+                        recommended that you set this via the DISCORD_TOKEN environment
+                        variable instead, if possible. (default: )
+  --dont-split-responses
+                        Post the entire response as a single message, rather than splitting
+                        it into seperate messages by sentence. (default: False)
+  --history-lines HISTORY_LINES
+                        Number of lines of chat history the AI will see when generating a
+                        response. (default: 7)
+  --ignore-dms          If set, the bot will not respond to direct messages. (default:
+                        False)
+  --reply-in-thread     If set, the bot will generate a thread to respond in if it is not
+                        already in one. (default: False)
+  --stream-responses    Stream responses into a single message as they are generated.
+                        (default: False)
+
+Oobabooga:
+
   --base-url BASE_URL   Base URL for the oobabooga instance. This should be
                         ws://hostname[:port] for plain websocket connections, or
-                        wss://hostname[:port] for websocket connections over TLS.
-  --log-all-the-things  Prints all oobabooga requests and responses in their entirety to
-                        STDOUT
-  --persona PERSONA     This prefix will be added in front of every user-supplied request.
-                        This is useful for setting up a 'character' for the bot to play.
-                        Alternatively, this can be set with the OOBABOT_PERSONA environment
-                        variable.
-  --reply-in-thread     When set, the bot will generate a new thread for each response it
-                        generates. But it will only do so if the user who prompted the bot
-                        has thread-create permissions.
+                        wss://hostname[:port] for websocket connections over TLS. (default:
+                        ws://localhost:5005)
+  --log-all-the-things  Print all AI input and output to STDOUT. (default: False)
 
-Stable Diffusion Settings:
-  --diffusion-steps DIFFUSION_STEPS
-                        Number of diffusion steps to take when generating an image. The
-                        default is 30.
-  --image-height IMAGE_HEIGHT
-                        Size of images to generate. This is the height of the image in
-                        pixels. The default is 512.
-  --image-width IMAGE_WIDTH
-                        Size of images to generate. This is the width of the image in
-                        pixels. The default is 512.
+Stable Diffusion:
+
   --image-words [IMAGE_WORDS ...]
-                        One or more words that will indicate the user is requeting an image
-                        to be generated.
-  --stable-diffusion-sampler STABLE_DIFFUSION_SAMPLER, --sd-sampler STABLE_DIFFUSION_SAMPLER
-                        Sampler to use when generating images. If not specified, the one
-                        set on the AUTOMATIC1111 server will be used.
-  --stable-diffusion-url STABLE_DIFFUSION_URL, --sd-url STABLE_DIFFUSION_URL
-                        URL for an AUTOMATIC1111 Stable Diffusion server
-  --sd-negative-prompt SD_NEGATIVE_PROMPT
-                        Negative prompt to use when generating images. This will discourage
-                        Stable Diffusion from generating images with the specified content.
-                        By default, this is set to follow Discord's TOS.
-  --sd-negative-prompt-nsfw SD_NEGATIVE_PROMPT_NSFW
-                        Negative prompt to use when generating images in a channel marked
-                        as'Age-Restricted'.
+                        When one of these words is used in a message, the bot will generate
+                        an image. (default: ['drawing', 'photo', 'pic', 'picture', 'image',
+                        'sketch'])
+  --stable-diffusion-url STABLE_DIFFUSION_URL
+                        URL for an AUTOMATIC1111 Stable Diffusion server. (default: )
+  --extra-prompt-text EXTRA_PROMPT_TEXT
+                        This will be appended to every image generation prompt sent to
+                        Stable Diffusion. (default: )
 
-Also, to authenticate to Discord, you must set the environment variable: DISCORD_TOKEN =
-<your bot's discord token>
+
+Additional settings can be set in config.yml.  Use the --generate-config option to print a
+new copy of this file to STDOUT.
+
+Please set the 'DISCORD_TOKEN' environment variable to your bot's discord token.
 ```
+
+There are **a lot more settings** in the [config.yml file (sample)](./docs/config.sample.yml) here.
 
 ## Required settings
 
@@ -294,12 +296,22 @@ Oobabot doesn't add any restrictions on who can run these commands, but luckily 
 
 If you're running on a large server, you may want to restrict who can run these commands.  I suggest creating a new role, and only allowing that role to run the commands.
 
+## Using a config file
+
+Instead of the command line, you can also use a config file.  This is useful if you want to run multiple instances of the bot, or if you want to run it as a service.
+
+There are also many more settings available in the config file, which are not available on the command line.  See [docs/CONFIG.md](./docs/CONFIG.md) for information on how to use it.
+
+You can also look at a [config.yml file (sample)](./docs/config.sample.yml) here.
+
 ## Known Issues
 
 - detection of requests for photos is very crude, and will likely be improved in the future.
-- some of the default settings are very specific to my use case, and will likely be made
-  configurable in the future
 - public threads in 'age restricted' channels are treated as if they
   were not age-restricted
 - sometimes the bot wants to continue conversations on behalf of other members of the chatroom.  I have some hacks in place to notice and truncate this behavior, but it can lead to terse responses on occasion.
 - found one not listed here?  Have an idea?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!
+
+## Contributing
+
+Contributions are welcome!  Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for more information.

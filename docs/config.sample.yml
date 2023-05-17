@@ -1,0 +1,142 @@
+
+# Welcome to Oobabot!
+#
+# This is the configuration file for Oobabot.  It is a YAML file, and
+# comments are allowed.  Oobabot attempts to load a file named
+# "config.yml" from the current directory when it is run.
+#
+
+version: 0.1.6
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# persona
+# .
+persona:
+
+  # Name the AI will use to refer to itself
+  #   default: oobabot
+  ai_name: oobabot
+
+  # This prefix will be added in front of every user-supplied request.  This is useful for
+  # setting up a 'character' for the bot to play.  Alternatively, this can be set with the
+  # OOBABOT_PERSONA environment variable.
+  persona: ''
+
+  # One or more words that the bot will listen for. The bot will listen in all discord
+  # channels can access for one of these words to be mentioned, then reply to any messages
+  # it sees with a matching word. The bot will always reply to @-mentions and direct
+  # messages, even if no wakewords are supplied.
+  #   default: ['oobabot']
+  wakewords:
+    - oobabot
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# discord
+# .
+discord:
+
+  # Token to log into Discord with.  For security purposes it's strongly recommended that
+  # you set this via the DISCORD_TOKEN environment variable instead, if possible.
+  discord_token: ''
+
+  # Post the entire response as a single message, rather than splitting it into seperate
+  # messages by sentence.
+  #   default: false
+  dont_split_responses: false
+
+  # Number of lines of chat history the AI will see when generating a response.
+  #   default: 7
+  history_lines: 7
+
+  # If set, the bot will not respond to direct messages.
+  #   default: false
+  ignore_dms: false
+
+  # If set, the bot will generate a thread to respond in if it is not already in one.
+  #   default: false
+  reply_in_thread: false
+
+  # A list of strings that will cause the bot to stop generating a response when
+  # encountered.
+  #   default: ['### end of transcript ###<|endoftext|>', '<|endoftext|>']
+  stop_markers:
+    - '### End of Transcript ###<|endoftext|>'
+    - <|endoftext|>
+
+  # Stream responses into a single message as they are generated.
+  #   default: false
+  stream_responses: false
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# oobabooga
+# .
+oobabooga:
+
+  # Base URL for the oobabooga instance.  This should be ws://hostname[:port] for plain
+  # websocket connections, or wss://hostname[:port] for websocket connections over TLS.
+  #   default: ws://localhost:5005
+  base_url: ws://localhost:5005
+
+  # Print all AI input and output to STDOUT.
+  #   default: false
+  log_all_the_things: false
+
+  # A dictionary which will be passed straight through to Oobabooga on every request.  Feel
+  # free to add additional simple parameters here as Oobabooga's API evolves. See
+  # Oobabooga's documentation for what these parameters mean.
+  request_params:
+    max_new_tokens: 250
+    do_sample: true
+    temperature: 1.3
+    top_p: 0.1
+    typical_p: 1
+    repetition_penalty: 1.18
+    top_k: 40
+    min_length: 0
+    no_repeat_ngram_size: 0
+    num_beams: 1
+    penalty_alpha: 0
+    length_penalty: 1
+    early_stopping: false
+    seed: -1
+    add_bos_token: true
+    truncation_length: 730
+    ban_eos_token: false
+    skip_special_tokens: true
+    stopping_strings: []
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# stable_diffusion
+# .
+stable_diffusion:
+
+  # When one of these words is used in a message, the bot will generate an image.
+  #   default: ['drawing', 'photo', 'pic', 'picture', 'image', 'sketch']
+  image_words:
+    - drawing
+    - photo
+    - pic
+    - picture
+    - image
+    - sketch
+
+  # URL for an AUTOMATIC1111 Stable Diffusion server.
+  #   default:
+  stable_diffusion_url: ''
+
+  # This will be appended to every image generation prompt sent to Stable Diffusion.
+  #   default:
+  extra_prompt_text: ''
+
+  # A dictionary which will be passed straight through to Stable Diffusion on every request.
+  # Feel free to add additional simple parameters here as Stable Diffusion's API evolves.
+  # See Stable Diffusion's documentation for what these parameters mean.
+  request_params:
+    do_not_save_samples: true
+    do_not_save_grid: true
+    negative_prompt: animal harm, suicide, loli, nsfw
+    negative_prompt_nsfw: animal harm, suicide, loli
+    steps: 30
+    width: 512
+    height: 512
+    sampler: ''

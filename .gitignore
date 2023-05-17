@@ -2,6 +2,7 @@
 out.png
 .DS_Store
 config.yml
+config.yml.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
