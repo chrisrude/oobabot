@@ -37,7 +37,13 @@ else, you can specify a different location with the
 If you ever upgrade and want to regenerate the config.yml,
 you can just do this:
 
-  `oobabot --generate-config > config.yml`
+  ```bash
+  cp config.yml config.yml.backup &&
+  oobabot --config config.yml.backup --generate-config > config.yml
+  ```
+
+> Note: it's important to **make a backup copy of your config.yml** first,
+> because the pipe command in the second line will overwrite it!
 
 Your previous config.yml file will be read before generating the new one,
 and the new one will include all the settings from the old one, plus
