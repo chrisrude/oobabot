@@ -424,6 +424,20 @@ class Settings:
             )
         )
         self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="extra_prompt_text",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        This will be appended to every image generation prompt
+                        sent to Stable Diffusion.
+                        """
+                    )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
             oesp.ConfigSetting[oesp.SettingDictType](
                 name="request_params",
                 default=self.DEFAULT_SD_REQUEST_PARAMS,
@@ -450,6 +464,8 @@ class Settings:
             "Template",
             description="UI and AI request templates",
             include_in_argparse=False,
+            # todo: turn back on in later release
+            include_in_yaml=False,
         )
         self.setting_groups.append(self.template_settings)
 

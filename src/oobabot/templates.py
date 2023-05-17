@@ -144,7 +144,7 @@ class TemplateStore:
         ),
         Templates.IMAGE_DETACH: textwrap.dedent(
             """
-            {USER_NAME} tried to make an image with the prompt:
+            {USER_NAME} asked for an image with the prompt:
                 '{IMAGE_PROMPT}'
             ...but couldn't find a suitable one.
             """

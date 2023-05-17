@@ -49,6 +49,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     ):
         super().__init__(self.SERVICE_NAME, settings["stable_diffusion_url"])
 
+        self.extra_prompt_text = settings["extra_prompt_text"]
         self.request_params = settings["request_params"]
 
         # when we're in a "age restricted" channel, we'll swap
@@ -157,6 +158,9 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         if is_channel_nsfw:
             request["negative_prompt"] = self.negative_prompt_nsfw
 
+        if self.extra_prompt_text:
+            request["prompt"] += ", " + self.extra_prompt_text
+
         async def do_post() -> bytes:
             fancy_logger.get().debug(
                 "Stable Diffusion: Image request (nsfw: %r): %s",
@@ -236,3 +240,8 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             "Stable Diffusion: Using negative prompt: %s...",
             str(self.request_params.get("negative_prompt", ""))[:20],
         )
+        if self.extra_prompt_text:
+            fancy_logger.get().debug(
+                "Stable Diffusion: will append to every prompt: '%s'",
+                self.extra_prompt_text,
+            )

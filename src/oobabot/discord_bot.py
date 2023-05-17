@@ -80,7 +80,7 @@ class DiscordBot(discord.Client):
 
         if self.stream_responses:
             fancy_logger.get().debug("Responses: streamed live")
-        if self.dont_split_responses:
+        elif self.dont_split_responses:
             fancy_logger.get().debug("Responses: returned as single messages")
         else:
             fancy_logger.get().debug("Responses: streamed as separate sentences")
