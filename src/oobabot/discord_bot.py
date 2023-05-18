@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-# Purpose: Discord client for Rosie
-#
+"""
+Main bot class.  Contains Discord-specific code that can't
+be easily extracted into a cross-platform library.
+"""
 
 import asyncio
 import typing
@@ -21,17 +23,22 @@ from oobabot import types
 
 
 class DiscordBot(discord.Client):
+    """
+    Main bot class.  Connects to Discord, monitors for messages,
+    and dispatches responses.
+    """
+
     def __init__(
         self,
-        ooba_client: ooba_client.OobaClient,
+        bot_commands: bot_commands.BotCommands,
         decide_to_respond: decide_to_respond.DecideToRespond,
+        discord_settings: dict,
+        image_generator: typing.Optional[image_generator.ImageGenerator],
+        ooba_client: ooba_client.OobaClient,
         persona: persona.Persona,
         prompt_generator: prompt_generator.PromptGenerator,
         repetition_tracker: repetition_tracker.RepetitionTracker,
         response_stats: response_stats.AggregateResponseStats,
-        bot_commands: bot_commands.BotCommands,
-        image_generator: typing.Optional[image_generator.ImageGenerator],
-        discord_settings: dict,
     ):
         self.bot_commands = bot_commands
         self.decide_to_respond = decide_to_respond

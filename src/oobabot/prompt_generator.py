@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-# purpose: generate a prompt for the AI to respond to, given
-# the message history and persona.
+"""
+Generate a prompt for the AI to respond to, given the
+message history and persona.
+"""
 import typing
 
 from oobabot import fancy_logger
@@ -193,7 +195,6 @@ class PromptGenerator:
                 templates.TemplateToken.IMAGE_COMING: image_coming,
             },
         )
-        # todo: make this part of the template?
         prompt += self.bot_prompt_line + "\n"
         return prompt
 

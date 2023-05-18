@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+Logging with colors
+"""
+
 import logging
 import typing
 
@@ -30,6 +34,10 @@ FORMATS = {
 
 
 class ColorfulLoggingFormatter(logging.Formatter):
+    """
+    Logging formatter that adds colors to the log levels.
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self.formatters = {}

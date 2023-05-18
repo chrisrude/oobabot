@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+Implementation of the bot's slash commands.
+"""
 import typing
 
 import discord
@@ -12,6 +15,10 @@ from oobabot import templates
 
 
 class BotCommands:
+    """
+    Implementation of the bot's slash commands.
+    """
+
     def __init__(
         self,
         decide_to_respond: decide_to_respond.DecideToRespond,

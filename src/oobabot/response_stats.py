@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+Purpose: collects timing and rate statistics for the bot's responses
+"""
+
 import time
 import typing
 

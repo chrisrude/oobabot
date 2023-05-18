@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+Documents all the settings for the bot.
+"""
 import os
 import shutil
 import sys

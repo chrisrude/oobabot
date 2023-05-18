@@ -1,8 +1,16 @@
 # -*- coding: utf-8 -*-
+"""
+Generic types for messages, used to abstract away
+Discord-specific types from the rest of the code.
+"""
 import typing
 
 
 class GenericMessage:
+    """
+    Represents a message from a user.
+    """
+
     def __init__(
         self,
         author_id: int,
@@ -30,10 +38,17 @@ class GenericMessage:
 
 
 class DirectMessage(GenericMessage):
-    pass
+    """
+    Represents a message sent directly to the bot.
+    """
 
 
 class ChannelMessage(GenericMessage):
+    """
+    Represents a message sent in a channel, including
+    a private group chat or thread.
+    """
+
     def __init__(
         self,
         /,

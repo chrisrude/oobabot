@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+"""
+Purpose: Provides a base class for HTTP clients that limits the number
+of connections to a single host to one, so that we don't overwhelm the
+server.
+
+This is a workaround for the fact that Oobabooga, at the time of writing,
+could not support multiple pending requests at the same time without failing.
+"""
+
 import abc
 import asyncio
 import socket
@@ -7,7 +16,9 @@ import aiohttp
 
 
 class OobaHttpClientError(Exception):
-    pass
+    """
+    Purpose: Exception class for OobaHttpClient
+    """
 
 
 class SerializedHttpClient(abc.ABC):
@@ -56,7 +67,11 @@ class SerializedHttpClient(abc.ABC):
         self.base_url = base_url
         self._session = None
 
-    def get_session(self) -> aiohttp.ClientSession:
+    def _get_session(self) -> aiohttp.ClientSession:
+        """
+        Returns: the session, if it exists
+        Raises: OobaHttpClientError if the session does not exist.
+        """
         if not self._session:
             raise OobaHttpClientError("Session not initialized")
         return self._session

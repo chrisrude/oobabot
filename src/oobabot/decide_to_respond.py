@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+Decides whether the bot responds to a message.
+"""
+
 import random
 import typing
 
@@ -105,6 +109,11 @@ class DecideToRespond:
     def provide_unsolicited_reply_in_channel(
         self, our_user_id: int, message: types.ChannelMessage
     ) -> bool:
+        """
+        Returns True if we should respond to the message, even
+        though we weren't directly mentioned.
+        """
+
         # if we're not at-mentioned but others are, don't reply
         if message.mentions and not message.is_mentioned(our_user_id):
             return False

@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Detects when the bot is repeating previous messages, and attempts
+to fix this by hiding the messages that it's repeating from its view
+of the chat history.
+
+Is also used to implement the /lobotomize command, which is the same
+thing except it's triggered by a command instead of automatically.
+"""
 import typing
 
 from oobabot import fancy_logger
@@ -6,8 +14,10 @@ from oobabot import types
 
 
 class RepetitionTracker:
-    # how many times the bot can repeat the same thing before we
-    # throttle history
+    """
+    Tracks the last message the bot posted in each channel, and
+    the number of times in a row it has been repeated.
+    """
 
     def __init__(self, repetition_threshold: int) -> None:
         self.repetition_threshold = repetition_threshold

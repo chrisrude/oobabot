@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-# Purpose: Streaming client for the Ooba API.
-# Can provide the response by token or by sentence.
-#
-
-# Purpose: Split a string into sentences, based on a set of terminators.
-#          This is a helper class for ooba_client.py.
+"""
+Client for the Ooba API.
+Can provide the response by token or by sentence.
+"""
 import json
 import time
 import typing
@@ -18,7 +16,7 @@ from oobabot import http_client
 
 class SentenceSplitter:
     """
-    Purpose: Split an English string into sentences.
+    Split a response into sentences.
     """
 
     # anything that can't be in a real response
@@ -87,8 +85,9 @@ class SentenceSplitter:
 
 
 class OobaClient(http_client.SerializedHttpClient):
-    # Purpose: Streaming client for the Ooba API.
-    # Can provide the response by token or by sentence.
+    """
+    Client for the Ooba API.  Can provide the response by token or by sentence.
+    """
 
     SERVICE_NAME = "Oobabooga"
 
@@ -104,7 +103,7 @@ class OobaClient(http_client.SerializedHttpClient):
         self.log_all_the_things = settings["log_all_the_things"]
 
     async def _setup(self):
-        async with self.get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
+        async with self._get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
             return
 
     async def request_by_sentence(self, prompt: str) -> typing.AsyncIterator[str]:
@@ -159,7 +158,7 @@ class OobaClient(http_client.SerializedHttpClient):
         }
         request.update(self.request_params)
 
-        async with self.get_session().ws_connect(
+        async with self._get_session().ws_connect(
             self.OOBABOOGA_STREAMING_URI_PATH
         ) as websocket:
             await websocket.send_json(request)

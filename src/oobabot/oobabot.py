@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
+"""
+Bot entrypoint.
+"""
 
 import asyncio
 import contextlib
@@ -25,6 +28,11 @@ from oobabot import templates
 
 
 class OobaBot:
+    """
+    Main bot class.  Load settings, creates helper objects,
+    and invokes the bot loop.
+    """
+
     def __init__(
         self,
         cli_args: typing.List[str],
@@ -171,15 +179,15 @@ class OobaBot:
 
         fancy_logger.get().info("Connecting to Discord... ")
         bot = discord_bot.DiscordBot(
-            self.ooba_client,
+            bot_commands=self.bot_commands,
             decide_to_respond=self.decide_to_respond,
+            discord_settings=self.settings.discord_settings.get_all(),
+            ooba_client=self.ooba_client,
+            image_generator=self.image_generator,
             persona=self.persona,
             prompt_generator=self.prompt_generator,
             repetition_tracker=self.repetition_tracker,
             response_stats=self.response_stats,
-            image_generator=self.image_generator,
-            bot_commands=self.bot_commands,
-            discord_settings=self.settings.discord_settings.get_all(),
         )
 
         # opens http connections to our services,

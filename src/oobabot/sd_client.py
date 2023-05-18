@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-# Purpose: Client for generating images using the AUTOMATIC1111
-# API.  Takes a prompt and returns image binary data in PNG format.
-#
+"""
+Client for generating images using the AUTOMATIC1111
+API.  Takes a prompt and returns image binary data in PNG format.
+"""
 
 import asyncio
 import base64
@@ -99,24 +100,23 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         #    check if it's there before we try to set it
         #
         current_options = None
-        async with self.get_session().get(url) as response:
+        async with self._get_session().get(url) as response:
             if response.status != 200:
                 raise http_client.OobaHttpClientError(response)
             current_options = await response.json()
 
-        # now, set the options
         options_to_set = {}
-        for k, v in self.DEFAULT_OPTIONS.items():
-            if k not in current_options:
+        for option_name, option_value in self.DEFAULT_OPTIONS.items():
+            if option_name not in current_options:
                 continue
-            if v == current_options[k]:
+            if option_value == current_options[option_name]:
                 continue
-            options_to_set[k] = v
+            options_to_set[option_name] = option_value
             fancy_logger.get().info(
                 "Stable Diffusion:  changing option '%s' from to '%s' to '%s'",
-                k,
-                current_options[k],
-                v,
+                option_name,
+                current_options[option_name],
+                option_value,
             )
 
         if not options_to_set:
@@ -125,14 +125,14 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             )
             return
 
-        async with self.get_session().post(url, json=options_to_set) as response:
+        async with self._get_session().post(url, json=options_to_set) as response:
             if response.status != 200:
                 raise http_client.OobaHttpClientError(response)
             await response.json()
 
     async def get_samplers(self) -> typing.List[str]:
         url = self.API_COMMAND_URLS["get_samplers"]
-        async with self.get_session().get(url) as response:
+        async with self._get_session().get(url) as response:
             if response.status != 200:
                 raise http_client.OobaHttpClientError(response)
             response = await response.json()
@@ -144,15 +144,17 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         prompt: str,
         is_channel_nsfw: bool = False,
     ) -> "asyncio.Task[bytes]":
-        # Purpose: Generate an image from a prompt.
-        # Args:
-        #     prompt: The prompt to generate an image from.
-        #     is_channel_nsfw: Whether the channel is NSFW.
-        #     this will change the negative prompt.
-        # Returns:
-        #     The image as bytes.
-        # Raises:
-        #     OobaHttpClientError, if the request fails.
+        """
+        Generate an image from a prompt.
+        Args:
+            prompt: The prompt to generate an image from.
+            is_channel_nsfw: Whether the channel is NSFW.
+            this will change the negative prompt.
+        Returns:
+            The image as bytes.
+        Raises:
+            OobaHttpClientError, if the request fails.
+        """
         request = self.request_params.copy()
         request["prompt"] = prompt
         if is_channel_nsfw:
@@ -169,7 +171,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             )
             start_time = time.time()
 
-            async with self.get_session().post(
+            async with self._get_session().post(
                 self.API_COMMAND_URLS["txt2img"],
                 json=request,
             ) as response:

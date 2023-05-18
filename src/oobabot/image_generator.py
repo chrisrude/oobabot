@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+Generates images from Stable Diffusion
+"""
+
 import asyncio
 import io
 import re
@@ -209,6 +213,11 @@ class StableDiffusionImageView(discord.ui.View):
 
 
 class ImageGenerator:
+    """
+    Generates images from a given prompt, and posts that image as a
+    message to a given channel.
+    """
+
     def __init__(
         self,
         stable_diffusion_client: sd_client.StableDiffusionClient,

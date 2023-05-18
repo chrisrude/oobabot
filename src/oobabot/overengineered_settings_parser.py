@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+"""
+Settings library which supports both CLI and YAML settings files.
+Allows for settings to be exposed through one or both of these interfaces.
+
+load - sets defaults, then loads from YAML, then loads from CLI.
+load_from_cli - sets defaults, then loads from CLI only.
+load_from_dict - sets defaults, then loads from a dictionary only.
+load_from_yaml - sets defaults, then loads from YAML only.
+write_sample_config - writes a sample config file to STDOUT.
+"""
+
 import argparse
 import textwrap
 import typing
@@ -46,6 +57,10 @@ T = typing.TypeVar("T", bound="SettingValueType")
 
 
 class ConfigSetting(typing.Generic[T]):
+    """
+    An individual setting that can be exposed through CLI and/or YAML
+    """
+
     data_type: T
     description_lines: typing.List[str]
     cli_args: typing.List[str]
@@ -152,6 +167,10 @@ class ConfigSetting(typing.Generic[T]):
 
 
 class ConfigSettingGroup:
+    """
+    A group of related settings that can be exposed through CLI and/or YAML
+    """
+
     name: str
     description: str
     settings: typing.Dict[str, ConfigSetting]
@@ -241,10 +260,13 @@ def load_from_yaml(
     filename: str,
     setting_groups: typing.List["ConfigSettingGroup"],
 ) -> None:
+    """
+    Load settings from a YAML file only
+    """
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(filename, "r", encoding="utf-8") as file:
             yaml = ryaml.YAML(typ="safe")
-            yaml_settings = yaml.load(f)
+            yaml_settings = yaml.load(file)
             for group in setting_groups:
                 group.set_values_from_yaml(yaml_settings)
 
@@ -256,6 +278,9 @@ def load_from_cli(
     args,
     setting_groups: typing.List["ConfigSettingGroup"],
 ) -> argparse.ArgumentParser:
+    """
+    Load settings from the command line only
+    """
     cli_parser = argparse.ArgumentParser(
         description=f"oobabot v{oobabot.__version__}: Discord bot for "
         + "oobabooga's text-generation-webui",
@@ -280,6 +305,9 @@ def load_from_dict(
     setting_groups: typing.List["ConfigSettingGroup"],
     settings_dict: dict,
 ) -> None:
+    """
+    Load settings from a dictionary
+    """
     print(f"settings_dict: {settings_dict}")
     for group in setting_groups:
         group.set_values_from_dict(settings_dict)
@@ -290,12 +318,13 @@ def load(
     setting_groups: typing.List["ConfigSettingGroup"],
     filename: str,
 ) -> argparse.ArgumentParser:
-    # Load settings in this order.
-    # The later sources will overwrite the earlier ones.
-    #
-    #  1. config.yml
-    #  2. command line arguments
-    #
+    """
+    Load settings from defaults, config.yml, and command line arguments
+    in that order.  Later sources will overwrite earlier ones.
+
+    Returns the argparse parser, which can be used to print out the help
+    message.
+    """
     load_from_yaml(filename, setting_groups)
     namespace = load_from_cli(args, setting_groups)
 

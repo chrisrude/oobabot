@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+"""
+Converts Discord library objects into generic objects that can be used by the AI
+
+This is done to make it easier to swap out the Discord library for something else
+in the future, and to make it easier to test the AI without having to mock the
+Discord library.
+"""
+
+
 import re
 import typing
 

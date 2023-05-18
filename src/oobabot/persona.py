@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-# handles retrieving persona data from a variety of formats
-#
+"""
+Retrieves persona data from a variety of formats.
+"""
+
 import json
 import re
 
@@ -92,14 +94,14 @@ class Persona:
         )
 
     def load_from_text_file(self, filename: str):
-        with open(filename, "r", encoding="utf-8") as f:
-            persona = f.read()
+        with open(filename, "r", encoding="utf-8") as file:
+            persona = file.read()
         self.persona = persona
 
     def load_from_json_file(self, filename: str):
         try:
-            with open(filename, "r", encoding="utf-8") as f:
-                json_data = json.load(f)
+            with open(filename, "r", encoding="utf-8") as file:
+                json_data = json.load(file)
 
         except json.JSONDecodeError as err:
             fancy_logger.get().warning(
@@ -111,10 +113,10 @@ class Persona:
         self.load_from_dict(json_data)
 
     def load_from_yaml_file(self, filename):
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(filename, "r", encoding="utf-8") as file:
             yaml = ryaml.YAML(typ="safe")
             try:
-                yaml_settings = yaml.load(f)
+                yaml_settings = yaml.load(file)
             except ryaml.YAMLError as err:
                 fancy_logger.get().warning(
                     "Could not parse persona file: %s.  Cause: %s",
