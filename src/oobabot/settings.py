@@ -317,7 +317,7 @@ class Settings:
         self.discord_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="log_level",
-                default="INFO",
+                default="DEBUG",
                 description_lines=[
                     "Set the log level.  Valid values are: ",
                     "CRITICAL, ERROR, WARNING, INFO, DEBUG",
