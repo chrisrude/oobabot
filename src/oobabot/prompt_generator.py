@@ -25,7 +25,7 @@ class PromptGenerator:
     EST_CHARACTERS_PER_TOKEN = 3
 
     # the estimated number of characters in a line of message history
-    # this is used to rougly calculate whether we'll have enough space
+    # this is used to roughly calculate whether we'll have enough space
     # to supply the requested number of lines of history.
     #
     # in practice, we will look at the actual number of characters to

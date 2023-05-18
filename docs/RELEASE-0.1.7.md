@@ -79,7 +79,7 @@ You can now configure **every parameter** sent to Oobabooga
 and Stable Diffusion to generate responses.  Some notable ones are:
 
 - truncation_length (aka "max tokens")
-- temperature (controls bot creativitiy)
+- temperature (controls bot creativity)
 - repetition_penalty
 - early_stopping flag
 
@@ -92,8 +92,8 @@ without needing a software update.
 
 ### Creating a new `config.yml` file
 
-Pass `--generate-config` to the CLI to print a fesh new config.yml
-file to sdout.  You can then redirect this to a file.
+Pass `--generate-config` to the CLI to print a fresh new config.yml
+file to STDOUT.  You can then redirect this to a file.
 
 This file will include any other settings you've supplied on the
 command line.  So if you're upgrading from an earlier version,
@@ -176,9 +176,9 @@ I'm just impressed it works at all.
   message responses
 
 - new over-engineered config file parsing, should afford
-  easier paramater adding in the future
+  easier parameter adding in the future
 
-- fixes for pylint, added to precommit hooks
+- fixes for pylint, added to pre-commit hooks
 
 ### Full Changelog
 

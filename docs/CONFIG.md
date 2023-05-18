@@ -8,8 +8,8 @@ settings you would normally pass on the command line, and more.
 
 ### Creating a new `config.yml` file
 
-Pass `--generate-config` to the CLI to print a fesh new config.yml
-file to sdout.  You can then redirect this to a file.
+Pass `--generate-config` to the CLI to print a fresh new config.yml
+file to STDOUT.  You can then redirect this to a file.
 
 This file will include any other settings you've supplied on the
 command line.  So if you're upgrading from an earlier version,

@@ -164,7 +164,7 @@ class DiscordBot(discord.Client):
         message_task, response_channel = result
 
         # log the mention, now that we know the channel we
-        # want to montior later to continue to conversation
+        # want to monitor later to continue to conversation
         if isinstance(message, types.ChannelMessage):
             # this logic is weird, so let's explain it...
             #
@@ -176,7 +176,7 @@ class DiscordBot(discord.Client):
             # In the general case, we want to monitor the channel
             # only if we were summoned in it.
             #
-            # However if we were summonned in a channel but are
+            # However if we were summoned in a channel but are
             # creating a new thread for the answer (because of
             # the --reply-in-thread flag), we want to monitor
             # that thread, not the original channel.
@@ -248,7 +248,7 @@ class DiscordBot(discord.Client):
                     + f"in {raw_message.channel.name}"
                 )
             else:
-                # This user can't create threads, so we won't resond.
+                # This user can't create threads, so we won't respond.
                 # The reason we don't respond in the channel is that
                 # it can create confusion later if a second user who
                 # DOES have thread-create permission replies to that
@@ -269,7 +269,7 @@ class DiscordBot(discord.Client):
 
     async def history_plus_thread_kickoff_message(
         self,
-        aiter_history: typing.AsyncIterator[discord.Message],
+        async_iter_history: typing.AsyncIterator[discord.Message],
         limit: int,
     ) -> typing.AsyncIterator[types.GenericMessage]:
         """
@@ -284,7 +284,7 @@ class DiscordBot(discord.Client):
         """
         items = 0
         last_returned = None
-        async for item in aiter_history:
+        async for item in async_iter_history:
             last_returned = item
             yield discord_utils.discord_message_to_generic_message(item)
             items += 1

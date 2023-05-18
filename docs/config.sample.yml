@@ -39,7 +39,7 @@ discord:
   # you set this via the DISCORD_TOKEN environment variable instead, if possible.
   discord_token: ''
 
-  # Post the entire response as a single message, rather than splitting it into seperate
+  # Post the entire response as a single message, rather than splitting it into separate
   # messages by sentence.
   #   default: false
   dont_split_responses: false

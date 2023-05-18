@@ -75,7 +75,7 @@ class TemplateStore:
                 TemplateToken.MESSAGE_HISTORY,
                 TemplateToken.PERSONA,
             ],
-            "The main prompt sent to Oobabooga to generate a resonse from "
+            "The main prompt sent to Oobabooga to generate a response from "
             + "the bot AI.  The AI's reply to this prompt will be sent to "
             + "discord as the bot's response.",
         ),
@@ -169,7 +169,7 @@ class TemplateStore:
         Templates.IMAGE_CONFIRMATION: textwrap.dedent(
             """
             {USER_NAME}, is this what you wanted?
-            If no choice is made, this message will 💣 self-destuct 💣 in 3 minutes.
+            If no choice is made, this message will 💣 self-destruct 💣 in 3 minutes.
             """
         ),
         Templates.IMAGE_GENERATION_ERROR: textwrap.dedent(

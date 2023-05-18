@@ -79,7 +79,7 @@ class SentenceSplitter:
 
         # since we've printed all the previous segments,
         # the start of the last segment becomes the starting
-        # point for the next roud.
+        # point for the next round.
         if len(segments) > 0:
             self.printed_idx += segments[-1].start  # type: ignore
 

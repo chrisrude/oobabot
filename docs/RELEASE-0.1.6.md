@@ -39,7 +39,7 @@ If you're running on a large server, you may want to restrict who can run these 
 
 - The hard-coded token budget has been decreased from 2048 to 730.  This was based on reports from users who were running models which didn't actually support 2048 tokens, myself included.  This will be configurable in the future, but for now this a safer default.
 
-- The default number of history lines has decreased from 15 to 7.  This was because of the smaller token budget, but also because 15 tokens increased infrence times a lot for those running on CPUs.  This is configurable with the `--history-lines` command line argument.
+- The default number of history lines has decreased from 15 to 7.  This was because of the smaller token budget, but also because 15 tokens increased inference times a lot for those running on CPUs.  This is configurable with the `--history-lines` command line argument.
 
 ## Notable Bugfixes
 

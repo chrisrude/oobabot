@@ -189,9 +189,9 @@ class StableDiffusionImageView(discord.ui.View):
         """
         if interaction.user.id == self.requesting_user_id:
             return True
-        error_mesage = self._get_message(templates.Templates.IMAGE_UNAUTHORIZED)
+        error_message = self._get_message(templates.Templates.IMAGE_UNAUTHORIZED)
         await interaction.response.send_message(
-            content=error_mesage,
+            content=error_message,
             ephemeral=True,
         )
         return False
@@ -242,7 +242,7 @@ class ImageGenerator:
     ) -> discord.Message:
         is_channel_nsfw = False
 
-        # note: public threads in NSFW chanels are not considered here
+        # note: public threads in NSFW channels are not considered here
         if isinstance(raw_message.channel, discord.TextChannel):
             is_channel_nsfw = raw_message.channel.is_nsfw()
 

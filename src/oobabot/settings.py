@@ -283,7 +283,7 @@ class Settings:
                     textwrap.dedent(
                         """
                         Post the entire response as a single message, rather than
-                        splitting it into seperate messages by sentence.
+                        splitting it into separate messages by sentence.
                         """
                     )
                 ],
@@ -679,7 +679,7 @@ class Settings:
     def load(self, args) -> None:
         # we need to hack this in here because we want to know the filename
         # before we parse the args, so that we can load the config file
-        # first and then have the arguments ovewrite the config file.
+        # first and then have the arguments overwrite the config file.
         config_setting = self.general_settings.get_setting("config")
         config_filename = config_setting.default
         if args is not None:
@@ -691,15 +691,15 @@ class Settings:
                 except ValueError:
                     continue
 
-        argparser = oesp.load(
+        arg_parser = oesp.load(
             args=args,
             setting_groups=self.setting_groups,
             filename=config_filename,
         )
 
         if self.general_settings.get("help"):
-            helpstr = argparser.format_help()
-            print(helpstr)
+            help_str = arg_parser.format_help()
+            print(help_str)
 
             print(
                 "\n"

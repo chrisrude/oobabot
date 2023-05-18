@@ -62,8 +62,8 @@ class SerializedHttpClient(abc.ABC):
                 f"Could not connect to {self.service_name} server: [{self.base_url}]"
             ) from err
 
-    def __init__(self, sevice_name: str, base_url: str):
-        self.service_name = sevice_name
+    def __init__(self, service_name: str, base_url: str):
+        self.service_name = service_name
         self.base_url = base_url
         self._session = None
 

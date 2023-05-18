@@ -23,7 +23,7 @@ class RepetitionTracker:
         self.repetition_threshold = repetition_threshold
 
         # stores a map of channel_id ->
-        #   (last_message, throttle_message_id, repetion_count)
+        #   (last_message, throttle_message_id, repetition_count)
 
         self.repetition_count: typing.Dict[int, typing.Tuple[str, int, int]] = {}
 

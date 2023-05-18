@@ -161,7 +161,7 @@ class AggregateResponseStats:
             return
 
         fancy_logger.get().info(
-            f"Recevied {self.total_requests_received} request(s), "
+            f"Received {self.total_requests_received} request(s), "
             + f"sent {self.total_successful_responses} successful responses "
             + f"and failed to send one {self.total_failed_responses} times(s)"
         )

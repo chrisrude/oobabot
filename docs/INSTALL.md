@@ -22,8 +22,8 @@ Here's what you'll be setting up:
 
 - download a model to run.
 
-  I suspect the most interesting model will change frequenty, but as of May 3 20213 I am currently using [gpt4-x-alpaca, found on HuggingFace](https://huggingface.co/chavinlo/gpt4-x-alpaca).  This runs quite well a GPU with 10GB of RAM.
-- enable the "API" plugin.  You can do this with the `--api` command-line option, or by enabling the "api" plugin onfrom the "interface mode" tab of the web UI.
+  I suspect the most interesting model will change frequently, but as of May 3 20213 I am currently using [gpt4-x-alpaca, found on HuggingFace](https://huggingface.co/chavinlo/gpt4-x-alpaca).  This runs quite well a GPU with 10GB of RAM.
+- enable the "API" plugin.  You can do this with the `--api` command-line option, or by enabling the "api" plugin on the "interface mode" tab of the web UI.
 - make note of the URL to the web UI, you'll need this in a later step (either ws:// or wss:// should work, your choice)
 
 ## 2. Create a Discord bot account for **`oobabot`**
