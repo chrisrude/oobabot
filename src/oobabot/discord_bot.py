@@ -63,7 +63,7 @@ class DiscordBot(discord.Client):
 
         if self.user:
             self.ai_user_id = self.user.id
-            user_id_str = str(self.ai_user_id)
+            user_id_str = self.user.name
         else:
             user_id_str = "<unknown>"
 

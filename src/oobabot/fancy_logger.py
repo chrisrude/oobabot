@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import typing
 
 FOREGROUND_COLORS = {
     "black": 30,
@@ -48,12 +49,14 @@ def get(name: str = "oobabot") -> logging.Logger:
     return logging.getLogger(name)
 
 
-def init_logging() -> logging.Logger:
+def init_logging(level: typing.Union[int, str]) -> logging.Logger:
     logger = get()
-    logger.setLevel(logging.DEBUG)
+    if not level:
+        level = logging.DEBUG
+    logger.setLevel(level)
 
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(level)
     console_handler.setFormatter(ColorfulLoggingFormatter())
     logger.addHandler(console_handler)
 

@@ -313,6 +313,18 @@ class Settings:
                 ],
             )
         )
+        # log level
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="log_level",
+                default="INFO",
+                description_lines=[
+                    "Set the log level.  Valid values are: ",
+                    "CRITICAL, ERROR, WARNING, INFO, DEBUG",
+                ],
+                include_in_argparse=False,
+            )
+        )
         self.discord_settings.add_setting(
             oesp.ConfigSetting[bool](
                 name="reply_in_thread",
@@ -352,7 +364,9 @@ class Settings:
                 description_lines=[
                     textwrap.dedent(
                         """
-                        Stream responses into a single message as they are generated.
+                        FEATURE PREVIEW: Stream responses into a single message
+                        as they are generated.
+                        Note: may be janky
                         """
                     )
                 ],
@@ -504,6 +518,9 @@ class Settings:
                 )
             )
 
+        self.add_deprecated_settings()
+
+    def add_deprecated_settings(self) -> None:
         ###########################################################
         # Deprecated Settings
         # These used to be part of the Stable Diffusion section,

@@ -30,13 +30,15 @@ class OobaBot:
         cli_args: typing.List[str],
         settings_dict: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ):
-        fancy_logger.init_logging()
-
         self.settings = settings.Settings()
         if settings_dict is not None:
             self.settings.load_from_dict(settings_dict)
         else:
             self.settings.load(cli_args)
+
+        fancy_logger.init_logging(
+            level=self.settings.discord_settings.get_str("log_level")
+        )
 
         # templates used to generate prompts to send to the AI
         # as well as for some UI elements
@@ -121,12 +123,14 @@ class OobaBot:
             template_store=self.template_store,
         )
 
-        def sigint_handler(_signum, _frame):
-            fancy_logger.get().info("Received SIGINT, exiting...")
+        def exit_handler(signum, _frame):
+            sig_name = signal.Signals(signum).name
+            fancy_logger.get().info("Received signal %s, exiting...", sig_name)
             self.response_stats.write_stat_summary_to_log()
-            sys.exit(1)
+            sys.exit(0)
 
-        signal.signal(signal.SIGINT, sigint_handler)
+        signal.signal(signal.SIGINT, exit_handler)
+        signal.signal(signal.SIGTERM, exit_handler)
 
     def run(self):
         if self.settings.general_settings.get("generate_config"):
