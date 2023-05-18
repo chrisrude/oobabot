@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # import pytest
-
+"""
+Tests whether the sentence splitter works as expected
+"""
 from oobabot.ooba_client import SentenceSplitter
 
 
@@ -9,17 +11,17 @@ def test_split_text_to_sentences():
     tokens = list(text)
     tokens.append(SentenceSplitter.END_OF_INPUT)
 
-    s1 = "This is a sentence. "
-    s2 = "This is another sentence."
+    sentence_1 = "This is a sentence. "
+    sentence_2 = "This is another sentence."
     expected = []
-    expected.extend([[]] * (len(s1)))
-    expected.append([s1])
-    expected.extend([[]] * (len(s2) - 1))
-    expected.append([s2])
+    expected.extend([[]] * (len(sentence_1)))
+    expected.append([sentence_1])
+    expected.extend([[]] * (len(sentence_2) - 1))
+    expected.append([sentence_2])
 
-    s1 = SentenceSplitter()
+    sentence_1 = SentenceSplitter()
     for token in tokens:
-        for sent in s1.by_sentence(token):
+        for sent in sentence_1.by_sentence(token):
             print(f"^{sent}$")
 
     splitter = SentenceSplitter()

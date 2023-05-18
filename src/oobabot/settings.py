@@ -496,6 +496,24 @@ class Settings:
                 show_default_in_yaml=False,
             )
         )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[bool](
+                name="use_ai_generated_keywords",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate
+                        image keywords from a user's message.  It will then pass the
+                        keywords that Oobabooga produces to Stable Diffusion to finally
+                        generate an image.
+                        Otherwise, the bot will simply extract keywords directly
+                        from the user's message using a simple regex.
+                        """
+                    )
+                ],
+            )
+        )
 
         ###########################################################
         # Template Settings

@@ -10,8 +10,11 @@ import typing
 
 import discord
 
+from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import http_client
+from oobabot import ooba_client
+from oobabot import prompt_generator
 from oobabot import sd_client
 from oobabot import templates
 
@@ -220,18 +223,37 @@ class ImageGenerator:
 
     def __init__(
         self,
+        ooba_client: ooba_client.OobaClient,
+        persona_settings: typing.Dict[str, typing.Any],
+        prompt_generator: prompt_generator.PromptGenerator,
+        sd_settings: typing.Dict[str, typing.Any],
         stable_diffusion_client: sd_client.StableDiffusionClient,
-        image_words: typing.List[str],
         template_store: templates.TemplateStore,
     ):
+        self.ai_name = persona_settings.get("ai_name", "")
+        self.ooba_client = ooba_client
+        self.image_words = sd_settings.get("image_words", [])
+        self.prompt_generator = prompt_generator
         self.stable_diffusion_client = stable_diffusion_client
         self.template_store = template_store
+        self.use_ai_generated_keywords = sd_settings.get("use_ai_generated_keywords")
+
+        if self.use_ai_generated_keywords:
+            fancy_logger.get().debug("Image Generator: using AI-generated keywords")
+        else:
+            fancy_logger.get().debug("Image Generator: regex-based keywords")
+
+        fancy_logger.get().debug(
+            "Image Generator: image keywords: %s",
+            ", ".join(self.image_words),
+        )
+
         self.image_patterns = [
             re.compile(
                 r"^.*\b" + image_word + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$",
                 re.IGNORECASE,
             )
-            for image_word in image_words
+            for image_word in self.image_words
         ]
 
     async def _generate_image(
@@ -300,18 +322,45 @@ class ImageGenerator:
 
     async def generate_image(
         self,
-        image_prompt: str,
+        user_image_keywords: str,
         raw_message: discord.Message,
         response_channel: discord.abc.Messageable,
-    ) -> typing.Optional["asyncio.Task[discord.Message]"]:
+    ) -> "asyncio.Task[discord.Message]":
         """
-        If the message contains a photo word, kick off a task
-        to generate an image, post it to the channel, and return
-        the generated message.
+        Kick off a task to generate an image, post it to the channel,
+        and return message the image is posted in.
+        """
 
-        If the message does not contain a photo word, return None.
-        """
-        create_image_task = asyncio.create_task(
-            self._generate_image(image_prompt, raw_message, response_channel)
+        if self.use_ai_generated_keywords:
+            # ignore the prompt extracted above, and instead pass
+            # the raw message back to Oobabooga and ask it to
+            # generate keywords.  Then pass those keywords to
+            # the image generator.
+            return asyncio.create_task(
+                self._generate_keywords_then_image(
+                    raw_message,
+                    response_channel,
+                )
+            )
+
+        return asyncio.create_task(
+            self._generate_image(user_image_keywords, raw_message, response_channel)
         )
-        return create_image_task
+
+    async def _generate_keywords_then_image(
+        self,
+        raw_message: discord.Message,
+        response_channel: discord.abc.Messageable,
+    ) -> "discord.Message":
+        message = discord_utils.discord_message_to_generic_message(raw_message)
+        # remove the bot's name from the body text, so it doesn't
+        # pollute the keywords
+        message.body_text = message.body_text.replace(self.ai_name, "")
+        keyword_generation_prompt = self.prompt_generator.keyword_generation_prompt(
+            message
+        )
+        ai_keywords = await self.ooba_client.request_as_string(
+            keyword_generation_prompt
+        )
+        fancy_logger.get().debug("AI-generated keywords: %s", ai_keywords)
+        return await self._generate_image(ai_keywords, raw_message, response_channel)

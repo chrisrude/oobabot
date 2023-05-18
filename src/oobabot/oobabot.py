@@ -105,13 +105,11 @@ class OobaBot:
         self.image_generator = None
         if self.stable_diffusion_client is not None:
             self.image_generator = image_generator.ImageGenerator(
+                ooba_client=self.ooba_client,
+                persona_settings=self.settings.persona_settings.get_all(),
+                prompt_generator=self.prompt_generator,
+                sd_settings=self.settings.stable_diffusion_settings.get_all(),
                 stable_diffusion_client=self.stable_diffusion_client,
-                image_words=[
-                    str(w)
-                    for w in self.settings.stable_diffusion_settings.get_list(
-                        "image_words"
-                    )
-                ],
                 template_store=self.template_store,
             )
 

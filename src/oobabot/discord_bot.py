@@ -344,12 +344,25 @@ class DiscordBot(discord.Client):
                 )
             else:
                 if self.dont_split_responses:
-                    generator = self.ooba_client.request_as_string(prompt_prefix)
+                    response = await self.ooba_client.request_as_string(prompt_prefix)
+                    await self.render_response(
+                        response,
+                        this_response_stat,
+                        response_channel,
+                        response_channel_id,
+                    )
                 else:
-                    generator = self.ooba_client.request_by_sentence(prompt_prefix)
-                await self.render_response(
-                    generator, this_response_stat, response_channel, response_channel_id
-                )
+                    async for sentence in self.ooba_client.request_by_sentence(
+                        prompt_prefix
+                    ):
+                        can_continue = await self.render_response(
+                            sentence,
+                            this_response_stat,
+                            response_channel,
+                            response_channel_id,
+                        )
+                        if not can_continue:
+                            break
 
         except discord.DiscordException as err:
             fancy_logger.get().error("Error: %s", err, exc_info=True)
@@ -361,28 +374,31 @@ class DiscordBot(discord.Client):
 
     async def render_response(
         self,
-        response_iterator: typing.AsyncIterator[str],
+        response: str,
         this_response_stat: response_stats.ResponseStats,
         response_channel: discord.abc.Messageable,
         response_channel_id: int,
-    ):
-        async for sentence in response_iterator:
-            (sentence, abort_response) = self.filter_immersion_breaking_lines(sentence)
-            if abort_response:
-                break
-            if not sentence:
-                # we can't send an empty message
-                continue
+    ) -> bool:
+        """
+        Returns True if we can continue, False if we should abort.
+        """
+        (sentence, abort_response) = self.filter_immersion_breaking_lines(response)
+        if abort_response:
+            return False
+        if not sentence:
+            # we can't send an empty message
+            return True
 
-            response_message = await response_channel.send(sentence)
-            generic_response_message = discord_utils.discord_message_to_generic_message(
-                response_message
-            )
-            self.repetition_tracker.log_message(
-                response_channel_id, generic_response_message
-            )
+        response_message = await response_channel.send(sentence)
+        generic_response_message = discord_utils.discord_message_to_generic_message(
+            response_message
+        )
+        self.repetition_tracker.log_message(
+            response_channel_id, generic_response_message
+        )
 
-            this_response_stat.log_response_part()
+        this_response_stat.log_response_part()
+        return True
 
     async def render_streaming_response(
         self,

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # todo: write tests
-
+"""
+would include tests for Oobabot if we had any good ones
+"""
 from oobabot import oobabot
 
 

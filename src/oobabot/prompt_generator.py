@@ -215,3 +215,20 @@ class PromptGenerator:
             )
         image_coming = self.image_request_made if image_requested else ""
         return self._generate(message_history_txt, image_coming)
+
+    def keyword_generation_prompt(
+        self,
+        image_request_message: types.GenericMessage,
+    ) -> str:
+        """
+        given a message that requests an image, generate a prompt
+        to the AI to take that message text and generate a set of
+        keywords describing that image
+        """
+        return self.template_store.format(
+            templates.Templates.PROMPT_IMAGE_KEYWORDS,
+            {
+                templates.TemplateToken.AI_NAME: self.persona.ai_name,
+                templates.TemplateToken.USER_MESSAGE: image_request_message.body_text,
+            },
+        )

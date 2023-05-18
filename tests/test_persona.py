@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # import pytest
-
+"""
+Tests loading persona files in different formats
+"""
 import pytest
 
 import oobabot.persona

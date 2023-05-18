@@ -116,11 +116,11 @@ class OobaClient(http_client.SerializedHttpClient):
             for sentence in splitter.by_sentence(new_token):
                 yield sentence
 
-    async def request_as_string(self, prompt: str) -> typing.AsyncIterator[str]:
+    async def request_as_string(self, prompt: str) -> str:
         """
         Yields the entire response as a single string.
         """
-        yield "".join([token async for token in self.request_by_token(prompt)])
+        return "".join([token async for token in self.request_by_token(prompt)])
 
     async def request_as_grouped_tokens(
         self,
@@ -193,6 +193,8 @@ class OobaClient(http_client.SerializedHttpClient):
 
                     elif "stream_end" == incoming_data["event"]:
                         # Make sure any unprinted text is flushed.
+                        if self.log_all_the_things:
+                            print("", flush=True)
                         yield SentenceSplitter.END_OF_INPUT
                         return
 
