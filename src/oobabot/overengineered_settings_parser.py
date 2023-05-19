@@ -164,7 +164,23 @@ class ConfigSetting(typing.Generic[T]):
             # is now blank, that's no surprise.  Keep the default
             # rather than overwriting it with None
             return
-        self.set_value(yaml[self.name])
+        value = yaml[self.name]
+        # if value is a dict, it's possible that it only contains
+        # some, but not all of the keys that we need.  So we want to
+        # merge it with the default dict, overwriting the default
+        # values with the values from the yaml
+        if isinstance(value, dict):
+            if isinstance(self.default, dict):
+                value = {**self.default, **value}
+            else:
+                raise ValueError(
+                    f"Setting {self.name} is a dict, but the default value is not"
+                )
+        # note: keeping the type checker happy across python versions
+        # here is actually kinda hard.  It's worried about what the
+        # values in the combined dict might be.  But really it's fine,
+        # so just tell it to chill.
+        self.set_value(value)  # type: ignore
 
     def set_value(self, value: T) -> None:
         self.value = value
