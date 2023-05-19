@@ -57,6 +57,9 @@ class DiscordBot(discord.Client):
         self.stop_markers = discord_settings["stop_markers"]
         self.stream_responses = discord_settings["stream_responses"]
 
+        # add stopping_strings to stop_markers
+        self.stop_markers.extend(self.ooba_client.get_stopping_strings())
+
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -352,7 +355,7 @@ class DiscordBot(discord.Client):
                         response_channel_id,
                     )
                 else:
-                    async for sentence in self.ooba_client.request_by_sentence(
+                    async for sentence in self.ooba_client.request_by_message(
                         prompt_prefix
                     ):
                         can_continue = await self.render_response(
@@ -464,12 +467,18 @@ class DiscordBot(discord.Client):
                 abort_response = True
                 break
 
-            if line in self.stop_markers:
-                fancy_logger.get().warning(
-                    'Filtered out "%s" from response, aborting', line
-                )
-                abort_response = True
-                break
+            # look for partial stop markers within a line
+            for marker in self.stop_markers:
+                if marker in line:
+                    (keep_part, removed) = line.split(marker, 1)
+                    fancy_logger.get().warning(
+                        'Filtered out "%s" from response, aborting',
+                        removed,
+                    )
+                    if keep_part:
+                        good_lines.append(keep_part)
+                    abort_response = True
+                    break
 
             if not line and not previous_line:
                 # filter out multiple blank lines in a row

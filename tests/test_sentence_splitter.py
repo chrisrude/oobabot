@@ -21,10 +21,10 @@ def test_split_text_to_sentences():
 
     sentence_1 = SentenceSplitter()
     for token in tokens:
-        for sent in sentence_1.by_sentence(token):
+        for sent in sentence_1.next(token):
             print(f"^{sent}$")
 
     splitter = SentenceSplitter()
-    actual = [list(splitter.by_sentence(token)) for token in tokens]
+    actual = [list(splitter.next(token)) for token in tokens]
 
     assert expected == actual

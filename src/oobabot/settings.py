@@ -410,6 +410,23 @@ class Settings:
                 ],
             )
         )
+        # get a regex for filtering a message
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="message_regex",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        A regex that will be used to extract message lines
+                        from the AI's output.  The first capture group will
+                        be used as the message.  If this is not set, the
+                        entire output will be used as the message.
+                        """
+                    )
+                ],
+            )
+        )
         self.oobabooga_settings.add_setting(
             oesp.ConfigSetting[oesp.SettingDictType](
                 name="request_params",

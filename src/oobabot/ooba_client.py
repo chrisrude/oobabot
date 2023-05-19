@@ -3,7 +3,9 @@
 Client for the Ooba API.
 Can provide the response by token or by sentence.
 """
+import abc
 import json
+import re
 import time
 import typing
 
@@ -14,9 +16,9 @@ from oobabot import fancy_logger
 from oobabot import http_client
 
 
-class SentenceSplitter:
+class MessageSplitter(abc.ABC):
     """
-    Split a response into sentences.
+    Split a response into separate messages.
     """
 
     # anything that can't be in a real response
@@ -25,12 +27,12 @@ class SentenceSplitter:
     def __init__(self):
         self.printed_idx = 0
         self.full_response = ""
-        self.segmenter = pysbd.Segmenter(language="en", clean=False, char_span=True)
 
-    def by_sentence(self, new_token: str) -> typing.Generator[str, None, None]:
+    def next(self, new_token: str) -> typing.Generator[str, None, None]:
         """
-        Collects tokens into a single string, looks for ends of english
-        sentences, then yields each sentence as soon as it's found.
+        Collects tokens into a single string, splits into messages
+        by the subclass's logic, then yields each message as soon
+        as it's found.
 
         Parameters:
             new_token: str, the next token to add to the string
@@ -40,7 +42,7 @@ class SentenceSplitter:
 
         Note:
         When there is no longer any input, the caller must pass
-        SentenceSplitter.END_OF_INPUT to this function.  This
+        MessageSplitter.END_OF_INPUT to this function.  This
         function will then yield any remaining text, even if it
         doesn't look like a full sentence.
         """
@@ -57,6 +59,44 @@ class SentenceSplitter:
             self.printed_idx += len(unseen)
             return
 
+        yield from self.partition(unseen)
+
+    @abc.abstractmethod
+    def partition(self, unseen: str) -> typing.Generator[str, None, None]:
+        pass
+
+
+class RegexSplitter(MessageSplitter):
+    """
+    Split a response into separate messages using a regex.
+    """
+
+    def __init__(self, regex: str):
+        super().__init__()
+        self.pattern = re.compile(regex)
+
+    def partition(self, unseen: str) -> typing.Generator[str, None, None]:
+        while True:
+            match = self.pattern.match(unseen)
+            if not match:
+                break
+            to_print = match.group(1)
+            yield to_print
+            self.printed_idx += match.end()
+            unseen = self.full_response[self.printed_idx :]
+
+
+class SentenceSplitter(MessageSplitter):
+    """
+    Split a response into separate messages using English
+    sentence word breaks.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.segmenter = pysbd.Segmenter(language="en", clean=False, char_span=True)
+
+    def partition(self, unseen: str) -> typing.Generator[str, None, None]:
         segments = self.segmenter.segment(unseen)
 
         # any remaining non-sentence things will be in the last element
@@ -99,21 +139,44 @@ class OobaClient(http_client.SerializedHttpClient):
     ):
         super().__init__(self.SERVICE_NAME, settings["base_url"])
         self.total_response_tokens = 0
+        self.message_regex = settings["message_regex"]
         self.request_params = settings["request_params"]
         self.log_all_the_things = settings["log_all_the_things"]
+
+        if self.message_regex:
+            fancy_logger.get().debug(
+                "Ooba Client: Splitting responses into messages " + "with: %s",
+                self.message_regex,
+            )
+            self.fn_new_splitter = lambda: RegexSplitter(self.message_regex)
+        else:
+            fancy_logger.get().debug(
+                "Ooba Client: Splitting responses into messages "
+                + "by English sentence.",
+            )
+
+            self.fn_new_splitter = SentenceSplitter
 
     async def _setup(self):
         async with self._get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
             return
 
-    async def request_by_sentence(self, prompt: str) -> typing.AsyncIterator[str]:
+    def get_stopping_strings(self) -> typing.List[str]:
         """
-        Yields each complete sentence of the response as it arrives.
+        Returns a list of strings that indicate the end of a response.
+        Taken from the yaml `stopping_strings` within our
+        response_params.
         """
+        return self.request_params.get("stopping_strings", [])
 
-        splitter = SentenceSplitter()
+    async def request_by_message(self, prompt: str) -> typing.AsyncIterator[str]:
+        """
+        Yields individual messages from the response as it arrives.
+        These can be split by a regex or by sentence.
+        """
+        splitter = self.fn_new_splitter()
         async for new_token in self.request_by_token(prompt):
-            for sentence in splitter.by_sentence(new_token):
+            for sentence in splitter.next(new_token):
                 yield sentence
 
     async def request_as_string(self, prompt: str) -> str:
