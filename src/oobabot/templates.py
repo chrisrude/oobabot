@@ -63,7 +63,11 @@ class TemplateStore:
     """
 
     # mapping of template names to tokens allowed in that template
-    TEMPLATES: typing.Dict[Templates, typing.Tuple[typing.List[TemplateToken], str]] = {
+    #  key: template name
+    #  value: tuple of (list of tokens, description, is_an_ai_prompt)
+    TEMPLATES: typing.Dict[
+        Templates, typing.Tuple[typing.List[TemplateToken], str, bool]
+    ] = {
         Templates.COMMAND_LOBOTOMIZE_RESPONSE: (
             [
                 TemplateToken.AI_NAME,
@@ -71,6 +75,7 @@ class TemplateStore:
             ],
             "Displayed in Discord after a successful /lobotomize command.  "
             + "Both the discord users and the bot AI will see this message.",
+            False,
         ),
         Templates.PROMPT: (
             [
@@ -82,6 +87,7 @@ class TemplateStore:
             "The main prompt sent to Oobabooga to generate a response from "
             + "the bot AI.  The AI's reply to this prompt will be sent to "
             + "discord as the bot's response.",
+            True,
         ),
         Templates.PROMPT_HISTORY_LINE: (
             [
@@ -92,6 +98,7 @@ class TemplateStore:
             + "render a single line of chat history.  A list of these, "
             + "one for each past chat message, will become {MESSAGE_HISTORY} "
             + "and inserted into the main prompt",
+            True,
         ),
         Templates.PROMPT_IMAGE_COMING: (
             [
@@ -100,6 +107,7 @@ class TemplateStore:
             "Part of the AI response-generation prompt, this is used to "
             + "inform the AI that it is in the process of generating an "
             + "image.",
+            True,
         ),
         Templates.PROMPT_IMAGE_KEYWORDS: (
             [
@@ -111,6 +119,7 @@ class TemplateStore:
             image keywords.  The AI's response to this prompt will then be sent
             to Stable Diffusion to generate an image.
             """,
+            True,
         ),
         Templates.IMAGE_DETACH: (
             [
@@ -119,6 +128,7 @@ class TemplateStore:
             ],
             "Shown in Discord when the user selects to discard an image "
             + "that Stable Diffusion had generated.",
+            False,
         ),
         Templates.IMAGE_CONFIRMATION: (
             [
@@ -128,6 +138,7 @@ class TemplateStore:
             "Shown in Discord when an image is first generated from "
             + "Stable Diffusion.  This should prompt the user to either "
             + "save or discard the image.",
+            False,
         ),
         Templates.IMAGE_GENERATION_ERROR: (
             [
@@ -136,11 +147,13 @@ class TemplateStore:
             ],
             "Shown in Discord when the we could not contact Stable Diffusion "
             + "to generate an image.",
+            False,
         ),
         Templates.IMAGE_UNAUTHORIZED: (
             [TemplateToken.USER_NAME],
             "Shown in Discord privately to a user if they try to regenerate "
             "an image that was requested by someone else.",
+            False,
         ),
     }
 
@@ -222,12 +235,12 @@ class TemplateStore:
 
     def __init__(self, settings: dict):
         self.templates: typing.Dict[Templates, TemplateMessageFormatter] = {}
-        for template, (tokens, purpose) in self.TEMPLATES.items():
+        for template, (tokens, purpose, is_ai_prompt) in self.TEMPLATES.items():
             template_name = str(template)
             template_fmt = settings[template_name]
             if template_fmt is None:
                 raise ValueError(f"Template {template_name} has no default format")
-            self.add_template(template, template_fmt, tokens, purpose)
+            self.add_template(template, template_fmt, tokens, purpose, is_ai_prompt)
 
     def add_template(
         self,
@@ -235,12 +248,14 @@ class TemplateStore:
         format_str: str,
         allowed_tokens: typing.List[TemplateToken],
         purpose: str,
+        is_ai_prompt: bool,
     ):
         self.templates[template_name] = TemplateMessageFormatter(
             template_name,
             format_str,
             allowed_tokens,
             purpose,
+            is_ai_prompt,
         )
 
     def format(
@@ -261,12 +276,14 @@ class TemplateMessageFormatter:
         template: str,
         allowed_tokens: typing.List[TemplateToken],
         purpose: str,
+        is_ai_prompt: bool,
     ):
         self._validate_format_string(template_name, template, allowed_tokens)
         self.template_name = template_name
         self.template = template
         self.allowed_tokens = allowed_tokens
         self.purpose = purpose
+        self.is_ai_prompt = is_ai_prompt
 
     def __str__(self):
         return self.template

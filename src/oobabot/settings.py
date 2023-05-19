@@ -19,7 +19,7 @@ def console_wrapped(message):
 
 def make_template_comment(
     name: str,
-    tokens_desc_tuple: typing.Tuple[typing.List[templates.TemplateToken], str],
+    tokens_desc_tuple: typing.Tuple[typing.List[templates.TemplateToken], str, bool],
 ) -> typing.List[str]:
     return [
         f"Path to a file containing the {name} template.",
@@ -273,6 +273,7 @@ class Settings:
                 ],
                 cli_args=["--discord-token"],
                 show_default_in_yaml=False,
+                place_default_in_yaml=True,
             )
         )
         self.discord_settings.add_setting(
@@ -444,6 +445,7 @@ class Settings:
                 ],
                 include_in_argparse=False,
                 show_default_in_yaml=False,
+                place_default_in_yaml=True,
             )
         )
 
@@ -511,6 +513,7 @@ class Settings:
                 ],
                 include_in_argparse=False,
                 show_default_in_yaml=False,
+                place_default_in_yaml=True,
             )
         )
         self.stable_diffusion_settings.add_setting(
@@ -539,12 +542,12 @@ class Settings:
             "Template",
             description="UI and AI request templates",
             include_in_argparse=False,
-            # todo: turn back on in later release
-            include_in_yaml=False,
         )
         self.setting_groups.append(self.template_settings)
 
         for template, tokens_desc_tuple in templates.TemplateStore.TEMPLATES.items():
+            _, _, is_ai_prompt = tokens_desc_tuple
+
             self.template_settings.add_setting(
                 oesp.ConfigSetting[str](
                     name=str(template),
@@ -552,7 +555,7 @@ class Settings:
                     description_lines=make_template_comment(
                         str(template), tokens_desc_tuple
                     ),
-                    show_default_in_yaml=False,
+                    include_in_yaml=is_ai_prompt,
                 )
             )
 

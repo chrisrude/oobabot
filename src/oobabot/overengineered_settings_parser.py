@@ -75,6 +75,7 @@ class ConfigSetting(typing.Generic[T]):
         default: T,
         description_lines: typing.List[str],
         cli_args: typing.Optional[typing.List[str]] = None,
+        place_default_in_yaml: bool = False,
         include_in_argparse: bool = True,
         include_in_yaml: bool = True,
         show_default_in_yaml: bool = True,
@@ -89,6 +90,7 @@ class ConfigSetting(typing.Generic[T]):
         self.value = default
         self.include_in_argparse = include_in_argparse
         self.include_in_yaml = include_in_yaml
+        self.place_default_in_yaml = place_default_in_yaml
         self.show_default_in_yaml = show_default_in_yaml
         self.fn_on_set = fn_on_set
 
@@ -131,10 +133,13 @@ class ConfigSetting(typing.Generic[T]):
     def add_to_yaml_group(self, group: ryaml.CommentedMap):
         if not self.include_in_yaml:
             return
+        value = None
+        if self.place_default_in_yaml or (self.value != self.default):
+            value = self.value
         add_to_group(
             group,
             key=self.name,
-            value=self.value,
+            value=value,
             comment_lines=self.make_yaml_comment(),
             indent=INDENT_UNIT,
         )
@@ -144,7 +149,7 @@ class ConfigSetting(typing.Generic[T]):
 
         if self.show_default_in_yaml:
             if self.default is not None:
-                comment_lines.append(f"  default: {str(self.default).lower()}")
+                comment_lines.append(f"  default: {self.default}")
             else:
                 comment_lines.append("  default: None")
         return comment_lines
@@ -153,6 +158,11 @@ class ConfigSetting(typing.Generic[T]):
         if not self.include_in_yaml:
             return
         if self.name not in yaml:
+            return
+        if (not self.place_default_in_yaml) and (yaml[self.name] is None):
+            # if we didn't place the default in the yaml, and the setting
+            # is now blank, that's no surprise.  Keep the default
+            # rather than overwriting it with None
             return
         self.set_value(yaml[self.name])
 
