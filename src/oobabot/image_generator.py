@@ -238,16 +238,6 @@ class ImageGenerator:
         self.template_store = template_store
         self.use_ai_generated_keywords = sd_settings.get("use_ai_generated_keywords")
 
-        if self.use_ai_generated_keywords:
-            fancy_logger.get().debug("Image Generator: using AI-generated keywords")
-        else:
-            fancy_logger.get().debug("Image Generator: regex-based keywords")
-
-        fancy_logger.get().debug(
-            "Image Generator: image keywords: %s",
-            ", ".join(self.image_words),
-        )
-
         self.image_patterns = [
             re.compile(
                 r"^.*\b" + image_word + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$",
@@ -255,6 +245,24 @@ class ImageGenerator:
             )
             for image_word in self.image_words
         ]
+
+    def on_ready(self):
+        """
+        Called when the bot is connected to Discord.
+        """
+        if self.use_ai_generated_keywords:
+            fancy_logger.get().debug(
+                "Stable Diffusion: image prompts generated with AI preprocessing"
+            )
+        else:
+            fancy_logger.get().debug(
+                "Stable Diffusion: image prompts extracted with regex"
+            )
+
+        fancy_logger.get().debug(
+            "Stable Diffusion: image keywords: %s",
+            ", ".join(self.image_words),
+        )
 
     async def _generate_image(
         self,

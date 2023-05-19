@@ -89,16 +89,15 @@ class DiscordBot(discord.Client):
             fancy_logger.get().debug("listening to DMs")
 
         if self.stream_responses:
-            fancy_logger.get().debug("Responses: streamed live")
+            fancy_logger.get().debug(
+                "Response Grouping: streamed live into a single message"
+            )
         elif self.dont_split_responses:
-            fancy_logger.get().debug("Responses: returned as single messages")
+            fancy_logger.get().debug("Response Grouping: returned as single messages")
         else:
-            fancy_logger.get().debug("Responses: streamed as separate sentences")
-
-        if self.image_generator:
-            fancy_logger.get().debug("Image generation: enabled")
-        else:
-            fancy_logger.get().debug("Image generation: disabled")
+            fancy_logger.get().debug(
+                "Response Grouping: split into messages by sentence"
+            )
 
         fancy_logger.get().debug("AI name: %s", self.persona.ai_name)
         fancy_logger.get().debug("AI persona: %s", self.persona.persona)
@@ -115,6 +114,13 @@ class DiscordBot(discord.Client):
             ", ".join(self.persona.wakewords) if self.persona.wakewords else "<none>"
         )
         fancy_logger.get().debug("Wakewords: %s", str_wakewords)
+
+        self.ooba_client.on_ready()
+
+        if self.image_generator is None:
+            fancy_logger.get().debug("Stable Diffusion: disabled")
+        else:
+            self.image_generator.on_ready()
 
         # we do this at the very end because when you restart
         # the bot, it can take a while for the commands to

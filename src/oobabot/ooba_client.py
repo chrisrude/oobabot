@@ -144,18 +144,25 @@ class OobaClient(http_client.SerializedHttpClient):
         self.log_all_the_things = settings["log_all_the_things"]
 
         if self.message_regex:
+            self.fn_new_splitter = lambda: RegexSplitter(self.message_regex)
+        else:
+            self.fn_new_splitter = SentenceSplitter
+
+    def on_ready(self):
+        """
+        Called when the client is ready to start.
+        Used to log our configuration.
+        """
+        if self.message_regex:
             fancy_logger.get().debug(
                 "Ooba Client: Splitting responses into messages " + "with: %s",
                 self.message_regex,
             )
-            self.fn_new_splitter = lambda: RegexSplitter(self.message_regex)
         else:
             fancy_logger.get().debug(
                 "Ooba Client: Splitting responses into messages "
                 + "by English sentence.",
             )
-
-            self.fn_new_splitter = SentenceSplitter
 
     async def _setup(self):
         async with self._get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
