@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import signal
 import sys
+import threading
 import typing
 
 from oobabot import bot_commands
@@ -36,14 +37,54 @@ class OobaBot:
     def __init__(
         self,
         cli_args: typing.List[str],
-        settings_dict: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ):
-        self.settings = settings.Settings()
-        if settings_dict is not None:
-            self.settings.load_from_dict(settings_dict)
-        else:
-            self.settings.load(cli_args)
+        self.bot_commands: bot_commands.BotCommands = None
+        self.discord_bot: discord_bot.DiscordBot = None
+        self.decide_to_respond: decide_to_respond.DecideToRespond = None
+        self.image_generator: image_generator.ImageGenerator = None
+        self.ooba_client: ooba_client.OobaClient = None
+        self.persona: persona.Persona = None
+        self.prompt_generator: prompt_generator.PromptGenerator = None
+        self.repetition_tracker: repetition_tracker.RepetitionTracker = None
+        self.response_stats: response_stats.ResponseStats = None
+        self.stable_diffusion_client: typing.Optional[
+            sd_client.StableDiffusionClient
+        ] = None
+        self.template_store: templates.TemplateStore = None
 
+        self.startup_lock = threading.Lock()
+        self.settings = settings.Settings()
+
+        self.settings.load(cli_args)
+
+    def run(self):
+        # we'll release this after begin() is called
+        with self.startup_lock:
+            self._begin()
+
+            if self.settings.general_settings.get("generate_config"):
+                self.settings.write_sample_config(out_stream=sys.stdout)
+                return
+
+            if not self.settings.discord_settings.get("discord_token"):
+                msg = (
+                    f"Please set the '{self.settings.DISCORD_TOKEN_ENV_VAR}' "
+                    + "environment variable to your bot's discord token."
+                )
+                print(msg, file=sys.stderr)
+                if self._our_own_main():
+                    sys.exit(1)
+                else:
+                    raise RuntimeError(msg)
+
+            self._prepare_connections()
+
+        asyncio.run(self._init_then_start())
+
+    def _our_own_main(self) -> bool:
+        return threading.current_thread() == threading.main_thread()
+
+    def _begin(self):
         fancy_logger.init_logging(
             level=self.settings.discord_settings.get_str("log_level")
         )
@@ -129,28 +170,21 @@ class OobaBot:
             template_store=self.template_store,
         )
 
-        def exit_handler(signum, _frame):
-            sig_name = signal.Signals(signum).name
-            fancy_logger.get().info("Received signal %s, exiting...", sig_name)
-            self.response_stats.write_stat_summary_to_log()
-            sys.exit(0)
+        self.discord_bot = None
 
-        signal.signal(signal.SIGINT, exit_handler)
-        signal.signal(signal.SIGTERM, exit_handler)
+        if self._our_own_main():
+            # if we're running as a worker thread in another process,
+            # we can't (and shouldn't) register
+            def exit_handler(signum, _frame):
+                sig_name = signal.Signals(signum).name
+                fancy_logger.get().info("Received signal %s, exiting...", sig_name)
+                self.response_stats.write_stat_summary_to_log()
+                sys.exit(0)
 
-    def run(self):
-        if self.settings.general_settings.get("generate_config"):
-            self.settings.write_sample_config(out_stream=sys.stdout)
-            sys.exit(0)
+            signal.signal(signal.SIGINT, exit_handler)
+            signal.signal(signal.SIGTERM, exit_handler)
 
-        if not self.settings.discord_settings.get("discord_token"):
-            msg = (
-                f"Please set the '{self.settings.DISCORD_TOKEN_ENV_VAR}' "
-                + "environment variable to your bot's discord token."
-            )
-            print(msg, file=sys.stderr)
-            sys.exit(1)
-
+    def _prepare_connections(self):
         ########################################################
         # Test connection to services
         for client in [self.ooba_client, self.stable_diffusion_client]:
@@ -170,13 +204,16 @@ class OobaBot:
                 fancy_logger.get().error("Please check the URL and try again.")
                 if err.__cause__ is not None:
                     fancy_logger.get().error("Reason: %s", err.__cause__)
-                sys.exit(1)
+                if self._our_own_main():
+                    sys.exit(1)
+                else:
+                    raise
 
         ########################################################
         # Connect to Discord
 
         fancy_logger.get().info("Connecting to Discord... ")
-        bot = discord_bot.DiscordBot(
+        self.discord_bot = discord_bot.DiscordBot(
             bot_commands=self.bot_commands,
             decide_to_respond=self.decide_to_respond,
             discord_settings=self.settings.discord_settings.get_all(),
@@ -188,27 +225,41 @@ class OobaBot:
             response_stats=self.response_stats,
         )
 
-        # opens http connections to our services,
-        # then connects to Discord
-        async def init_then_start():
-            async with contextlib.AsyncExitStack() as stack:
-                for context_manager in [
-                    self.ooba_client,
-                    self.stable_diffusion_client,
-                ]:
-                    if context_manager is not None:
-                        await stack.enter_async_context(context_manager)
+    # opens http connections to our services,
+    # then connects to Discord
+    async def _init_then_start(self):
+        async with contextlib.AsyncExitStack() as stack:
+            for context_manager in [
+                self.ooba_client,
+                self.stable_diffusion_client,
+            ]:
+                if context_manager is not None:
+                    await stack.enter_async_context(context_manager)
 
-                try:
-                    await bot.start(
-                        self.settings.discord_settings.get_str("discord_token")
-                    )
-                finally:
-                    await bot.close()
+            try:
+                await self.discord_bot.start(
+                    self.settings.discord_settings.get_str("discord_token")
+                )
+            finally:
+                await self.discord_bot.close()
 
-        asyncio.run(init_then_start())
+    def stop(self):
+        """
+        Stops the bot, if it's running.  Safe to be called
+        from a separate thread from the one that called run().
+        """
+        if self.discord_bot is None:
+            return None
+        with self.startup_lock:
+            future = asyncio.run_coroutine_threadsafe(
+                self.discord_bot.close(),
+                self.discord_bot.loop,
+            )
+        return future.result()
 
 
 def main():
+    # create the object and load our settings
     oobabot = OobaBot(sys.argv[1:])
+    # start the loop
     oobabot.run()

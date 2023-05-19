@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "oobabot"
-version = "0.1.7"
+version = "0.1.8"
 description = "A Discord bot which talks to Large Language Model AIs running on oobabooga's text-generation-webui"
 authors = ["Christopher Rude <chris@rudesoftware.net>"]
 license = "MIT"
