@@ -151,8 +151,15 @@ class DiscordBot(discord.Client):
             if not should_respond:
                 return
 
+            is_summon_in_public_channel = is_summon and isinstance(
+                message,
+                types.ChannelMessage,
+            )
+
             async with raw_message.channel.typing():
-                await self._handle_response(message, raw_message, is_summon)
+                await self._handle_response(
+                    message, raw_message, is_summon_in_public_channel
+                )
 
         except discord.DiscordException as err:
             fancy_logger.get().error(
@@ -163,7 +170,7 @@ class DiscordBot(discord.Client):
         self,
         message: types.GenericMessage,
         raw_message: discord.Message,
-        is_summon: bool,
+        is_summon_in_public_channel: bool,
     ) -> None:
         """
         Called when we've decided to respond to a message.
@@ -180,6 +187,7 @@ class DiscordBot(discord.Client):
             message=message,
             raw_message=raw_message,
             image_requested=image_prompt is not None,
+            is_summon_in_public_channel=is_summon_in_public_channel,
         )
         if result is None:
             # we failed to create a thread that the user could
@@ -205,7 +213,7 @@ class DiscordBot(discord.Client):
             # the --reply-in-thread flag), we want to monitor
             # that thread, not the original channel.
             #
-            if is_summon:
+            if is_summon_in_public_channel:
                 if isinstance(response_channel, discord.Thread):
                     message.channel_id = response_channel.id
                 self.decide_to_respond.log_mention(message)
@@ -242,6 +250,7 @@ class DiscordBot(discord.Client):
         message: types.GenericMessage,
         raw_message: discord.Message,
         image_requested: bool,
+        is_summon_in_public_channel: bool,
     ) -> typing.Optional[typing.Tuple[asyncio.Task, discord.abc.Messageable]]:
         """
         Send a text response to a message.
@@ -288,93 +297,78 @@ class DiscordBot(discord.Client):
 
         response_coro = self._send_text_response_in_channel(
             message=message,
+            raw_message=raw_message,
             image_requested=image_requested,
+            is_summon_in_public_channel=is_summon_in_public_channel,
             response_channel=response_channel,
             response_channel_id=response_channel.id,
         )
         response_task = asyncio.create_task(response_coro)
         return (response_task, response_channel)
 
-    async def history_plus_thread_kickoff_message(
-        self,
-        async_iter_history: typing.AsyncIterator[discord.Message],
-        limit: int,
-    ) -> typing.AsyncIterator[types.GenericMessage]:
-        """
-        When returning the history of a thread, Discord
-        does not include the message that kicked off the thread.
-
-        It will show it in the UI as if it were, but it's not
-        one of the messages returned by the history iterator.
-
-        This method attempts to return that message as well,
-        if we need it.
-        """
-        items = 0
-        last_returned = None
-        async for item in async_iter_history:
-            last_returned = item
-            yield discord_utils.discord_message_to_generic_message(item)
-            items += 1
-        if last_returned is not None and items < limit:
-            # we've reached the beginning of the history, but
-            # still have space.  If this message was a reply
-            # to another message, return that message as well.
-            if last_returned.reference is not None:
-                ref = last_returned.reference.resolved
-                if ref is not None and isinstance(ref, discord.Message):
-                    yield discord_utils.discord_message_to_generic_message(ref)
-
-    async def recent_messages_following_thread(
-        self, channel: discord.abc.Messageable
-    ) -> typing.AsyncIterator[types.GenericMessage]:
-        history = channel.history(limit=self.prompt_generator.history_lines)
-        result = self.history_plus_thread_kickoff_message(
-            history,
-            limit=self.prompt_generator.history_lines,
-        )
-        return result
-
     async def _send_text_response_in_channel(
         self,
         message: types.GenericMessage,
+        raw_message: discord.Message,
         image_requested: bool,
+        is_summon_in_public_channel: bool,
         response_channel: discord.abc.Messageable,
         response_channel_id: int,
     ) -> None:
         """
-        Getting closer now!  This method is what actually queries
-        the AI for a text response, breaks the response into individual
-        messages, and then and then calls __send_response_message() to
-        send sech message.
+        Getting closer now!  This method is what actually gathers message
+        history, queries the AI for a text response, breaks the response
+        into individual messages, and then and then calls
+        __send_response_message() to send sech message.
         """
         fancy_logger.get().debug(
             "Request from %s in %s", message.author_name, message.channel_name
         )
 
-        recent_messages = await self.recent_messages_following_thread(response_channel)
-
         repeated_id = self.repetition_tracker.get_throttle_message_id(
             response_channel_id
         )
 
+        reference = None
+        ignore_all_until_message_id = None
+        if is_summon_in_public_channel:
+            reference = raw_message.to_reference()
+            ignore_all_until_message_id = raw_message.id
+
+        recent_messages = await self._recent_messages_following_thread(
+            channel=response_channel,
+            num_history_lines=self.prompt_generator.history_lines,
+            stop_before_message_id=repeated_id,
+            ignore_all_until_message_id=ignore_all_until_message_id,
+        )
+
         prompt_prefix = await self.prompt_generator.generate(
-            ai_user_id=self.ai_user_id,
             message_history=recent_messages,
             image_requested=image_requested,
-            throttle_message_id=repeated_id,
         )
 
         this_response_stat = self.response_stats.log_request_arrived(prompt_prefix)
 
+        # restrict the @mentions the AI is allowed to use in its response.
+        # this is to prevent another user from being able to trick the AI
+        # into @-pinging a large group and annoying them.
+        # Only the author of the original message may be @-pinged.
+        allowed_mentions = discord.AllowedMentions(
+            everyone=False,
+            users=[raw_message.author],
+            roles=False,
+        )
+
         try:
             if self.stream_responses:
                 generator = self.ooba_client.request_as_grouped_tokens(prompt_prefix)
-                await self.render_streaming_response(
+                await self._render_streaming_response(
                     generator,
                     this_response_stat,
                     response_channel,
                     response_channel_id,
+                    allowed_mentions,
+                    reference,
                 )
             else:
                 if self.dont_split_responses:
@@ -384,6 +378,8 @@ class DiscordBot(discord.Client):
                         this_response_stat,
                         response_channel,
                         response_channel_id,
+                        allowed_mentions,
+                        reference,
                     )
                 else:
                     async for sentence in self.ooba_client.request_by_message(
@@ -394,6 +390,8 @@ class DiscordBot(discord.Client):
                             this_response_stat,
                             response_channel,
                             response_channel_id,
+                            allowed_mentions=allowed_mentions,
+                            reference=reference,
                         )
                         if not can_continue:
                             break
@@ -412,6 +410,8 @@ class DiscordBot(discord.Client):
         this_response_stat: response_stats.ResponseStats,
         response_channel: discord.abc.Messageable,
         response_channel_id: int,
+        allowed_mentions: discord.AllowedMentions,
+        reference: typing.Optional[discord.MessageReference],
     ) -> bool:
         """
         Given a string that represents an individual response message,
@@ -433,7 +433,12 @@ class DiscordBot(discord.Client):
             # we can't send an empty message
             return True
 
-        response_message = await response_channel.send(sentence)
+        response_message = await response_channel.send(
+            sentence,
+            allowed_mentions=allowed_mentions,
+            suppress_embeds=True,
+            reference=reference,  # type: ignore
+        )
         generic_response_message = discord_utils.discord_message_to_generic_message(
             response_message
         )
@@ -444,12 +449,14 @@ class DiscordBot(discord.Client):
         this_response_stat.log_response_part()
         return True
 
-    async def render_streaming_response(
+    async def _render_streaming_response(
         self,
         response_iterator: typing.AsyncIterator[str],
         this_response_stat: response_stats.ResponseStats,
         response_channel: discord.abc.Messageable,
         response_channel_id: int,
+        allowed_mentions: discord.AllowedMentions,
+        reference: typing.Optional[discord.MessageReference],
     ):
         response = ""
         last_message = None
@@ -469,9 +476,18 @@ class DiscordBot(discord.Client):
                 # when we send the first message, we don't want to send a notification,
                 # as it will only include the first token of the response.  This will
                 # not be very useful to anyone.
-                last_message = await response_channel.send(response, silent=True)
+                last_message = await response_channel.send(
+                    response,
+                    allowed_mentions=allowed_mentions,
+                    silent=True,
+                    suppress_embeds=True,
+                    reference=reference,  # type: ignore
+                )
             else:
-                await last_message.edit(content=response)
+                await last_message.edit(
+                    content=response,
+                    allowed_mentions=allowed_mentions,
+                )
 
             this_response_stat.log_response_part()
 
@@ -537,3 +553,145 @@ class DiscordBot(discord.Client):
 
             good_lines.append(line)
         return ("\n".join(good_lines), abort_response)
+
+    ########
+    async def _filter_history_message(
+        self,
+        message: discord.Message,
+        stop_before_message_id: typing.Optional[int],
+    ) -> typing.Tuple[typing.Optional[types.GenericMessage], bool]:
+        """
+        Filter out any messages that we don't want to include in the
+        AI's history.
+
+        These include:
+         - messages generated by our image generator
+         - messages at or before the stop_before_message_id
+
+        Also, modify the message in the following ways:
+         - if the message is from the AI, set the author name to
+           the AI's persona name, not its Discord account name
+         - remove <@_0000000_> user-id based message mention text,
+           replacing them with @username mentions
+        """
+        # if we've hit the throttle message, stop and don't add any
+        # more history
+        if stop_before_message_id and message.id == stop_before_message_id:
+            return (None, False)
+
+        generic_message = discord_utils.discord_message_to_generic_message(message)
+
+        if generic_message.author_id == self.ai_user_id:
+            # make sure the AI always sees its persona name
+            # in the transcript, even if the chat program
+            # has it under a different account name
+            generic_message.author_name = self.persona.ai_name
+
+            # hack: use the suppress_embeds=True flag to indicate
+            # that this message is one we generated as part of a text
+            # response, as opposed to an image or application message
+            if not message.flags.suppress_embeds:
+                # this is a message generated by our image generator
+                return (None, True)
+
+        return (generic_message, True)
+
+    async def _filtered_history_iterator(
+        self,
+        async_iter_history: typing.AsyncIterator[discord.Message],
+        stop_before_message_id: typing.Optional[int],
+        ignore_all_until_message_id: typing.Optional[int],
+        limit: int,
+    ) -> typing.AsyncIterator[types.GenericMessage]:
+        """
+        When returning the history of a thread, Discord
+        does not include the message that kicked off the thread.
+
+        It will show it in the UI as if it were, but it's not
+        one of the messages returned by the history iterator.
+
+        This method attempts to return that message as well,
+        if we need it.
+        """
+        items = 0
+        last_returned = None
+        ignoring_all = ignore_all_until_message_id is not None
+        async for item in async_iter_history:
+            if ignoring_all:
+                if item.id == ignore_all_until_message_id:
+                    ignoring_all = False
+                else:
+                    fancy_logger.get().debug(
+                        "Ignoring message %d because it was sent after %d",
+                        item.id,
+                        ignore_all_until_message_id,
+                    )
+                    continue
+
+            last_returned = item
+            (sanitized_message, allow_more) = await self._filter_history_message(
+                item,
+                stop_before_message_id=stop_before_message_id,
+            )
+            if not allow_more:
+                # we've hit a message which requires us to stop
+                # and look at more history
+                return
+            if sanitized_message is not None:
+                yield sanitized_message
+                items += 1
+
+        if last_returned is not None and items < limit:
+            # we've reached the beginning of the history, but
+            # still have space.  If this message was a reply
+            # to another message, return that message as well.
+            if last_returned.reference is None:
+                return
+
+            ref = last_returned.reference.resolved
+
+            # the resolved message may be None if the message
+            # was deleted
+            if ref is not None and isinstance(ref, discord.Message):
+                (sanitized_message, _) = await self._filter_history_message(
+                    ref,
+                    stop_before_message_id,
+                )
+                if sanitized_message is not None:
+                    yield sanitized_message
+
+    # when looking through the history of a channel, we'll have a goal
+    # of retrieving a certain number of lines of history.  However,
+    # there are some messages in the history that we'll want to filter
+    # out.  These include messages that were generated by our image
+    # generator, as well as certain messages that will be ignored
+    # in order to generate a response for a specific user who
+    # @-mentions the bot.
+    #
+    # This is the maximum number of "extra" messages to retrieve
+    # from the history, in an attempt to find enough messages
+    # that we can filter out the ones we don't want and still
+    # have enough left over to satisfy the request.
+    #
+    # Note that since the history is returned in reverse order,
+    # and each is pulled in only as needed, there's not much of a
+    # penalty to making this somewhat large.  But still, we want
+    # to keep it reasonable.
+    MESSAGE_HISTORY_LOOKBACK_BONUS = 20
+
+    async def _recent_messages_following_thread(
+        self,
+        channel: discord.abc.Messageable,
+        stop_before_message_id: typing.Optional[int],
+        ignore_all_until_message_id: typing.Optional[int],
+        num_history_lines: int,
+    ) -> typing.AsyncIterator[types.GenericMessage]:
+        max_messages_to_check = num_history_lines + self.MESSAGE_HISTORY_LOOKBACK_BONUS
+        history = channel.history(limit=max_messages_to_check)
+        result = self._filtered_history_iterator(
+            history,
+            limit=num_history_lines,
+            stop_before_message_id=stop_before_message_id,
+            ignore_all_until_message_id=ignore_all_until_message_id,
+        )
+        return result

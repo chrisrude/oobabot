@@ -116,7 +116,10 @@ class BotCommands:
                 channel_id=interaction.channel_id,
                 send_timestamp=interaction.created_at.timestamp(),
             )
-            await interaction.response.send_message(text_to_send)
+            await interaction.response.send_message(
+                text_to_send,
+                suppress_embeds=True,
+            )
 
         @discord.app_commands.command(
             name="lobotomize",
@@ -154,6 +157,7 @@ class BotCommands:
             await interaction.response.send_message(
                 response,
                 silent=True,
+                suppress_embeds=True,
             )
 
         fancy_logger.get().debug(

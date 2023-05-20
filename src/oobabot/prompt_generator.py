@@ -120,9 +120,7 @@ class PromptGenerator:
 
     async def _render_history(
         self,
-        ai_user_id: int,
         message_history: typing.AsyncIterator[types.GenericMessage],
-        stop_before_message_id: typing.Optional[int],
     ) -> str:
         # add on more history, but only if we have room
         # if we don't have room, we'll just truncate the history
@@ -138,31 +136,13 @@ class PromptGenerator:
         history_lines = []
 
         async for message in message_history:
-            # if we've hit the throttle message, stop and don't add any
-            # more history
-            if stop_before_message_id and message.message_id == stop_before_message_id:
-                break
-
-            adjusted_author_name = message.author_name
-            if message.author_id == ai_user_id:
-                # make sure the AI always sees its persona name
-                # in the transcript, even if the chat program
-                # has it under a different account name
-                adjusted_author_name = self.persona.ai_name
-
-                # we'll ignore any messages we generate which refer
-                # another message, since those are ones our image
-                # generation code generated
-                if message.reference_message_id:
-                    continue
-
             if not message.body_text:
                 continue
 
             line = self.template_store.format(
                 templates.Templates.PROMPT_HISTORY_LINE,
                 {
-                    templates.TemplateToken.USER_NAME: adjusted_author_name,
+                    templates.TemplateToken.USER_NAME: message.author_name,
                     templates.TemplateToken.USER_MESSAGE: message.body_text,
                 },
             )
@@ -200,10 +180,8 @@ class PromptGenerator:
 
     async def generate(
         self,
-        ai_user_id: int,
         message_history: typing.Optional[typing.AsyncIterator[types.GenericMessage]],
         image_requested: bool,
-        throttle_message_id: int,
     ) -> str:
         """
         Generate a prompt for the AI to respond to.
@@ -211,7 +189,7 @@ class PromptGenerator:
         message_history_txt = ""
         if message_history is not None:
             message_history_txt = await self._render_history(
-                ai_user_id, message_history, throttle_message_id
+                message_history,
             )
         image_coming = self.image_request_made if image_requested else ""
         return self._generate(message_history_txt, image_coming)
