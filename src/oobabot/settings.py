@@ -130,6 +130,7 @@ class Settings:
     def __init__(self):
         self._settings = None
 
+        self.arg_parser = None
         self.setting_groups: typing.List[oesp.ConfigSettingGroup] = []
 
         ###########################################################
@@ -729,36 +730,37 @@ class Settings:
                 except ValueError:
                     continue
 
-        arg_parser = oesp.load(
+        self.arg_parser = oesp.load(
             args=args,
             setting_groups=self.setting_groups,
             filename=config_filename,
         )
 
-        if self.general_settings.get("help"):
-            help_str = arg_parser.format_help()
-            print(help_str)
+    def print_help(self):
+        if self.arg_parser is None:
+            raise ValueError("display_help called before load")
 
+        help_str = self.arg_parser.format_help()
+        print(help_str)
+
+        print(
+            "\n"
+            + console_wrapped(
+                (
+                    "Additional settings can be set in config.yml.  "
+                    "Use the --generate-config option to print a new "
+                    "copy of this file to STDOUT."
+                )
+            )
+        )
+
+        if "" == self.discord_settings.get("discord_token"):
             print(
                 "\n"
                 + console_wrapped(
                     (
-                        "Additional settings can be set in config.yml.  "
-                        "Use the --generate-config option to print a new "
-                        "copy of this file to STDOUT."
+                        f"Please set the '{self.DISCORD_TOKEN_ENV_VAR}' "
+                        "environment variable to your bot's discord token."
                     )
                 )
             )
-
-            if "" == self.discord_settings.get("discord_token"):
-                print(
-                    "\n"
-                    + console_wrapped(
-                        (
-                            f"Please set the '{self.DISCORD_TOKEN_ENV_VAR}' "
-                            "environment variable to your bot's discord token."
-                        )
-                    )
-                )
-
-            sys.exit(0)

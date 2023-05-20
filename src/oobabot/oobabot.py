@@ -62,6 +62,10 @@ class OobaBot:
         with self.startup_lock:
             self._begin()
 
+            if self.settings.general_settings.get("help"):
+                self.settings.print_help()
+                return
+
             if self.settings.general_settings.get("generate_config"):
                 self.settings.write_sample_config(out_stream=sys.stdout)
                 return
