@@ -72,3 +72,63 @@ def discord_message_to_generic_message(
         + f"unsolicited replies disabled.: {raw_message.channel}"
     )
     return types.GenericMessage(**generic_args)
+
+
+def replace_mention_ids_with_names(
+    generic_message: types.GenericMessage,
+    fn_user_id_to_name: typing.Callable[[re.Match[str]], str],
+):
+    """
+    Replace user ID mentions with the user's chosen display
+    name in the given guild (aka server)
+    """
+    # it looks like normal IDs are 18 digits.  But give it some
+    # wiggle room in case things change in the future.
+    # e.g.: <@009999999999999999>
+    at_mention_pattern = r"<@(\d{16,20})>"
+    while True:
+        match = re.search(at_mention_pattern, generic_message.body_text)
+        if not match:
+            break
+        generic_message.body_text = (
+            generic_message.body_text[: match.start()]
+            + fn_user_id_to_name(match)
+            + generic_message.body_text[match.end() :]
+        )
+
+
+def dm_user_id_to_name(
+    bot_user_id: int,
+    bot_name: str,
+) -> typing.Callable[[re.Match[str]], str]:
+    """
+    Replace user ID mentions with the bot's name.  Used when
+    we are in a DM with the bot.
+    """
+    if " " in bot_name:
+        bot_name = f'"{bot_name}"'
+
+    def _replace_user_id_mention(match: typing.Match[str]) -> str:
+        user_id = int(match.group(1))
+        print(f"bot_user_id={bot_user_id}, user_id={user_id}")
+        if user_id == bot_user_id:
+            return f"@{bot_name}"
+        return match.group(0)
+
+    return _replace_user_id_mention
+
+
+def guild_user_id_to_name(
+    guild: discord.Guild,
+) -> typing.Callable[[re.Match[str]], str]:
+    def _replace_user_id_mention(match: typing.Match[str]) -> str:
+        user_id = int(match.group(1))
+        member = guild.get_member(user_id)
+        if member is None:
+            return match.group(0)
+        display_name = member.display_name
+        if " " in display_name:
+            display_name = f'"{display_name}"'
+        return f"@{display_name}"
+
+    return _replace_user_id_mention
