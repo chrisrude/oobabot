@@ -193,9 +193,17 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             while True:
                 try:
                     return await do_post()
-                except aiohttp.ClientError as err:
-                    if tries > 2 or err.__cause__ is not ConnectionResetError:
-                        raise http_client.OobaHttpClientError(err) from err
+                except (aiohttp.ClientError, aiohttp.ClientOSError) as err:
+                    retry = False
+                    if err.__cause__ is ConnectionResetError:
+                        retry = True
+                    if isinstance(err, aiohttp.ClientOSError) and 104 == err.errno:
+                        retry = True
+                    if tries > 2:
+                        retry = False
+                    if not retry:
+                        raise
+
                     fancy_logger.get().warning(
                         "Stable Diffusion: Connection reset error: %s, "
                         + "retrying in 1 second",

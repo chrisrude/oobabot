@@ -488,6 +488,7 @@ class DiscordBot(discord.Client):
                     content=response,
                     allowed_mentions=allowed_mentions,
                 )
+                last_message.content = response
 
             this_response_stat.log_response_part()
 
