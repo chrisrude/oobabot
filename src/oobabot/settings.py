@@ -115,6 +115,7 @@ class Settings:
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
     DEFAULT_IMAGE_WORDS: typing.List[str] = [
+        "draw me",
         "drawing",
         "photo",
         "pic",

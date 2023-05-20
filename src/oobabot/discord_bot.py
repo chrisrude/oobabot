@@ -134,6 +134,15 @@ class DiscordBot(discord.Client):
             )
 
     async def on_message(self, raw_message: discord.Message) -> None:
+        """
+        Called when a message is received from Discord.
+
+        This method is called for every message that the bot can see.
+        It decides whether to respond to the message, and if so,
+        calls _handle_response() to generate a response.
+
+        :param raw_message: The raw message from Discord.
+        """
         try:
             message = discord_utils.discord_message_to_generic_message(raw_message)
             should_respond, is_summon = self.decide_to_respond.should_reply_to_message(
@@ -155,13 +164,19 @@ class DiscordBot(discord.Client):
         message: types.GenericMessage,
         raw_message: discord.Message,
         is_summon: bool,
-    ):
+    ) -> None:
+        """
+        Called when we've decided to respond to a message.
+
+        It decides if we're sending a text response, an image response,
+        or both, and then sends the response(s).
+        """
         image_prompt = None
         if self.image_generator is not None:
             # are we creating an image?
             image_prompt = self.image_generator.maybe_get_image_prompt(raw_message)
 
-        result = await self.send_response(
+        result = await self._send_text_response(
             message=message,
             raw_message=raw_message,
             image_requested=image_prompt is not None,
@@ -222,14 +237,18 @@ class DiscordBot(discord.Client):
         if raise_later is not None:
             raise raise_later
 
-    async def send_response(
+    async def _send_text_response(
         self,
         message: types.GenericMessage,
         raw_message: discord.Message,
         image_requested: bool,
     ) -> typing.Optional[typing.Tuple[asyncio.Task, discord.abc.Messageable]]:
         """
-        Send a response to a message.
+        Send a text response to a message.
+
+        This method determines what channel or thread to post the message
+        in, creating a thread if necessary.  It then posts the message
+        by calling _send_text_response_to_channel().
 
         Returns a tuple of the task that was created to send the message,
         and the channel that the message was sent to.
@@ -267,7 +286,7 @@ class DiscordBot(discord.Client):
                 fancy_logger.get().debug("User can't create threads, not responding.")
                 return None
 
-        response_coro = self.send_response_in_channel(
+        response_coro = self._send_text_response_in_channel(
             message=message,
             image_requested=image_requested,
             response_channel=response_channel,
@@ -316,13 +335,19 @@ class DiscordBot(discord.Client):
         )
         return result
 
-    async def send_response_in_channel(
+    async def _send_text_response_in_channel(
         self,
         message: types.GenericMessage,
         image_requested: bool,
         response_channel: discord.abc.Messageable,
         response_channel_id: int,
     ) -> None:
+        """
+        Getting closer now!  This method is what actually queries
+        the AI for a text response, breaks the response into individual
+        messages, and then and then calls __send_response_message() to
+        send sech message.
+        """
         fancy_logger.get().debug(
             "Request from %s in %s", message.author_name, message.channel_name
         )
@@ -354,7 +379,7 @@ class DiscordBot(discord.Client):
             else:
                 if self.dont_split_responses:
                     response = await self.ooba_client.request_as_string(prompt_prefix)
-                    await self.render_response(
+                    await self._send_response_message(
                         response,
                         this_response_stat,
                         response_channel,
@@ -364,7 +389,7 @@ class DiscordBot(discord.Client):
                     async for sentence in self.ooba_client.request_by_message(
                         prompt_prefix
                     ):
-                        can_continue = await self.render_response(
+                        can_continue = await self._send_response_message(
                             sentence,
                             this_response_stat,
                             response_channel,
@@ -381,7 +406,7 @@ class DiscordBot(discord.Client):
         this_response_stat.write_to_log(f"Response to {message.author_name} done!  ")
         self.response_stats.log_response_success(this_response_stat)
 
-    async def render_response(
+    async def _send_response_message(
         self,
         response: str,
         this_response_stat: response_stats.ResponseStats,
@@ -389,9 +414,19 @@ class DiscordBot(discord.Client):
         response_channel_id: int,
     ) -> bool:
         """
+        Given a string that represents an individual response message,
+        post it in the given channel.
+
+        It also looks to see if a message contains a termination string,
+        and if so it will return False to indicate that we should stop
+        the response.
+
+        Also does some bookkeeping to make sure we don't repeat ourselves,
+        and to track how many messages we've sent.
+
         Returns True if we can continue, False if we should abort.
         """
-        (sentence, abort_response) = self.filter_immersion_breaking_lines(response)
+        (sentence, abort_response) = self._filter_immersion_breaking_lines(response)
         if abort_response:
             return False
         if not sentence:
@@ -423,7 +458,7 @@ class DiscordBot(discord.Client):
                 continue
 
             response += token
-            (response, abort_response) = self.filter_immersion_breaking_lines(response)
+            (response, abort_response) = self._filter_immersion_breaking_lines(response)
             if abort_response:
                 break
             if not response:
@@ -450,7 +485,17 @@ class DiscordBot(discord.Client):
             response_channel_id, generic_response_message
         )
 
-    def filter_immersion_breaking_lines(self, sentence: str) -> typing.Tuple[str, bool]:
+    def _filter_immersion_breaking_lines(
+        self, sentence: str
+    ) -> typing.Tuple[str, bool]:
+        """
+        Given a string that represents an individual response message,
+        filter out any lines that would break immersion.
+
+        These include lines that include a termination symbol, lines
+        that attempt to carry on the conversation as a different user,
+        and lines that include text which is part of the AI prompt.
+        """
         lines = sentence.split("\n")
         good_lines = []
         previous_line = ""
