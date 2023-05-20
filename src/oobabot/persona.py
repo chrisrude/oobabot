@@ -5,6 +5,7 @@ Retrieves persona data from a variety of formats.
 
 import json
 import re
+import typing
 
 import ruamel.yaml as ryaml
 
@@ -26,7 +27,7 @@ class Persona:
     The persona of the AI.
     """
 
-    wakewords: list[str]
+    wakewords: typing.List[str]
     """
     If we see one of these words in a message, we'll respond to it.
     """

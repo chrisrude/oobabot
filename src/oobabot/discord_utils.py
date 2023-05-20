@@ -76,7 +76,7 @@ def discord_message_to_generic_message(
 
 def replace_mention_ids_with_names(
     generic_message: types.GenericMessage,
-    fn_user_id_to_name: typing.Callable[[re.Match[str]], str],
+    fn_user_id_to_name: typing.Callable[["re.Match[str]"], str],
 ):
     """
     Replace user ID mentions with the user's chosen display
@@ -100,7 +100,7 @@ def replace_mention_ids_with_names(
 def dm_user_id_to_name(
     bot_user_id: int,
     bot_name: str,
-) -> typing.Callable[[re.Match[str]], str]:
+) -> typing.Callable[["re.Match[str]"], str]:
     """
     Replace user ID mentions with the bot's name.  Used when
     we are in a DM with the bot.
@@ -120,7 +120,7 @@ def dm_user_id_to_name(
 
 def guild_user_id_to_name(
     guild: discord.Guild,
-) -> typing.Callable[[re.Match[str]], str]:
+) -> typing.Callable[["re.Match[str]"], str]:
     def _replace_user_id_mention(match: typing.Match[str]) -> str:
         user_id = int(match.group(1))
         member = guild.get_member(user_id)
