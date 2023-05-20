@@ -77,6 +77,10 @@ For it to do something interesting, you'll need a Discord account, and a bot tok
 
 For tests, you can run them with `poetry run pytest`.  This will run all the tests in the `tests` directory.  If you want to run a specific test, you can do so with `poetry run pytest tests/test_file.py::test_function`.  You can also run a specific test class with `poetry run pytest tests/test_file.py::TestClass`.
 
+### Updating Dependencies
+
+From time to time additonal dependencies will be added.  You can easily update your local environment with `poetry install`.  This will update all dependencies, including dev dependencies.
+
 ## Coding Guidelines
 
 The project is built to support Python 3.9 and higher.  It uses [poetry](https://python-poetry.org/) to build and package with.  It uses [black](https://github.com/psf/black) for code formatting, with assistance from isort and flake8.  It uses [pytest](https://docs.pytest.org/en/stable/) for testing.
