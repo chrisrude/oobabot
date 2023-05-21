@@ -7,7 +7,8 @@ load - sets defaults, then loads from YAML, then loads from CLI.
 load_from_cli - sets defaults, then loads from CLI only.
 load_from_dict - sets defaults, then loads from a dictionary only.
 load_from_yaml - sets defaults, then loads from YAML only.
-write_sample_config - writes a sample config file to STDOUT.
+write_to_file - writes the given config as YAML to the given file.
+write_to_stream - writes the given config as YAML to the given stream.
 """
 
 import argparse
@@ -340,9 +341,9 @@ def load_from_dict(
 
 
 def load(
-    args: typing.List[str],
+    cli_args: typing.List[str],
     setting_groups: typing.List["ConfigSettingGroup"],
-    filename: str,
+    config_file: str,
 ) -> argparse.ArgumentParser:
     """
     Load settings from defaults, config.yml, and command line arguments
@@ -351,8 +352,8 @@ def load(
     Returns the argparse parser, which can be used to print out the help
     message.
     """
-    load_from_yaml(filename, setting_groups)
-    namespace = load_from_cli(args, setting_groups)
+    load_from_yaml(config_file, setting_groups)
+    namespace = load_from_cli(cli_args, setting_groups)
 
     # returning this since it can print out the help message
     return namespace
@@ -370,7 +371,7 @@ START_COMMENT = textwrap.dedent(
 )
 
 
-def write_sample_config(
+def write_to_stream(
     setting_groups: typing.List["ConfigSettingGroup"],
     out_stream: typing.TextIO,
 ) -> None:
@@ -394,3 +395,13 @@ def write_sample_config(
     yaml.indent(mapping=INDENT_UNIT, sequence=2 * INDENT_UNIT, offset=INDENT_UNIT)
 
     yaml.dump(yaml_map, out_stream)
+
+
+def write_to_file(
+    setting_groups: typing.List["ConfigSettingGroup"], filename: str
+) -> None:
+    """
+    Write the current values in the setting groups to a YAML file
+    """
+    with open(filename, "w", encoding="utf-8") as file:
+        write_to_stream(setting_groups, file)

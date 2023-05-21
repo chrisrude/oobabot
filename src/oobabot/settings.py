@@ -1,6 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-Documents all the settings for the bot.
+Documents all the settings for the bot.  Allows for settings
+to be loaded from the environment, command line and config file.
+
+Methods:
+    - load:
+        loads settings from the environment, command line and config file
+
+    - write_to_stream:
+        writes the current config file to the given stream
+
+    - write_to_file:
+        writes the current config file to the given file path
+
+Attributes:
+    - setting_groups:
+        a list of all the setting groups
+
+    - discord_settings:
+        a setting group for settings related to Discord
+
+    - oobabooga_settings:
+        a setting group for settings related to the oobabooga API
+
+    - stable_diffusion_settings:
+        a setting group for settings related to the stable diffusion API
+
+    - general_settings:
+        a setting group for settings that are not included in the config file
 """
 import os
 import shutil
@@ -12,12 +39,12 @@ from oobabot import templates
 import oobabot.overengineered_settings_parser as oesp
 
 
-def console_wrapped(message):
+def _console_wrapped(message):
     width = shutil.get_terminal_size().columns
     return "\n".join(textwrap.wrap(message, width))
 
 
-def make_template_comment(
+def _make_template_comment(
     name: str,
     tokens_desc_tuple: typing.Tuple[typing.List[templates.TemplateToken], str, bool],
 ) -> typing.List[str]:
@@ -554,16 +581,16 @@ class Settings:
                 oesp.ConfigSetting[str](
                     name=str(template),
                     default=templates.TemplateStore.DEFAULT_TEMPLATES[template],
-                    description_lines=make_template_comment(
+                    description_lines=_make_template_comment(
                         str(template), tokens_desc_tuple
                     ),
                     include_in_yaml=is_ai_prompt,
                 )
             )
 
-        self.add_deprecated_settings()
+        self._add_deprecated_settings()
 
-    def add_deprecated_settings(self) -> None:
+    def _add_deprecated_settings(self) -> None:
         ###########################################################
         # Deprecated Settings
         # These used to be part of the Stable Diffusion section,
@@ -706,38 +733,65 @@ class Settings:
         )
     )
 
-    def write_sample_config(self, out_stream) -> None:
-        oesp.write_sample_config(self.setting_groups, out_stream)
+    def write_to_stream(self, out_stream) -> None:
+        oesp.write_to_stream(self.setting_groups, out_stream)
         if sys.stdout.isatty():
             print(self.META_INSTRUCTION, file=sys.stderr)
         else:
             print("# oobabot: config.yml output successfully", file=sys.stderr)
 
-    def load_from_dict(self, config_dict: dict) -> None:
-        oesp.load_from_dict(self.setting_groups, config_dict)
+    def write_to_file(self, filename: str) -> None:
+        oesp.write_to_file(self.setting_groups, filename)
 
-    def load(self, args) -> None:
+    def _filename_from_args(self, args: typing.List[str]) -> str:
+        """
+        Get the configuration filename from the command line arguments.
+        If none is supplied, return the default.
+        """
+
         # we need to hack this in here because we want to know the filename
         # before we parse the args, so that we can load the config file
         # first and then have the arguments overwrite the config file.
         config_setting = self.general_settings.get_setting("config")
-        config_filename = config_setting.default
         if args is not None:
             for config_flag in config_setting.cli_args:
                 # find the element after config_flag in args
                 try:
-                    config_filename = args[args.index(config_flag) + 1]
-                    break
+                    return args[args.index(config_flag) + 1]
                 except ValueError:
                     continue
+        return config_setting.default
+
+    def load(
+        self,
+        cli_args: typing.List[str],
+        config_file: typing.Optional[str] = None,
+    ) -> None:
+        """
+        Load the config from the command line arguments and config file.
+
+        params:
+            cli_args: list of command line arguments to parse
+            config_file: path to the config file to load
+
+        cli_args is intended to be used when running from a standalone
+        application, while config_file is intended to be used when
+        running from inside another process.
+        """
+
+        if config_file is None:
+            config_file = self._filename_from_args(cli_args)
 
         self.arg_parser = oesp.load(
-            args=args,
+            cli_args=cli_args,
             setting_groups=self.setting_groups,
-            filename=config_filename,
+            config_file=config_file,
         )
 
     def print_help(self):
+        """
+        Prints CLI usage information to STDOUT.
+        """
         if self.arg_parser is None:
             raise ValueError("display_help called before load")
 
@@ -746,7 +800,7 @@ class Settings:
 
         print(
             "\n"
-            + console_wrapped(
+            + _console_wrapped(
                 (
                     "Additional settings can be set in config.yml.  "
                     "Use the --generate-config option to print a new "
@@ -758,7 +812,7 @@ class Settings:
         if "" == self.discord_settings.get("discord_token"):
             print(
                 "\n"
-                + console_wrapped(
+                + _console_wrapped(
                     (
                         f"Please set the '{self.DISCORD_TOKEN_ENV_VAR}' "
                         "environment variable to your bot's discord token."

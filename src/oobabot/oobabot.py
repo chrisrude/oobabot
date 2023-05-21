@@ -29,25 +29,55 @@ from oobabot import settings
 from oobabot import templates
 
 
-# this warning causese more harm than good here
+# this warning causes more harm than good here
 # pylint: disable=W0201
 class Oobabot:
     """
     Main bot class.  Load settings, creates helper objects,
     and invokes the bot loop.
+
+    Methods:
+        constructor: Loads settings from the command line, environment
+            variables, and config file.  This config may be changed
+            before calling start().
+        start: Start the bot.  Blocks until the bot exits.
+        stop: Stop the bot.  Blocks until the bot exits.
+
+    Class Methods:
+        test_discord_token: Test a discord token to see if it's valid.
+            Requires Internet access.
+        generate_invite_url: Generate a URL that can be used to invite
+            the bot to a server.
     """
 
     def __init__(
         self,
         cli_args: typing.List[str],
     ):
+        """
+        Initialize the bot, and load settings from the command line,
+        environment variables, and config file.  These will be
+        available in self.settings.
+
+        self.settings is an :py:class:`oobabot.settings.Settings` object.
+        """
         self.startup_lock = threading.Lock()
         self.settings = settings.Settings()
 
         self.settings.load(cli_args)
 
-    def run(self):
-        # we'll release this after begin() is called
+    def start(self):
+        """
+        Start the bot.  Blocks until the bot exits.
+
+        When running from the CLI, the bot would normally exit
+        when the user presses Ctrl-C.  Or otherwise sends a SIGINT
+        or SIGTERM signal.
+
+        When running inside another process, the bot will exit
+        when another thread calls stop().
+        """
+
         with self.startup_lock:
             self._begin()
 
@@ -56,7 +86,7 @@ class Oobabot:
                 return
 
             if self.settings.general_settings.get("generate_config"):
-                self.settings.write_sample_config(out_stream=sys.stdout)
+                self.settings.write_to_stream(out_stream=sys.stdout)
                 return
 
             if not self.settings.discord_settings.get("discord_token"):
@@ -75,9 +105,19 @@ class Oobabot:
         asyncio.run(self._init_then_start())
 
     def _our_own_main(self) -> bool:
+        """
+        Returns True if we're running from the CLI, False if we're
+        running inside another process.
+        """
         return threading.current_thread() == threading.main_thread()
 
     def _begin(self):
+        """
+        Called after we've loaded our configuration but before we
+        start the bot.  This is a good place to do any one-time setup
+        for helper objects.
+        """
+
         fancy_logger.init_logging(
             level=self.settings.discord_settings.get_str("log_level"),
         )
@@ -218,9 +258,11 @@ class Oobabot:
             response_stats=self.response_stats,
         )
 
-    # opens http connections to our services,
-    # then connects to Discord
     async def _init_then_start(self):
+        """
+        Opens HTTP connections to oobabooga and stable diffusion,
+        then connects to Discord.  Blocks until the bot is stopped.
+        """
         if self.discord_bot is None:
             raise RuntimeError("Discord bot not initialized")
 
@@ -243,6 +285,8 @@ class Oobabot:
         """
         Stops the bot, if it's running.  Safe to be called
         from a separate thread from the one that called run().
+
+        Blocks until the bot is gracefully stopped.
         """
         if self.discord_bot is None:
             return None
@@ -253,12 +297,25 @@ class Oobabot:
             )
         return future.result()
 
-    def test_discord_token(self, discord_token: str) -> bool:
+    @classmethod
+    def test_discord_token(cls, discord_token: str) -> bool:
         """
-        Tests a discord token to see if it's valid.
+        Tests a discord token to see if it's valid.  Can be called from any thread.
+
+        Requires Internet connectivity.
+
         Returns True if it was able to connect with the token, False if it isn't.
         """
         return asyncio.run(discord_utils.test_discord_token(discord_token))
+
+    @classmethod
+    def generate_invite_url(cls, discord_token: str) -> str:
+        """
+        Generates an invite URL for the bot with the given token.
+
+        Can be called from any thread.  Does not require Internet connectivity.
+        """
+        return discord_utils.generate_invite_url(discord_token)
 
 
 # pylint: enable=W0201
@@ -268,4 +325,4 @@ def main():
     # create the object and load our settings
     oobabot = Oobabot(sys.argv[1:])
     # start the loop
-    oobabot.run()
+    oobabot.start()

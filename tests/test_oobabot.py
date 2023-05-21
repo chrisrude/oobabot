@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-# todo: write tests
 """
 would include tests for Oobabot if we had any good ones
 """
+import asyncio
 import os
+
+import aiohttp
 
 from oobabot import oobabot
 
@@ -23,3 +25,21 @@ def test_discord_token():
     if token:
         connected = bot.test_discord_token(token)
         assert connected is True
+
+
+def test_invite_url():
+    bot = oobabot.Oobabot([])
+    token = os.environ.get(oobabot.settings.Settings.DISCORD_TOKEN_ENV_VAR, "")
+    if not token:
+        return
+    url = bot.generate_invite_url(token)
+
+    async def test_url(url: str) -> bool:
+        print(url)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                print(resp.status)
+                return resp.status == 200
+
+    result = asyncio.run(test_url(url))
+    assert result is True

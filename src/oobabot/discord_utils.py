@@ -8,6 +8,7 @@ Discord library.
 """
 
 
+import base64
 import re
 import typing
 
@@ -159,3 +160,48 @@ async def test_discord_token(discord_token: str) -> bool:
     finally:
         await simplest_bot.close()
     return simplest_bot.has_connected
+
+
+def generate_invite_url(discord_token: str) -> str:
+    # we want to generate a URL like this:
+    # https://discord.com/api/oauth2/authorize?client_id={client_id}&permissions={permissions}}&scope=bot
+    #
+    # where {client_id} is the bot's client ID, and {permissions} is the
+    # permissions bit array with our desired permissions set.
+
+    # turns out, the discord_token includes our client ID, so we can just
+    # extract it from there.
+    #
+    # the discord token has this format:
+    # AAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+    #
+    # where each section, A, B, and C, is independently a base64-encoded string.
+    #
+    # Section A encodes the bot's client ID, which is a 16-digit number.
+    # the other sections aren't important here.
+    token_parts = discord_token.split(".")
+    token_part_a = token_parts[0]
+
+    # the base64 decoder requires the string to be a multiple of 4 characters
+    # long, so we need to add padding
+    if len(token_part_a) % 4 != 0:
+        token_part_a += "=" * (4 - len(token_part_a) % 4)
+
+    client_id = base64.b64decode(token_part_a).decode("utf-8")
+
+    # for the permissions bit array, we can generate it with the library
+    permissions = discord.Permissions(
+        change_nickname=True,
+        send_messages=True,
+        create_public_threads=True,
+        send_messages_in_threads=True,
+        attach_files=True,
+        read_message_history=True,
+        read_messages=True,
+        add_reactions=True,
+    ).value
+
+    return (
+        "https://discord.com/api/oauth2/authorize?client_id="
+        + f"{client_id}&permissions={permissions}&scope=bot"
+    )
