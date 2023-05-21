@@ -74,6 +74,11 @@ class Oobabot:
         when the user presses Ctrl-C.  Or otherwise sends a SIGINT
         or SIGTERM signal.
 
+        This is also where one-off commands are run in CLI mode:
+         - help: Print help and exit
+         - generate_config: Print a the config file and exit
+         - invite_url: Print a URL that can be used to invite the bot
+
         When running inside another process, the bot will exit
         when another thread calls stop().
         """
@@ -99,6 +104,13 @@ class Oobabot:
                     sys.exit(1)
                 else:
                     raise RuntimeError(msg)
+
+            if self.settings.general_settings.get("invite_url"):
+                url = self.generate_invite_url(
+                    self.settings.discord_settings.get_str("discord_token")
+                )
+                print(url)
+                return
 
             self._prepare_connections()
 

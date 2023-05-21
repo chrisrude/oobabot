@@ -205,6 +205,22 @@ class Settings:
                 ],
             )
         )
+        self.general_settings.add_setting(
+            oesp.ConfigSetting[bool](
+                name="invite_url",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Print a URL which can be used to invite the
+                        bot to a Discord server.  Requires that
+                        the Discord token is set.
+                        """
+                    ),
+                ],
+                cli_args=["--invite-url"],
+            )
+        )
 
         ###########################################################
         # Persona Settings
@@ -758,7 +774,7 @@ class Settings:
                 # find the element after config_flag in args
                 try:
                     return args[args.index(config_flag) + 1]
-                except ValueError:
+                except (ValueError, IndexError):
                     continue
         return config_setting.default
 
