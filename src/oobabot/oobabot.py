@@ -15,6 +15,7 @@ import typing
 from oobabot import bot_commands
 from oobabot import decide_to_respond
 from oobabot import discord_bot
+from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import http_client
 from oobabot import image_generator
@@ -30,7 +31,7 @@ from oobabot import templates
 
 # this warning causese more harm than good here
 # pylint: disable=W0201
-class OobaBot:
+class Oobabot:
     """
     Main bot class.  Load settings, creates helper objects,
     and invokes the bot loop.
@@ -252,12 +253,19 @@ class OobaBot:
             )
         return future.result()
 
+    def test_discord_token(self, discord_token: str) -> bool:
+        """
+        Tests a discord token to see if it's valid.
+        Returns True if it was able to connect with the token, False if it isn't.
+        """
+        return asyncio.run(discord_utils.test_discord_token(discord_token))
+
 
 # pylint: enable=W0201
 
 
 def main():
     # create the object and load our settings
-    oobabot = OobaBot(sys.argv[1:])
+    oobabot = Oobabot(sys.argv[1:])
     # start the loop
     oobabot.run()

@@ -132,3 +132,30 @@ def guild_user_id_to_name(
         return f"@{display_name}"
 
     return _replace_user_id_mention
+
+
+def get_intents() -> discord.Intents:
+    intents = discord.Intents.default()
+    intents.message_content = True
+    intents.members = True
+    return intents
+
+
+async def test_discord_token(discord_token: str) -> bool:
+    class _SimplestBot(discord.Client):
+        async def on_ready(self):
+            self.has_connected = True
+            await self.close()
+
+        def __init__(self):
+            super().__init__(intents=get_intents())
+            self.has_connected = False
+
+    simplest_bot = _SimplestBot()
+    try:
+        await simplest_bot.start(discord_token, reconnect=False)
+    except discord.LoginFailure:
+        return False
+    finally:
+        await simplest_bot.close()
+    return simplest_bot.has_connected

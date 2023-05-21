@@ -60,11 +60,7 @@ class DiscordBot(discord.Client):
         # add stopping_strings to stop_markers
         self.stop_markers.extend(self.ooba_client.get_stopping_strings())
 
-        intents = discord.Intents.default()
-        intents.message_content = True
-        intents.members = True
-
-        super().__init__(intents=intents)
+        super().__init__(intents=discord_utils.get_intents())
 
     async def on_ready(self) -> None:
         guilds = self.guilds
