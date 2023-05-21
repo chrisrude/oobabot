@@ -2,9 +2,11 @@
 """
 Implementation of the bot's slash commands.
 """
+import io
 import typing
 
 import discord
+import discord.ext.commands as discord_ext_commands
 
 from oobabot import decide_to_respond
 from oobabot import discord_utils
@@ -81,6 +83,37 @@ class BotCommands:
                     if isinstance(channel, discord.GroupChannel):
                         return channel
             return None
+
+        @discord.app_commands.command(
+            name="logs",
+            description="Return the most recent log messages from the bot server.  "
+            + "Can only be called by the bot owner.",
+        )
+        @discord_ext_commands.is_owner()
+        async def logs(interaction: discord.Interaction):
+            fancy_logger.get().debug(
+                "/logs called by user '%s' in channel #%d",
+                interaction.user.name,
+                interaction.channel_id,
+            )
+            logs = (
+                fancy_logger.HTML_HEADER
+                + fancy_logger.HTML_RECORD_SEPARATOR.join(
+                    fancy_logger.recent_logs.get_all()
+                )
+                + fancy_logger.HTML_FOOTER
+            )
+            log_bytes = logs.encode("utf-8")
+
+            log_file = discord.File(
+                fp=io.BytesIO(log_bytes),
+                filename="logs.html",
+            )
+
+            await interaction.response.send_message(
+                file=log_file,
+                ephemeral=True,
+            )
 
         @discord.app_commands.command(
             name="say",
@@ -166,6 +199,7 @@ class BotCommands:
 
         tree = discord.app_commands.CommandTree(client)
         tree.add_command(lobotomize)
+        tree.add_command(logs)
         tree.add_command(say)
         commands = await tree.sync(guild=None)
         for command in commands:

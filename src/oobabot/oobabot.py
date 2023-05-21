@@ -28,6 +28,8 @@ from oobabot import settings
 from oobabot import templates
 
 
+# this warning causese more harm than good here
+# pylint: disable=W0201
 class OobaBot:
     """
     Main bot class.  Load settings, creates helper objects,
@@ -38,20 +40,6 @@ class OobaBot:
         self,
         cli_args: typing.List[str],
     ):
-        self.bot_commands: bot_commands.BotCommands = None
-        self.discord_bot: discord_bot.DiscordBot = None
-        self.decide_to_respond: decide_to_respond.DecideToRespond = None
-        self.image_generator: image_generator.ImageGenerator = None
-        self.ooba_client: ooba_client.OobaClient = None
-        self.persona: persona.Persona = None
-        self.prompt_generator: prompt_generator.PromptGenerator = None
-        self.repetition_tracker: repetition_tracker.RepetitionTracker = None
-        self.response_stats: response_stats.ResponseStats = None
-        self.stable_diffusion_client: typing.Optional[
-            sd_client.StableDiffusionClient
-        ] = None
-        self.template_store: templates.TemplateStore = None
-
         self.startup_lock = threading.Lock()
         self.settings = settings.Settings()
 
@@ -90,7 +78,7 @@ class OobaBot:
 
     def _begin(self):
         fancy_logger.init_logging(
-            level=self.settings.discord_settings.get_str("log_level")
+            level=self.settings.discord_settings.get_str("log_level"),
         )
 
         # templates used to generate prompts to send to the AI
@@ -232,6 +220,9 @@ class OobaBot:
     # opens http connections to our services,
     # then connects to Discord
     async def _init_then_start(self):
+        if self.discord_bot is None:
+            raise RuntimeError("Discord bot not initialized")
+
         async with contextlib.AsyncExitStack() as stack:
             for context_manager in [
                 self.ooba_client,
@@ -260,6 +251,9 @@ class OobaBot:
                 self.discord_bot.loop,
             )
         return future.result()
+
+
+# pylint: enable=W0201
 
 
 def main():
