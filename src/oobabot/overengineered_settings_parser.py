@@ -296,7 +296,7 @@ def load_from_yaml(
             for group in setting_groups:
                 group.set_values_from_yaml(yaml_settings)
 
-    except FileNotFoundError:
+    except (FileNotFoundError, IsADirectoryError):
         pass
 
 
