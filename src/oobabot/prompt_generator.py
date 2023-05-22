@@ -108,13 +108,13 @@ class PromptGenerator:
         required_history_size_chars = self.history_lines * chars_per_history_line
 
         if available_chars_for_history < required_history_size_chars:
-            raise ValueError(
+            fancy_logger.get().warning(
                 "AI token space is too small for prompt_prefix and history "
-                + "by an estimated "
-                + f"{required_history_size_chars - available_chars_for_history}"
+                + "by an estimated %d"
                 + " characters.  You may lose history context.  You can save space"
                 + " by shortening the persona or reducing the requested number of"
-                + " lines of history."
+                + " lines of history.",
+                required_history_size_chars - available_chars_for_history,
             )
         self.max_history_chars = available_chars_for_history
 
