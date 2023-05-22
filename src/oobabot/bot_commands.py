@@ -112,7 +112,7 @@ class BotCommands:
             )
             # this will cause the bot to monitor the channel
             # and consider unsolicited responses
-            self.decide_to_respond.log_mention_raw(
+            self.decide_to_respond.log_mention(
                 channel_id=interaction.channel_id,
                 send_timestamp=interaction.created_at.timestamp(),
             )

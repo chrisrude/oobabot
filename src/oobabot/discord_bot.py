@@ -204,26 +204,12 @@ class DiscordBot(discord.Client):
 
         # log the mention, now that we know the channel we
         # want to monitor later to continue to conversation
-        if isinstance(message, types.ChannelMessage):
-            # this logic is weird, so let's explain it...
-            #
-            # we're eventually going to call log_mention()
-            # if all these conditions pass.  When we do this,
-            # we'll start monitoring the channel_id in the near
-            # future for replies that we might respond to, unprompted.
-            #
-            # In the general case, we want to monitor the channel
-            # only if we were summoned in it.
-            #
-            # However if we were summoned in a channel but are
-            # creating a new thread for the answer (because of
-            # the --reply-in-thread flag), we want to monitor
-            # that thread, not the original channel.
-            #
+        if isinstance(response_channel, (discord.Thread, discord.abc.GuildChannel)):
             if is_summon_in_public_channel:
-                if isinstance(response_channel, discord.Thread):
-                    message.channel_id = response_channel.id
-                self.decide_to_respond.log_mention(message)
+                self.decide_to_respond.log_mention(
+                    response_channel.id,
+                    message.send_timestamp,
+                )
 
         image_task = None
         if self.image_generator is not None and image_prompt is not None:
@@ -339,7 +325,9 @@ class DiscordBot(discord.Client):
         reference = None
         ignore_all_until_message_id = None
         if is_summon_in_public_channel:
-            reference = raw_message.to_reference()
+            # we can't use the message reference if we're starting a new thread
+            if message.channel_id == response_channel_id:
+                reference = raw_message.to_reference()
             ignore_all_until_message_id = raw_message.id
 
         recent_messages = await self._recent_messages_following_thread(
@@ -366,10 +354,15 @@ class DiscordBot(discord.Client):
             roles=False,
         )
 
+        # will be set to true when we abort the response because:
+        #  it was empty
+        #  it repeated a previous response and we're throttling it
+        aborted_by_us = False
+        sent_message_count = 0
         try:
             if self.stream_responses:
                 generator = self.ooba_client.request_as_grouped_tokens(prompt_prefix)
-                await self._render_streaming_response(
+                last_sent_message = await self._render_streaming_response(
                     generator,
                     this_response_stat,
                     response_channel,
@@ -377,10 +370,15 @@ class DiscordBot(discord.Client):
                     allowed_mentions,
                     reference,
                 )
+                if last_sent_message is not None:
+                    sent_message_count = 1
             else:
                 if self.dont_split_responses:
                     response = await self.ooba_client.request_as_string(prompt_prefix)
-                    await self._send_response_message(
+                    (
+                        last_sent_message,
+                        aborted_by_us,
+                    ) = await self._send_response_message(
                         response,
                         this_response_stat,
                         response_channel,
@@ -388,11 +386,18 @@ class DiscordBot(discord.Client):
                         allowed_mentions,
                         reference,
                     )
+                    if last_sent_message is not None:
+                        sent_message_count = 1
                 else:
+                    sent_message_count = 0
+                    last_sent_message = None
                     async for sentence in self.ooba_client.request_by_message(
                         prompt_prefix
                     ):
-                        can_continue = await self._send_response_message(
+                        (
+                            sent_message,
+                            abort_response,
+                        ) = await self._send_response_message(
                             sentence,
                             this_response_stat,
                             response_channel,
@@ -400,11 +405,30 @@ class DiscordBot(discord.Client):
                             allowed_mentions=allowed_mentions,
                             reference=reference,
                         )
-                        if not can_continue:
+                        if sent_message is not None:
+                            last_sent_message = sent_message
+                            sent_message_count += 1
+                        if abort_response:
+                            aborted_by_us = True
                             break
 
         except discord.DiscordException as err:
             fancy_logger.get().error("Error: %s", err, exc_info=True)
+            self.response_stats.log_response_failure()
+            return
+
+        if 0 == sent_message_count:
+            if aborted_by_us:
+                fancy_logger.get().warning(
+                    "No response sent.  The AI has generated a message that we have "
+                    + "chosen not to send, probably because it was empty or repeated."
+                )
+            else:
+                fancy_logger.get().warning(
+                    "An empty response was received from Oobabooga.  Please check that "
+                    + "the AI is running properly on the Oobabooga server at %s.",
+                    self.ooba_client.base_url,
+                )
             self.response_stats.log_response_failure()
             return
 
@@ -419,7 +443,7 @@ class DiscordBot(discord.Client):
         response_channel_id: int,
         allowed_mentions: discord.AllowedMentions,
         reference: typing.Optional[discord.MessageReference],
-    ) -> bool:
+    ) -> typing.Tuple[typing.Optional[discord.Message], bool]:
         """
         Given a string that represents an individual response message,
         post it in the given channel.
@@ -431,14 +455,16 @@ class DiscordBot(discord.Client):
         Also does some bookkeeping to make sure we don't repeat ourselves,
         and to track how many messages we've sent.
 
-        Returns True if we can continue, False if we should abort.
+        Returns a tuple with:
+        - the sent discord message, if any
+        - a boolean indicating if we need to abort the response entirely
         """
         (sentence, abort_response) = self._filter_immersion_breaking_lines(response)
         if abort_response:
-            return False
+            return (None, True)
         if not sentence:
             # we can't send an empty message
-            return True
+            return (None, False)
 
         response_message = await response_channel.send(
             sentence,
@@ -446,15 +472,13 @@ class DiscordBot(discord.Client):
             suppress_embeds=True,
             reference=reference,  # type: ignore
         )
-        generic_response_message = discord_utils.discord_message_to_generic_message(
-            response_message
-        )
         self.repetition_tracker.log_message(
-            response_channel_id, generic_response_message
+            response_channel_id,
+            discord_utils.discord_message_to_generic_message(response_message),
         )
 
         this_response_stat.log_response_part()
-        return True
+        return (response_message, False)
 
     async def _render_streaming_response(
         self,
@@ -464,7 +488,7 @@ class DiscordBot(discord.Client):
         response_channel_id: int,
         allowed_mentions: discord.AllowedMentions,
         reference: typing.Optional[discord.MessageReference],
-    ):
+    ) -> typing.Optional[discord.Message]:
         response = ""
         last_message = None
         async for token in response_iterator:
@@ -499,15 +523,13 @@ class DiscordBot(discord.Client):
 
             this_response_stat.log_response_part()
 
-        if last_message is None:
-            raise discord.DiscordException("No response was generated")
+        if last_message is not None:
+            self.repetition_tracker.log_message(
+                response_channel_id,
+                discord_utils.discord_message_to_generic_message(last_message),
+            )
 
-        generic_response_message = discord_utils.discord_message_to_generic_message(
-            last_message
-        )
-        self.repetition_tracker.log_message(
-            response_channel_id, generic_response_message
-        )
+        return last_message
 
     def _filter_immersion_breaking_lines(
         self, sentence: str

@@ -221,6 +221,10 @@ class ImageGenerator:
     message to a given channel.
     """
 
+    # if a potential image prompt is shorter than this, we will
+    # conclude that it is not an image prompt.
+    MIN_IMAGE_PROMPT_LENGTH = 3
+
     def __init__(
         self,
         ooba_client: ooba_client.OobaClient,
@@ -324,6 +328,8 @@ class ImageGenerator:
             match = image_pattern.search(raw_message.content)
             if match:
                 image_prompt = match.group(2)
+                if len(image_prompt) < self.MIN_IMAGE_PROMPT_LENGTH:
+                    continue
                 fancy_logger.get().debug("Found image prompt: %s", image_prompt)
                 return image_prompt
         return None
