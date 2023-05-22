@@ -285,7 +285,7 @@ class Settings:
                     textwrap.dedent(
                         """
                         One or more words that the bot will listen for.
-                        The bot will listen in all discord channels can
+                        The bot will listen in all discord channels it can
                         access for one of these words to be mentioned, then reply
                         to any messages it sees with a matching word.
                         The bot will always reply to @-mentions and
