@@ -162,12 +162,10 @@ async def test_discord_token(discord_token: str) -> bool:
     return simplest_bot.has_connected
 
 
-def generate_invite_url(discord_token: str) -> str:
-    # we want to generate a URL like this:
-    # https://discord.com/api/oauth2/authorize?client_id={client_id}&permissions={permissions}}&scope=bot
-    #
-    # where {client_id} is the bot's client ID, and {permissions} is the
-    # permissions bit array with our desired permissions set.
+def get_user_id_from_token(discord_token: str) -> int:
+    """
+    Extract the bot's user ID from the discord token.
+    """
 
     # turns out, the discord_token includes our client ID, so we can just
     # extract it from there.
@@ -187,7 +185,15 @@ def generate_invite_url(discord_token: str) -> str:
     if len(token_part_a) % 4 != 0:
         token_part_a += "=" * (4 - len(token_part_a) % 4)
 
-    client_id = base64.b64decode(token_part_a).decode("utf-8")
+    return int(base64.b64decode(token_part_a).decode("utf-8"))
+
+
+def generate_invite_url(ai_user_id: int) -> str:
+    # we want to generate a URL like this:
+    # https://discord.com/api/oauth2/authorize?client_id={client_id}&permissions={permissions}}&scope=bot
+    #
+    # where {client_id} is the bot's client ID, and {permissions} is the
+    # permissions bit array with our desired permissions set.
 
     # for the permissions bit array, we can generate it with the library
     permissions = discord.Permissions(
@@ -203,5 +209,5 @@ def generate_invite_url(discord_token: str) -> str:
 
     return (
         "https://discord.com/api/oauth2/authorize?client_id="
-        + f"{client_id}&permissions={permissions}&scope=bot"
+        + f"{ai_user_id}&permissions={permissions}&scope=bot"
     )

@@ -328,7 +328,8 @@ class Oobabot:
 
         Can be called from any thread.  Does not require Internet connectivity.
         """
-        return discord_utils.generate_invite_url(discord_token)
+        ai_user_id = discord_utils.get_user_id_from_token(discord_token)
+        return discord_utils.generate_invite_url(ai_user_id)
 
 
 # pylint: enable=W0201

@@ -141,6 +141,8 @@ class AggregateResponseStats:
         """
         if 0 == self.total_successful_responses:
             return 0.0
+        if 0.0 == self.total_response_time_seconds:
+            return 0.0
         return self.fn_get_total_tokens() / self.total_response_time_seconds
 
     def average_prompt_length(self) -> float:

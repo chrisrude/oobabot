@@ -129,6 +129,17 @@ class DiscordBot(discord.Client):
                 "Failed to register commands: %s (continuing without commands)", err
             )
 
+        # show a warning if the bot is connected to zero guilds,
+        # with a helpful link on how to fix it
+        if num_guilds == 0:
+            fancy_logger.get().warning(
+                "The bot is not connected to any servers.  "
+                + "Please add the bot to a server here:",
+            )
+            fancy_logger.get().warning(
+                discord_utils.generate_invite_url(self.ai_user_id)
+            )
+
     async def on_message(self, raw_message: discord.Message) -> None:
         """
         Called when a message is received from Discord.

@@ -15,6 +15,16 @@ def test_things_can_be_created_at_least():
     oobabot.Oobabot(args)
 
 
+def test_user_id_extraction():
+    assert 1111111111111111111 == oobabot.discord_utils.get_user_id_from_token(
+        "MTExMTExMTExMTExMTExMTExMQ.000000.00000000000000000000000000000000000000"
+    )
+
+    assert 1234567891101101011 == oobabot.discord_utils.get_user_id_from_token(
+        "MTIzNDU2Nzg5MTEwMTEwMTAxMQ.000000.00000000000000000000000000000000000000"
+    )
+
+
 def test_discord_token():
     bot = oobabot.Oobabot([])
     connected = bot.test_discord_token("1234")
