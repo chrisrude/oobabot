@@ -267,6 +267,9 @@ class ConfigSettingGroup:
                 val = group_dict[setting.name]
                 setting.set_value(val)
 
+    def set(self, name: str, value: SettingValueType) -> None:
+        self.settings[name].set_value(value)
+
     def get_setting(self, name: str) -> ConfigSetting:
         return self.settings[name]
 
