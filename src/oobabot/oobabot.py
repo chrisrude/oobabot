@@ -132,6 +132,7 @@ class Oobabot:
 
         fancy_logger.init_logging(
             level=self.settings.discord_settings.get_str("log_level"),
+            log_to_console=self._our_own_main(),
         )
 
         # templates used to generate prompts to send to the AI

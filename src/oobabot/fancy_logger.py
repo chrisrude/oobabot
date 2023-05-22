@@ -133,20 +133,20 @@ def do_escape(msg: typing.Optional[typing.Any]) -> typing.Optional[typing.Any]:
 
 def init_logging(
     level: typing.Union[int, str],
+    log_to_console: bool = True,
 ) -> None:
     logger = get()
-    if not level:
-        level = logging.DEBUG
     logger.setLevel(level)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(
-        ColorfulLoggingFormatter(
-            coloring_book=make_coloring_book(apply_color_console),
+    if log_to_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(
+            ColorfulLoggingFormatter(
+                coloring_book=make_coloring_book(apply_color_console),
+            )
         )
-    )
-    logger.addHandler(console_handler)
+        logger.addHandler(console_handler)
 
     recent_logs.setLevel(level)
     recent_logs.setFormatter(
