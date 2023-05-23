@@ -293,6 +293,7 @@ class Oobabot:
                 )
             finally:
                 await self.discord_bot.close()
+        fancy_logger.get().info("Disconnected from Discord.")
 
     def stop(self):
         """

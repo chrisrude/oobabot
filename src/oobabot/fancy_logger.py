@@ -256,7 +256,7 @@ class RingBufferedHandler(logging.Handler):
     A singleton logging handler that stores the last N log messages in a ring buffer.
     """
 
-    def __init__(self, buffer_size: int = 80) -> None:
+    def __init__(self, buffer_size: int = 45) -> None:
         super().__init__()
         self.buffer = RingBuffer(buffer_size)
 

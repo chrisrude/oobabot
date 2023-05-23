@@ -184,6 +184,9 @@ class OobaClient(http_client.SerializedHttpClient):
         splitter = self.fn_new_splitter()
         async for new_token in self.request_by_token(prompt):
             for sentence in splitter.next(new_token):
+                # remove "### Assistant: " from strings
+                if sentence.startswith("### Assistant: "):
+                    sentence = sentence[len("### Assistant: ") :]
                 yield sentence
 
     async def request_as_string(self, prompt: str) -> str:
