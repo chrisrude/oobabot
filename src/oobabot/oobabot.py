@@ -6,11 +6,14 @@ Bot entrypoint.
 """
 
 import asyncio
+import concurrent.futures
 import contextlib
 import signal
 import sys
 import threading
 import typing
+
+import discord
 
 from oobabot import bot_commands
 from oobabot import decide_to_respond
@@ -291,11 +294,16 @@ class Oobabot:
                 await self.discord_bot.start(
                     self.settings.discord_settings.get_str("discord_token")
                 )
+            except discord.LoginFailure as err:
+                fancy_logger.get().error("Could not log in to Discord: %s", err)
+                fancy_logger.get().error("Please check the token and try again.")
+                if self._our_own_main():
+                    sys.exit(1)
             finally:
                 await self.discord_bot.close()
         fancy_logger.get().info("Disconnected from Discord.")
 
-    def stop(self):
+    def stop(self, wait_timeout: float = 5.0) -> None:
         """
         Stops the bot, if it's running.  Safe to be called
         from a separate thread from the one that called run().
@@ -303,13 +311,33 @@ class Oobabot:
         Blocks until the bot is gracefully stopped.
         """
         if self.discord_bot is None:
-            return None
+            return
+
+        async def close_and_set() -> None:
+            if self.discord_bot is None:
+                return
+            await self.discord_bot.close()
+
         with self.startup_lock:
-            future = asyncio.run_coroutine_threadsafe(
-                self.discord_bot.close(),
-                self.discord_bot.loop,
-            )
-        return future.result()
+            try:
+                # if discord is already stopped, then their .loop is set
+                # _MissingSentinel.  So instead check if it's still connected.
+                if self.discord_bot.is_closed():
+                    fancy_logger.get().info("Discord bot already stopped.")
+                    return
+
+                future = asyncio.run_coroutine_threadsafe(
+                    close_and_set(),
+                    self.discord_bot.loop,
+                )
+                future.result(timeout=wait_timeout)
+            except RuntimeError:
+                # this can happen if the main application is shutting down
+                fancy_logger.get().warning("Discord bot is already stopped.")
+            except concurrent.futures.TimeoutError:
+                fancy_logger.get().warning(
+                    "Discord bot did not stop in time, it might be busted."
+                )
 
     @classmethod
     def test_discord_token(cls, discord_token: str) -> bool:
