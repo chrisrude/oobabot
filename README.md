@@ -73,15 +73,17 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 You should now be able to run oobabot from wherever pip installed it.
 
 ```none
-usage: oobabot [-h] [-c CONFIG] [--generate-config] [--ai-name AI_NAME] [--persona PERSONA]
-               [--wakewords [WAKEWORDS ...]] [--discord-token DISCORD_TOKEN]
-               [--dont-split-responses] [--history-lines HISTORY_LINES] [--ignore-dms]
-               [--reply-in-thread] [--stream-responses] [--base-url BASE_URL]
-               [--log-all-the-things] [--image-words [IMAGE_WORDS ...]]
+  ³ oobabot  ~/oobabot        oobabot --help         383ms  Tue May 23 18:56:42 2023
+usage: oobabot [-h] [-c CONFIG] [--generate-config] [--invite-url] [--ai-name AI_NAME]
+               [--persona PERSONA] [--wakewords [WAKEWORDS ...]]
+               [--discord-token DISCORD_TOKEN] [--dont-split-responses]
+               [--history-lines HISTORY_LINES] [--ignore-dms] [--reply-in-thread]
+               [--stream-responses] [--base-url BASE_URL] [--log-all-the-things]
+               [--message-regex MESSAGE_REGEX] [--image-words [IMAGE_WORDS ...]]
                [--stable-diffusion-url STABLE_DIFFUSION_URL]
-               [--extra-prompt-text EXTRA_PROMPT_TEXT]
+               [--extra-prompt-text EXTRA_PROMPT_TEXT] [--use-ai-generated-keywords]
 
-oobabot v0.1.7: Discord bot for oobabooga's text-generation-webui
+oobabot v0.1.8: Discord bot for oobabooga's text-generation-webui
 
 General Settings:
 
@@ -92,6 +94,8 @@ General Settings:
   --generate-config     If set, oobabot will print its configuration as a .yml file, then
                         exit. Any command-line settings also passed will be reflected in
                         this file. (default: False)
+  --invite-url          Print a URL which can be used to invite the bot to a Discord
+                        server. Requires that the Discord token is set. (default: False)
 
 Persona:
 
@@ -102,7 +106,7 @@ Persona:
                         variable. (default: )
   --wakewords [WAKEWORDS ...]
                         One or more words that the bot will listen for. The bot will listen
-                        in all discord channels can access for one of these words to be
+                        in all discord channels it can access for one of these words to be
                         mentioned, then reply to any messages it sees with a matching word.
                         The bot will always reply to @-mentions and direct messages, even
                         if no wakewords are supplied. (default: ['oobabot'])
@@ -115,7 +119,7 @@ Discord:
                         variable instead, if possible. (default: )
   --dont-split-responses
                         Post the entire response as a single message, rather than splitting
-                        it into seperate messages by sentence. (default: False)
+                        it into separate messages by sentence. (default: False)
   --history-lines HISTORY_LINES
                         Number of lines of chat history the AI will see when generating a
                         response. (default: 7)
@@ -123,8 +127,8 @@ Discord:
                         False)
   --reply-in-thread     If set, the bot will generate a thread to respond in if it is not
                         already in one. (default: False)
-  --stream-responses    Stream responses into a single message as they are generated.
-                        (default: False)
+  --stream-responses    FEATURE PREVIEW: Stream responses into a single message as they are
+                        generated. Note: may be janky (default: False)
 
 Oobabooga:
 
@@ -133,18 +137,30 @@ Oobabooga:
                         wss://hostname[:port] for websocket connections over TLS. (default:
                         ws://localhost:5005)
   --log-all-the-things  Print all AI input and output to STDOUT. (default: False)
+  --message-regex MESSAGE_REGEX
+                        A regex that will be used to extract message lines from the AI's
+                        output. The first capture group will be used as the message. If
+                        this is not set, the entire output will be used as the message.
+                        (default: )
 
 Stable Diffusion:
 
   --image-words [IMAGE_WORDS ...]
                         When one of these words is used in a message, the bot will generate
-                        an image. (default: ['drawing', 'photo', 'pic', 'picture', 'image',
-                        'sketch'])
+                        an image. (default: ['draw me', 'drawing', 'photo', 'pic',
+                        'picture', 'image', 'sketch'])
   --stable-diffusion-url STABLE_DIFFUSION_URL
                         URL for an AUTOMATIC1111 Stable Diffusion server. (default: )
   --extra-prompt-text EXTRA_PROMPT_TEXT
                         This will be appended to every image generation prompt sent to
                         Stable Diffusion. (default: )
+  --use-ai-generated-keywords
+                        FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate
+                        image keywords from a user's message. It will then pass the
+                        keywords that Oobabooga produces to Stable Diffusion to finally
+                        generate an image. Otherwise, the bot will simply extract keywords
+                        directly from the user's message using a simple regex. (default:
+                        False)
 
 
 Additional settings can be set in config.yml.  Use the --generate-config option to print a

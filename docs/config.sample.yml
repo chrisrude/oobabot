@@ -6,7 +6,7 @@
 # "config.yml" from the current directory when it is run.
 #
 
-version: 0.1.6
+version: 0.1.8
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # persona
@@ -15,20 +15,27 @@ persona:
 
   # Name the AI will use to refer to itself
   #   default: oobabot
-  ai_name: oobabot
+  ai_name:
 
   # This prefix will be added in front of every user-supplied request.  This is useful for
   # setting up a 'character' for the bot to play.  Alternatively, this can be set with the
   # OOBABOT_PERSONA environment variable.
-  persona: ''
+  persona:
+
+  # Path to a file containing a persona.  This can be just a single string, a json file in
+  # the common "tavern" formats, or a yaml file in the Oobabooga format.  With a single
+  # string, the persona will be set to that string.  Otherwise, the ai_name and persona will
+  # be overwritten with the values in the file.  Also, the wakewords will be extended to
+  # include the character's own name.
+  #   default:
+  persona_file:
 
   # One or more words that the bot will listen for. The bot will listen in all discord
-  # channels can access for one of these words to be mentioned, then reply to any messages
-  # it sees with a matching word. The bot will always reply to @-mentions and direct
-  # messages, even if no wakewords are supplied.
+  # channels it can access for one of these words to be mentioned, then reply to any
+  # messages it sees with a matching word. The bot will always reply to @-mentions and
+  # direct messages, even if no wakewords are supplied.
   #   default: ['oobabot']
   wakewords:
-    - oobabot
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # discord
@@ -41,31 +48,35 @@ discord:
 
   # Post the entire response as a single message, rather than splitting it into separate
   # messages by sentence.
-  #   default: false
-  dont_split_responses: false
+  #   default: False
+  dont_split_responses:
 
   # Number of lines of chat history the AI will see when generating a response.
   #   default: 7
-  history_lines: 7
+  history_lines:
 
   # If set, the bot will not respond to direct messages.
-  #   default: false
-  ignore_dms: false
+  #   default: False
+  ignore_dms:
+
+  # Set the log level.  Valid values are:
+  # CRITICAL, ERROR, WARNING, INFO, DEBUG
+  #   default: DEBUG
+  log_level:
 
   # If set, the bot will generate a thread to respond in if it is not already in one.
-  #   default: false
-  reply_in_thread: false
+  #   default: False
+  reply_in_thread:
 
   # A list of strings that will cause the bot to stop generating a response when
   # encountered.
-  #   default: ['### end of transcript ###<|endoftext|>', '<|endoftext|>']
+  #   default: ['### End of Transcript ###<|endoftext|>', '<|endoftext|>']
   stop_markers:
-    - '### End of Transcript ###<|endoftext|>'
-    - <|endoftext|>
 
-  # Stream responses into a single message as they are generated.
-  #   default: false
-  stream_responses: false
+  # FEATURE PREVIEW: Stream responses into a single message as they are generated. Note: may
+  # be janky
+  #   default: False
+  stream_responses:
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # oobabooga
@@ -75,11 +86,17 @@ oobabooga:
   # Base URL for the oobabooga instance.  This should be ws://hostname[:port] for plain
   # websocket connections, or wss://hostname[:port] for websocket connections over TLS.
   #   default: ws://localhost:5005
-  base_url: ws://localhost:5005
+  base_url:
 
   # Print all AI input and output to STDOUT.
-  #   default: false
-  log_all_the_things: false
+  #   default: False
+  log_all_the_things:
+
+  # A regex that will be used to extract message lines from the AI's output.  The first
+  # capture group will be used as the message.  If this is not set, the entire output will
+  # be used as the message.
+  #   default:
+  message_regex:
 
   # A dictionary which will be passed straight through to Oobabooga on every request.  Feel
   # free to add additional simple parameters here as Oobabooga's API evolves. See
@@ -111,22 +128,16 @@ oobabooga:
 stable_diffusion:
 
   # When one of these words is used in a message, the bot will generate an image.
-  #   default: ['drawing', 'photo', 'pic', 'picture', 'image', 'sketch']
+  #   default: ['draw me', 'drawing', 'photo', 'pic', 'picture', 'image', 'sketch']
   image_words:
-    - drawing
-    - photo
-    - pic
-    - picture
-    - image
-    - sketch
 
   # URL for an AUTOMATIC1111 Stable Diffusion server.
   #   default:
-  stable_diffusion_url: ''
+  stable_diffusion_url:
 
   # This will be appended to every image generation prompt sent to Stable Diffusion.
   #   default:
-  extra_prompt_text: ''
+  extra_prompt_text:
 
   # A dictionary which will be passed straight through to Stable Diffusion on every request.
   # Feel free to add additional simple parameters here as Stable Diffusion's API evolves.
@@ -140,3 +151,60 @@ stable_diffusion:
     width: 512
     height: 512
     sampler: ''
+
+  # FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate image keywords from a
+  # user's message.  It will then pass the keywords that Oobabooga produces to Stable
+  # Diffusion to finally generate an image. Otherwise, the bot will simply extract keywords
+  # directly from the user's message using a simple regex.
+  #   default: False
+  use_ai_generated_keywords:
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# template
+# .
+template:
+
+  # Path to a file containing the prompt template.
+  # The main prompt sent to Oobabooga to generate a response from the bot AI.  The AI's
+  # reply to this prompt will be sent to discord as the bot's response.
+  # .
+  # Allowed tokens: {AI_NAME}, {IMAGE_COMING}, {MESSAGE_HISTORY}, {PERSONA}
+  # .
+  #   default:  You are in a chat room with multiple participants. Below is a transcript of
+  # recent messages in the conversation. Write the next one to three messages that you would
+  # send in this conversation, from the point of view of the participant named {AI_NAME}.
+  # {PERSONA}  All responses you write must be from the point of view of {AI_NAME}. ###
+  # Transcript: {MESSAGE_HISTORY} {IMAGE_COMING}
+  prompt:
+
+  # Path to a file containing the prompt_history_line template.
+  # Part of the AI response-generation prompt, this is used to render a single line of chat
+  # history.  A list of these, one for each past chat message, will become {MESSAGE_HISTORY}
+  # and inserted into the main prompt
+  # .
+  # Allowed tokens: {USER_MESSAGE}, {USER_NAME}
+  # .
+  #   default:  {USER_NAME} says: {USER_MESSAGE}
+  prompt_history_line:
+
+  # Path to a file containing the prompt_image_coming template.
+  # Part of the AI response-generation prompt, this is used to inform the AI that it is in
+  # the process of generating an image.
+  # .
+  # Allowed tokens: {AI_NAME}
+  # .
+  #   default:  {AI_NAME}: is currently generating an image, as requested.
+  prompt_image_coming:
+
+  # Path to a file containing the prompt_image_keywords template.
+  # Sent to Oobabooga, along with the user's image request, to generate             image
+  # keywords.  The AI's response to this prompt will then be sent             to Stable
+  # Diffusion to generate an image.
+  # .
+  # Allowed tokens: {AI_NAME}, {USER_MESSAGE}
+  # .
+  #   default:  Below is an instruction that describes a task, paired with an input that
+  # provides further context. Write a response that appropriately completes the request.
+  # ### Instruction: The input text asks for an image to be created.  Please create a list
+  # of keywords to describe that image.  ### Input: {USER_MESSAGE}  ### Response:
+  prompt_image_keywords:
