@@ -244,7 +244,7 @@ class Oobabot:
             try:
                 client.test_connection()
                 fancy_logger.get().info("Connected to %s!", client.service_name)
-            except http_client.OobaHttpClientError as err:
+            except (ValueError, http_client.OobaHttpClientError) as err:
                 fancy_logger.get().error(
                     "Could not connect to %s server: [%s]",
                     client.service_name,
