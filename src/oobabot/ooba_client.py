@@ -11,6 +11,7 @@ import typing
 
 import aiohttp
 import pysbd
+import pysbd.utils
 
 from oobabot import fancy_logger
 from oobabot import http_client
@@ -97,7 +98,9 @@ class SentenceSplitter(MessageSplitter):
         self.segmenter = pysbd.Segmenter(language="en", clean=False, char_span=True)
 
     def partition(self, unseen: str) -> typing.Generator[str, None, None]:
-        segments = self.segmenter.segment(unseen)
+        segments: typing.List[pysbd.utils.TextSpan] = self.segmenter.segment(
+            unseen
+        )  # type: ignore -- type is determined by char_span=True above
 
         # any remaining non-sentence things will be in the last element
         # of the list.  Don't print that yet.  At the very worst, we'll

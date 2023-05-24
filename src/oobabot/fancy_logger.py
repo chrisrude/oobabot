@@ -8,6 +8,8 @@ import logging
 import textwrap
 import typing
 
+from oobabot import discord_utils
+
 FOREGROUND_COLORS = {
     "black": 30,
     "red": 31,
@@ -18,6 +20,8 @@ FOREGROUND_COLORS = {
     "cyan": 36,
     "white": 37,
 }
+
+BACKGROUND_COLORS = {k: v + 10 for k, v in FOREGROUND_COLORS.items()}
 
 HTML_HEADER = textwrap.dedent(
     """
@@ -53,8 +57,10 @@ HTML_RECORD_SEPARATOR = "\n<br>"
 HTML_FOOTER = "</div></body></html>"
 
 
-def apply_color_console(color: str, text: str) -> str:
-    return f"\033[{FOREGROUND_COLORS[color]}m{text}\033[0m"
+def apply_color_console(color: str, text: str, bg_color: str = "black") -> str:
+    return (
+        f"\033[{FOREGROUND_COLORS[color]};{BACKGROUND_COLORS[bg_color]}m{text}\033[0m"
+    )
 
 
 def apply_color_html(color: str, text: str) -> str:
@@ -64,7 +70,10 @@ def apply_color_html(color: str, text: str) -> str:
 def make_coloring_book(
     fn_apply_color: typing.Callable[[str, str], str]
 ) -> typing.Dict[int, str]:
-    prefix = f'{fn_apply_color("yellow", "%(asctime)s")} %(levelname)s '
+    prefix = (
+        f'{fn_apply_color("yellow", "%(asctime)s")}'
+        + f'{fn_apply_color("white", " %(levelname)5s ")}'
+    )
     msg = "%(message)s"
     return {
         logging.DEBUG: prefix + fn_apply_color("cyan", msg),
@@ -147,6 +156,17 @@ def init_logging(
             )
         )
         logger.addHandler(console_handler)
+
+        discord_utils.setup_logging(
+            handler=logging.StreamHandler(),
+            level=logging.INFO,
+            formatter=ColorfulLoggingFormatter(
+                coloring_book=make_coloring_book(
+                    lambda a, b: apply_color_console(a, b, "magenta")
+                ),
+            ),
+            root=False,
+        )
 
     recent_logs.setLevel(level)
     recent_logs.setFormatter(

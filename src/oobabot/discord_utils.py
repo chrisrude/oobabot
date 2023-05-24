@@ -211,3 +211,7 @@ def generate_invite_url(ai_user_id: int) -> str:
         "https://discord.com/api/oauth2/authorize?client_id="
         + f"{ai_user_id}&permissions={permissions}&scope=bot"
     )
+
+
+def setup_logging(**kwargs: typing.Any):
+    discord.utils.setup_logging(**kwargs)
