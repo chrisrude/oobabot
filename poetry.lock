@@ -933,13 +933,13 @@ files = [
 
 [[package]]
 name = "ruamel-yaml"
-version = "0.17.26"
+version = "0.17.27"
 description = "ruamel.yaml is a YAML parser/emitter that supports roundtrip preservation of comments, seq/map flow style, and map key order"
 optional = false
 python-versions = ">=3"
 files = [
-    {file = "ruamel.yaml-0.17.26-py3-none-any.whl", hash = "sha256:25d0ee82a0a9a6f44683dcf8c282340def4074a4562f3a24f55695bb254c1693"},
-    {file = "ruamel.yaml-0.17.26.tar.gz", hash = "sha256:baa2d0a5aad2034826c439ce61c142c07082b76f4791d54145e131206e998059"},
+    {file = "ruamel.yaml-0.17.27-py3-none-any.whl", hash = "sha256:c4ffffc972d35927e715683fe1e2e47fa2aebb26ce67fe75e599fb84f115f20b"},
+    {file = "ruamel.yaml-0.17.27.tar.gz", hash = "sha256:cad7e3917da5c321658479f417320443b073e7b272033c799ba52e441d561ae5"},
 ]
 
 [package.dependencies]
@@ -1034,13 +1034,13 @@ files = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.6.1"
+version = "4.6.2"
 description = "Backported and Experimental Type Hints for Python 3.7+"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "typing_extensions-4.6.1-py3-none-any.whl", hash = "sha256:6bac751f4789b135c43228e72de18637e9a6c29d12777023a703fd1a6858469f"},
-    {file = "typing_extensions-4.6.1.tar.gz", hash = "sha256:558bc0c4145f01e6405f4a5fdbd82050bd221b119f4bf72a961a1cfd471349d6"},
+    {file = "typing_extensions-4.6.2-py3-none-any.whl", hash = "sha256:3a8b36f13dd5fdc5d1b16fe317f5668545de77fa0b8e02006381fd49d731ab98"},
+    {file = "typing_extensions-4.6.2.tar.gz", hash = "sha256:06006244c70ac8ee83fa8282cb188f697b8db25bc8b4df07be1873c43897060c"},
 ]
 
 [[package]]

@@ -407,7 +407,7 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
-            oesp.ConfigSetting[bool](
+            oesp.ConfigSetting[int](
                 name="stream_responses",
                 default=False,
                 description_lines=[
@@ -416,6 +416,29 @@ class Settings:
                         FEATURE PREVIEW: Stream responses into a single message
                         as they are generated.
                         Note: may be janky
+                        """
+                    )
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[int](
+                name="unsolicited_channel_cap",
+                default=3,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Adds a limit to the number of channels
+                        the bot will post unsolicited messages in at the same
+                        time.  This is to prevent the bot from being too noisy
+                        in large servers.
+
+                        When set, only the most recent N channels the bot has
+                        been summoned in will have a chance of receiving an
+                        unsolicited message.  The bot will still respond to
+                        @-mentions and wake words in any channel it can access.
+
+                        Set to 0 to disable this feature.
                         """
                     )
                 ],

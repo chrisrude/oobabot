@@ -106,6 +106,14 @@ class DiscordBot(discord.Client):
             "Stop markers: %s", ", ".join(self.stop_markers) or "<none>"
         )
 
+        # log unsolicited_channel_cap
+        cap = self.decide_to_respond.get_unsolicited_channel_cap()
+        cap = str(cap) if cap > 0 else "<unlimited>"
+        fancy_logger.get().debug(
+            "Unsolicited channel cap: %s",
+            cap,
+        )
+
         str_wakewords = (
             ", ".join(self.persona.wakewords) if self.persona.wakewords else "<none>"
         )

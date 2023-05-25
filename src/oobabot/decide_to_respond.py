@@ -19,14 +19,23 @@ class LastReplyTimes(dict):
     This uses the timestamp on the message, not the local system's
     RTC.  The advantage of this is that if messages are delayed,
     we'll only respond to ones that were actually sent within the
-    appropriate time window.
+    appropriate time window.  It also makes it easier to test.
     """
 
-    def __init__(self, cache_timeout: float):
+    def __init__(self, cache_timeout: float, unsolicited_channel_cap: int):
         self.cache_timeout = cache_timeout
+        self.unsolicited_channel_cap = unsolicited_channel_cap
 
     def purge_outdated(self, latest_timestamp: float) -> None:
         oldest_time_to_keep = latest_timestamp - self.cache_timeout
+
+        if self.unsolicited_channel_cap > 0:
+            # find the n-th largest timestamp
+            if self.unsolicited_channel_cap < len(self):
+                nth_largest_timestamp = sorted(self.values())[
+                    -self.unsolicited_channel_cap
+                ]
+                oldest_time_to_keep = max(oldest_time_to_keep, nth_largest_timestamp)
         purged = {
             channel_id: response_time
             for channel_id, response_time in self.items()
@@ -61,7 +70,11 @@ class DecideToRespond:
         self.time_vs_response_chance = time_vs_response_chance
 
         last_reply_cache_timeout = max(time for time, _ in time_vs_response_chance)
-        self.last_reply_times = LastReplyTimes(last_reply_cache_timeout)
+        unsolicited_channel_cap = discord_settings["unsolicited_channel_cap"]
+        self.last_reply_times = LastReplyTimes(
+            last_reply_cache_timeout,
+            unsolicited_channel_cap,
+        )
 
     def is_directly_mentioned(
         self, our_user_id: int, message: types.GenericMessage
@@ -193,3 +206,6 @@ class DecideToRespond:
 
     def log_mention(self, channel_id: int, send_timestamp: float) -> None:
         self.last_reply_times.log_mention(channel_id, send_timestamp)
+
+    def get_unsolicited_channel_cap(self) -> int:
+        return self.last_reply_times.unsolicited_channel_cap
