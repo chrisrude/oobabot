@@ -10,7 +10,7 @@ repository = "https://github.com/chrisrude/oobabot"
 [tool.poetry.dependencies]
 aiohttp = "^3.8.4"
 python = "^3.8.1"
-"discord.py" = {extras = ["voice"], version = "^2.2.3"}
+"discord.py" = "^2.2.2"
 pysbd = "^0.3.4"
 ruamel-yaml = "^0.17.26"
 
