@@ -44,11 +44,9 @@ def _console_wrapped(message):
 
 
 def _make_template_comment(
-    name: str,
     tokens_desc_tuple: typing.Tuple[typing.List[templates.TemplateToken], str, bool],
 ) -> typing.List[str]:
     return [
-        f"Path to a file containing the {name} template.",
         tokens_desc_tuple[1],
         ".",
         f"Allowed tokens: {', '.join([str(t) for t in tokens_desc_tuple[0]])}",
@@ -619,9 +617,7 @@ class Settings:
                 oesp.ConfigSetting[str](
                     name=str(template),
                     default=templates.TemplateStore.DEFAULT_TEMPLATES[template],
-                    description_lines=_make_template_comment(
-                        str(template), tokens_desc_tuple
-                    ),
+                    description_lines=_make_template_comment(tokens_desc_tuple),
                     include_in_yaml=is_ai_prompt,
                 )
             )
@@ -795,6 +791,19 @@ class Settings:
                 except (ValueError, IndexError):
                     continue
         return config_setting.default
+
+    def load_from_yaml_stream(self, stream: typing.TextIO) -> typing.Optional[str]:
+        """
+        Load the config from a YAML stream.
+
+        params:
+            stream: stream to load the config from
+
+        returns:
+            None if the config was loaded successfully, otherwise a string
+            containing an error message.
+        """
+        return oesp.load_from_yaml_stream(stream, setting_groups=self.setting_groups)
 
     def load(
         self,
