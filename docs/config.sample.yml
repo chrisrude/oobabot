@@ -6,7 +6,7 @@
 # "config.yml" from the current directory when it is run.
 #
 
-version: 0.1.8
+version: 0.1.9
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # persona
@@ -77,6 +77,15 @@ discord:
   # be janky
   #   default: False
   stream_responses:
+
+  # FEATURE PREVIEW: Adds a limit to the number of channels the bot will post unsolicited
+  # messages in at the same time.  This is to prevent the bot from being too noisy in large
+  # servers.  When set, only the most recent N channels the bot has been summoned in will
+  # have a chance of receiving an unsolicited message.  The bot will still respond to
+  # @-mentions and wake words in any channel it can access.  Set to 0 to disable this
+  # feature.
+  #   default: 3
+  unsolicited_channel_cap:
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # oobabooga
@@ -164,7 +173,6 @@ stable_diffusion:
 # .
 template:
 
-  # Path to a file containing the prompt template.
   # The main prompt sent to Oobabooga to generate a response from the bot AI.  The AI's
   # reply to this prompt will be sent to discord as the bot's response.
   # .
@@ -177,7 +185,6 @@ template:
   # Transcript: {MESSAGE_HISTORY} {IMAGE_COMING}
   prompt:
 
-  # Path to a file containing the prompt_history_line template.
   # Part of the AI response-generation prompt, this is used to render a single line of chat
   # history.  A list of these, one for each past chat message, will become {MESSAGE_HISTORY}
   # and inserted into the main prompt
@@ -187,7 +194,6 @@ template:
   #   default:  {USER_NAME} says: {USER_MESSAGE}
   prompt_history_line:
 
-  # Path to a file containing the prompt_image_coming template.
   # Part of the AI response-generation prompt, this is used to inform the AI that it is in
   # the process of generating an image.
   # .
@@ -196,7 +202,6 @@ template:
   #   default:  {AI_NAME}: is currently generating an image, as requested.
   prompt_image_coming:
 
-  # Path to a file containing the prompt_image_keywords template.
   # Sent to Oobabooga, along with the user's image request, to generate             image
   # keywords.  The AI's response to this prompt will then be sent             to Stable
   # Diffusion to generate an image.
