@@ -12,10 +12,12 @@ write_to_stream - writes the given config as YAML to the given stream.
 """
 
 import argparse
+import pathlib
 import textwrap
 import typing
 
 import ruamel.yaml as ryaml
+import ruamel.yaml.error as ryaml_error
 
 import oobabot
 
@@ -289,19 +291,38 @@ class ConfigSettingGroup:
 def load_from_yaml(
     filename: str,
     setting_groups: typing.List["ConfigSettingGroup"],
-) -> None:
+) -> typing.Optional[str]:
     """
     Load settings from a YAML file only
+
+    Returns None if successful, or an error message if not
     """
     try:
         with open(filename, "r", encoding="utf-8") as file:
-            yaml = ryaml.YAML(typ="safe")
-            yaml_settings = yaml.load(file)
-            for group in setting_groups:
-                group.set_values_from_yaml(yaml_settings)
+            return load_from_yaml_stream(file, setting_groups)
 
     except (FileNotFoundError, IsADirectoryError):
-        pass
+        return "File not found"
+
+
+def load_from_yaml_stream(
+    stream: typing.Union[pathlib.Path, ryaml.StreamTextType],
+    setting_groups: typing.List["ConfigSettingGroup"],
+) -> typing.Optional[str]:
+    """
+    Load settings from a YAML string only
+
+    Returns None if successful, or an error message if not
+    """
+    try:
+        yaml = ryaml.YAML(typ="safe")
+        yaml_settings = yaml.load(stream)
+    except ryaml_error.MarkedYAMLError as err:
+        return str(err)
+
+    for group in setting_groups:
+        group.set_values_from_yaml(yaml_settings)
+    return None
 
 
 def load_from_cli(
