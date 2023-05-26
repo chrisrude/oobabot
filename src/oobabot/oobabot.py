@@ -95,6 +95,10 @@ class Oobabot:
 
             if self.settings.general_settings.get("generate_config"):
                 self.settings.write_to_stream(out_stream=sys.stdout)
+                if sys.stdout.isatty():
+                    print(self.settings.META_INSTRUCTION, file=sys.stderr)
+                else:
+                    print("# oobabot: config.yml output successfully", file=sys.stderr)
                 return
 
             if not self.settings.discord_settings.get("discord_token"):

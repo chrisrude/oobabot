@@ -31,7 +31,6 @@ Attributes:
 """
 import os
 import shutil
-import sys
 import textwrap
 import typing
 
@@ -774,10 +773,6 @@ class Settings:
 
     def write_to_stream(self, out_stream) -> None:
         oesp.write_to_stream(self.setting_groups, out_stream)
-        if sys.stdout.isatty():
-            print(self.META_INSTRUCTION, file=sys.stderr)
-        else:
-            print("# oobabot: config.yml output successfully", file=sys.stderr)
 
     def write_to_file(self, filename: str) -> None:
         oesp.write_to_file(self.setting_groups, filename)
