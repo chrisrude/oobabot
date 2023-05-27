@@ -42,7 +42,6 @@ def test_discord_token():
     if invalid_intents_token:
         connected = bot.test_discord_token(invalid_intents_token)
         assert connected is False
-        assert False
 
 
 def test_invite_url():
