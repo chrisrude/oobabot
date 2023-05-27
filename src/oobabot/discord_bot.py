@@ -330,6 +330,10 @@ class DiscordBot(discord.Client):
             response_channel_id
         )
 
+        # determine if we're responding to a specific message that
+        # summoned us.  If so, find out what message ID that was, so
+        # that we can ignore all messages sent after it (as not to
+        # confuse the AI about what to reply to)
         reference = None
         ignore_all_until_message_id = None
         if is_summon_in_public_channel:
@@ -416,6 +420,9 @@ class DiscordBot(discord.Client):
                         if sent_message is not None:
                             last_sent_message = sent_message
                             sent_message_count += 1
+                            # only use the reference for the first
+                            # message in a multi-message chain
+                            reference = None
                         if abort_response:
                             aborted_by_us = True
                             break
@@ -676,11 +683,10 @@ class DiscordBot(discord.Client):
                 if item.id == ignore_all_until_message_id:
                     ignoring_all = False
                 else:
-                    fancy_logger.get().debug(
-                        "Ignoring message %d because it was sent after %d",
-                        item.id,
-                        ignore_all_until_message_id,
-                    )
+                    # this message was sent after the message we're
+                    # responding to.  So filter out it as to not confuse
+                    # the AI into responding to content from that message
+                    # instead
                     continue
 
             last_returned = item
