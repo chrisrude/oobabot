@@ -9,6 +9,8 @@ import aiohttp
 
 from oobabot import oobabot
 
+DISCORD_TOKEN_INVALID_INTENTS_ENV_VAR = "DISCORD_TOKEN_INVALID_INTENTS"
+
 
 def test_things_can_be_created_at_least():
     args = ["--discord-token", "1234"]
@@ -35,6 +37,12 @@ def test_discord_token():
     if token:
         connected = bot.test_discord_token(token)
         assert connected is True
+
+    invalid_intents_token = os.environ.get(DISCORD_TOKEN_INVALID_INTENTS_ENV_VAR, "")
+    if invalid_intents_token:
+        connected = bot.test_discord_token(invalid_intents_token)
+        assert connected is False
+        assert False
 
 
 def test_invite_url():

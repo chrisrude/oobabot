@@ -298,6 +298,15 @@ class Oobabot:
                 await self.discord_bot.start(
                     self.settings.discord_settings.get_str("discord_token")
                 )
+            except discord.errors.PrivilegedIntentsRequired as err:
+                fancy_logger.get().error("Could not log in to Discord: %s", err)
+                fancy_logger.get().error(
+                    "The bot token you provided does not have the required "
+                    + "gateway intents.  Did you remember to enable both "
+                    + "'SERVER MEMBERS INTENT' and 'MESSAGE CONTENT INTENT' "
+                    + "in the bot's settings on Discord?"
+                )
+
             except discord.LoginFailure as err:
                 fancy_logger.get().error("Could not log in to Discord: %s", err)
                 fancy_logger.get().error("Please check the token and try again.")
