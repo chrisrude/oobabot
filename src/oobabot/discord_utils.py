@@ -155,6 +155,19 @@ async def test_discord_token(discord_token: str) -> bool:
     simplest_bot = _SimplestBot()
     try:
         await simplest_bot.start(discord_token, reconnect=False)
+    except discord.errors.ConnectionClosed as err:
+        # in theory, discord.errors.PrivilegedIntentsRequired
+        # should get fired in this case, but it doesn't
+        if err.code != 4014:
+            raise
+        fancy_logger.get().error(
+            "The bot token you provided does not have the required "
+            + "gateway intents.  Did you remember to enable both "
+            + "'SERVER MEMBERS INTENT' and 'MESSAGE CONTENT INTENT' "
+            + "in the bot's settings on Discord?",
+        )
+        return False
+
     except discord.LoginFailure:
         return False
     finally:
