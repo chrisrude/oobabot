@@ -21,6 +21,7 @@ from oobabot import fancy_logger
 _log = fancy_logger.get()
 
 
+# pylint: disable=broad-exception-caught
 class SongbirdDriver:
     """
     Connects to a single Chat instance aka voice connection.
@@ -57,8 +58,6 @@ class SongbirdDriver:
 
     async def connect(self):
         self.driver = await songbird.songbird.Driver.create()
-        # `server` is the server payload from the gateway.
-        # `state` is the voice state payload from the gateway.
         await self.driver.connect(
             token=self.voice_token,
             endpoint=self.endpoint,
@@ -117,8 +116,17 @@ class SongbirdDriver:
     async def is_playing(self) -> bool:
         if self.track_handle is None:
             return False
-        info = await self.track_handle.get_info()
+        try:
+            info = await self.track_handle.get_info()
+        except Exception as err:
+            # this is super broad but songbird is supposedly throwing
+            # "module.TrackError" which is not exposed to us
+            fancy_logger.get().error("Error getting track info: %s", err)
+            return False
         return songbird.songbird.PlayMode.Play == info.playing
+
+
+# pylint: enable=broad-exception-caught
 
 
 class SongbirdVoiceClient(discord.VoiceProtocol):
