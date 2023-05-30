@@ -13,6 +13,7 @@ python = "^3.8.1"
 pysbd = "^0.3.4"
 ruamel-yaml = "^0.17.26"
 discord-py = "^2.2.3"
+songbird-py = "^0.1.9"
 
 [tool.poetry.scripts]
 oobabot = 'oobabot.oobabot:main'
