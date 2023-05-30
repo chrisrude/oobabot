@@ -74,7 +74,11 @@ class AudioCommands:
                 await self.voice_client.disconnect()
                 self.voice_client = None
 
-            self.voice_client = await voice_channel.connect()
+            self.voice_client = await voice_channel.connect(
+                # todo: have our own class which implements
+                # VoiceProtocol but uses Songbird
+                cls=discord.VoiceClient,
+            )
             if self.voice_client is None:
                 await discord_utils.fail_interaction(
                     interaction, "Failed to connect to voice channel"

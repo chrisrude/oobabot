@@ -12,7 +12,7 @@ aiohttp = "^3.8.4"
 python = "^3.8.1"
 pysbd = "^0.3.4"
 ruamel-yaml = "^0.17.26"
-discord-py = {extras = ["voice"], version = "^2.2.3"}
+discord-py = "^2.2.3"
 
 [tool.poetry.scripts]
 oobabot = 'oobabot.oobabot:main'
