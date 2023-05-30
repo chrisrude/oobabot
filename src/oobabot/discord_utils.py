@@ -220,15 +220,19 @@ def setup_logging(**kwargs: typing.Any):
 async def fail_interaction(
     interaction: discord.Interaction, reason: typing.Optional[str] = None
 ):
-    msg = reason
-    if msg is None:
-        command = "command"
-        if interaction.command is not None:
-            command = interaction.command.name
-        fancy_logger.get().warning(
-            f"{command} called from an unexpected channel: "
-            + f"{interaction.channel_id}"
-        )
-        msg = f"{command} failed"
+    command = "unknown command"
+    if interaction.command is not None:
+        command = interaction.command.name
 
-    await interaction.response.send_message(msg, ephemeral=True, silent=True)
+    if reason is None:
+        reason = f"{command} failed"
+
+    fancy_logger.get().warning(
+        "interaction failed: command='%s', user='%s', channel='%s', reason='%s'",
+        command,
+        interaction.user,
+        interaction.channel,
+        reason,
+    )
+
+    await interaction.response.send_message(reason, ephemeral=True, silent=True)

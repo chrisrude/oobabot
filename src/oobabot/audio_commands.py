@@ -23,34 +23,44 @@ class AudioCommands:
         self.voice_client = None
 
     def add_commands(self, tree):
-        def is_bot_owner(interaction: discord.Interaction) -> bool:
-            if interaction.guild is None:
-                return False
-            return interaction.user.id == interaction.guild.owner_id
-
         @discord.app_commands.command(
             name="join_voice",
             description=f"Have {self.persona.ai_name} join the voice "
             + "channel you are in right now.",
         )
-        @discord.app_commands.check(is_bot_owner)
         async def join_voice(interaction: discord.Interaction):
-            fancy_logger.get().debug(
-                "/join_voice called by user '%s'", interaction.user.name
-            )
             if interaction.user is None:
                 await discord_utils.fail_interaction(interaction)
 
-            if interaction.channel_id is None:
-                await discord_utils.fail_interaction(interaction)
-                return
+            fancy_logger.get().debug(
+                "/join_voice called by user '%s'", interaction.user.name
+            )
 
-            channel = await interaction.client.fetch_channel(interaction.channel_id)
-            if channel is None:
-                await discord_utils.fail_interaction(interaction)
-                return
+            voice_channel = None
+            had_to_discover_guild = False
+            if isinstance(interaction.user, discord.Member):
+                # if invoked from a guild channel, join the voice channel
+                # the invoker is in, within that guild
+                if interaction.user.voice is not None:
+                    voice_channel = interaction.user.voice.channel
+            else:
+                # if invoked from a private message, look at all guilds
+                # which have both the bot and the invoking user as a member,
+                # find find the first such guild where the user is in a voice
+                # channel.
+                had_to_discover_guild = True
+                for guild in interaction.user.mutual_guilds:
+                    # get member of guild
+                    member = guild.get_member(interaction.user.id)
+                    if member is None:
+                        continue
+                    if member.voice is None:
+                        continue
+                    if member.voice.channel is None:
+                        continue
+                    voice_channel = member.voice.channel
 
-            if not isinstance(channel, discord.VoiceChannel):
+            if voice_channel is None:
                 await discord_utils.fail_interaction(
                     interaction, "You must be in a voice channel to use this command"
                 )
@@ -64,7 +74,7 @@ class AudioCommands:
                 await self.voice_client.disconnect()
                 self.voice_client = None
 
-            self.voice_client = await channel.connect()
+            self.voice_client = await voice_channel.connect()
             if self.voice_client is None:
                 await discord_utils.fail_interaction(
                     interaction, "Failed to connect to voice channel"
@@ -72,40 +82,34 @@ class AudioCommands:
                 return
 
             # here is what we need to send to Songbird to connect to a voice channel:
+            songbird_connection_info = {
+                "channel_id": self.voice_client.channel.id,
+                "endpoint": self.voice_client.endpoint_ip,
+                "guild_id": self.voice_client.guild.id,
+                "session_id": self.voice_client.session_id,
+                "token": self.voice_client.token,
+                "user_id": self.voice_client.user.id,
+            }
+            print(songbird_connection_info)
 
-            # pub struct ConnectionInfo {
-            #     /// ID of the voice channel being joined, if it is known.
-            #     ///
-            #     /// This is not needed to establish a connection, but can be useful
-            #     /// for book-keeping.
-            #     pub channel_id: Option<ChannelId>,
-            #     /// URL of the voice websocket gateway server assigned to this call.
-            #     pub endpoint: String,
-            #     /// ID of the target voice channel's parent guild.
-            #     ///
-            #     /// Bots cannot connect to a guildless (i.e.,
-            #     /// direct message) voice call.
-            #     pub guild_id: GuildId,
-            #     /// Unique string describing this session for validation/
-            #     /// authentication purposes.
-            #     pub session_id: String,
-            #     /// Ephemeral secret used to validate the above session.
-            #     pub token: String,
-            #     /// UserID of this bot.
-            #     pub user_id: UserId,
-            # }
+            # print("-------------=================-----------------")
+            # print("also....")
+            # print("voice_port: ", self.voice_client.voice_port)
+            # print("ip:         ", self.voice_client.ip)
+            # print("port:       ", self.voice_client.port)
+            # print("secret_key: ", self.voice_client.secret_key)
+            # print("ssrc:       ", self.voice_client.ssrc)
 
-            # songbird_connection_info = {
-            #     "channel_id": channel.id,
-            #     "endpoint": self.voice_client.endpoint,
-            #     "guild_id": channel.guild.id,
-            #     "session_id": self.voice_client.session_id,
-            #     "token": self.voice_client.token,
-            #     "user_id": self.voice_client.user.id,
-            # }
+            if had_to_discover_guild:
+                message = (
+                    f"Joining voice channel in {voice_channel.guild.name}: "
+                    + voice_channel.name
+                )
+            else:
+                message = f"Joining voice channel: {voice_channel.name}"
 
             await interaction.response.send_message(
-                f"Listening to {channel.name}",
+                message,
                 ephemeral=True,
                 silent=True,
                 suppress_embeds=True,
@@ -116,47 +120,31 @@ class AudioCommands:
             description=f"Have {self.persona.ai_name} leave the "
             + "voice channel it is in.",
         )
-        @discord.app_commands.check(is_bot_owner)
         async def leave_voice(interaction: discord.Interaction):
-            fancy_logger.get().debug(
-                "/leave_voice called by user '%s'", interaction.user.name
-            )
             if interaction.user is None:
                 await discord_utils.fail_interaction(interaction)
 
-            if interaction.channel_id is None:
-                await discord_utils.fail_interaction(interaction)
-                return
-
-            channel = await interaction.client.fetch_channel(interaction.channel_id)
-            if channel is None:
-                await discord_utils.fail_interaction(interaction)
-                return
-
-            if not isinstance(channel, discord.VoiceChannel):
-                await discord_utils.fail_interaction(
-                    interaction, "You must be in a voice channel to use this command"
-                )
-                return
+            fancy_logger.get().debug(
+                "/leave_voice called by user: '%s'", interaction.user.name
+            )
 
             # are we already connected to a voice channel?  If so, disconnect
-            if self.voice_client is None:
+            if self.voice_client is None or not self.voice_client.is_connected():
                 await discord_utils.fail_interaction(
                     interaction, "Not connected to a voice channel"
                 )
                 return
 
-            fancy_logger.get().debug(
-                "disconnecting from voice channel #%s", self.voice_client.channel
-            )
+            channel = self.voice_client.channel
+
+            fancy_logger.get().debug("leaving voice channel #%s", channel)
             await self.voice_client.disconnect()
             self.voice_client = None
 
             await interaction.response.send_message(
-                f"Listening to {channel.name}",
+                f"Left voice channel: {channel.name}",
                 ephemeral=True,
                 silent=True,
-                suppress_embeds=True,
             )
 
         fancy_logger.get().debug("Registering audio commands")
