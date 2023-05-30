@@ -4,8 +4,6 @@ A replacement voice client for discord.py, using the Songbird rust library.
 """
 
 import asyncio
-import socket
-import threading
 import typing
 
 import discord
@@ -16,10 +14,108 @@ import discord.opus
 import discord.state
 import discord.types
 from discord.types import voice  # this is so pylint doesn't complain
+import songbird
 
 from oobabot import fancy_logger
 
 _log = fancy_logger.get()
+
+
+class SongbirdDriver:
+    """
+    Connects to a single Chat instance aka voice connection.
+    """
+
+    voice_token: str
+    endpoint: str
+    session_id: str
+    guild_id: int
+    channel_id: int
+    user_id: int
+
+    driver: typing.Optional[songbird.songbird.Driver]
+    track_handle: typing.Optional[songbird.songbird.TrackHandle]
+
+    def __init__(
+        self,
+        voice_token: str,
+        endpoint: str,
+        session_id: str,
+        guild_id: int,
+        channel_id: int,
+        user_id: int,
+    ) -> None:
+        self.voice_token = voice_token
+        self.endpoint = endpoint
+        self.session_id = session_id
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.user_id = user_id
+
+        self.driver = None
+        self.track_handle = None
+
+    async def connect(self):
+        self.driver = await songbird.songbird.Driver.create()
+        # `server` is the server payload from the gateway.
+        # `state` is the voice state payload from the gateway.
+        await self.driver.connect(
+            token=self.voice_token,
+            endpoint=self.endpoint,
+            session_id=self.session_id,
+            guild_id=self.guild_id,
+            channel_id=self.channel_id,
+            user_id=self.user_id,
+        )
+
+    async def disconnect(self):
+        if self.driver is None:
+            return
+        await self.driver.stop()
+        self.driver = None
+
+    def is_connected(self):
+        # todo(rude): more than this?
+        return self.driver is not None
+
+    async def get_crypto_mode(self) -> typing.Optional[str]:
+        if self.driver is None:
+            return None
+        config = await self.driver.get_config()
+        crypto_mode = config.crypto_mode
+
+        # Normal => "xsalsa20_poly1305",
+        # Suffix => "xsalsa20_poly1305_suffix",
+        # Lite => "xsalsa20_poly1305_lite",
+        match crypto_mode:
+            case songbird.songbird.CryptoMode.Normal:
+                return "xsalsa20_poly1305"
+            case songbird.songbird.CryptoMode.Suffix:
+                return "xsalsa20_poly1305_suffix"
+            case songbird.songbird.CryptoMode.Lite:
+                return "xsalsa20_poly1305_lite"
+
+        fancy_logger.get().error("Unknown crypto mode: %s", crypto_mode)
+        return None
+
+    async def play(
+        self,
+        url: str = "https://www.youtube.com/watch?v=y6120QOlsfU",
+    ):
+        if self.driver is None:
+            raise RuntimeError("Driver not connected")
+
+        await self.stop()
+
+        source = await songbird.songbird.Source.ytdl(url)
+
+        self.track_handle = await self.driver.play_source(source)
+
+    async def stop(self):
+        if self.track_handle is None:
+            return
+        self.track_handle.stop()
+        self.track_handle = None
 
 
 class SongbirdVoiceClient(discord.VoiceProtocol):
@@ -44,20 +140,14 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
 
     channel: discord.channel.VocalGuildChannel
     endpoint: typing.Optional[str]
-    endpoint_ip: str
-    voice_port: int
-    ip: str
-    port: int
-    secret_key: typing.List[int]
     session_id: typing.Optional[str]
-    ssrc: int
 
-    # todo: what does Songbird support?  This will actually
-    #       be sent to the server
+    # todo: what order do we want?
+    # todo: query this dynamically from songbird
     supported_modes: typing.Tuple[voice.SupportedModes, ...] = (
-        "xsalsa20_poly1305_lite",
-        "xsalsa20_poly1305_suffix",
         "xsalsa20_poly1305",
+        "xsalsa20_poly1305_suffix",
+        "xsalsa20_poly1305_lite",
     )
 
     def __init__(
@@ -67,10 +157,7 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         state = client._connection
         self.token: str = discord.utils.MISSING
         self.server_id: int = discord.utils.MISSING
-        self.socket = discord.utils.MISSING
-        self.loop: asyncio.AbstractEventLoop = state.loop
         self._state: discord.state.ConnectionState = state
-        self._connected: threading.Event = threading.Event()
         self.endpoint: typing.Optional[str] = None
 
         self._handshaking: bool = False
@@ -83,10 +170,11 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         self.sequence: int = 0
         self.timestamp: int = 0
         self.timeout: float = 0
-        self._runner: asyncio.Task = discord.utils.MISSING
-        self.encoder: discord.opus.Encoder = discord.utils.MISSING
-        self._lite_nonce: int = 0
-        self.websocket: discord.gateway.DiscordVoiceWebSocket = discord.utils.MISSING
+
+        if self.channel.guild is None:
+            raise ValueError("Channel does not have a guild.")
+
+        self._songbird_driver = None
 
     @property
     def guild(self) -> discord.guild.Guild:
@@ -164,18 +252,6 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
             # Just in case, strip it off since we're going to add it later
             self.endpoint = self.endpoint[6:]
 
-        # This gets set later
-        self.endpoint_ip = discord.utils.MISSING
-
-        self.socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.setblocking(False)
-
-        if not self._handshaking:
-            # If we're not handshaking then we need to terminate our previous
-            # connection in the websocket
-            await self.websocket.close(4000)
-            return
-
         self._voice_server_complete.set()
 
     async def voice_connect(
@@ -207,16 +283,6 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         self._handshaking = False
         self._voice_server_complete.clear()
         self._voice_state_complete.clear()
-
-    async def connect_websocket(self) -> discord.gateway.DiscordVoiceWebSocket:
-        websocket = await discord.gateway.DiscordVoiceWebSocket.from_client(
-            self  # type: ignore
-        )
-        self._connected.clear()
-        while websocket.secret_key is None:
-            await websocket.poll_event()
-        self._connected.set()
-        return websocket
 
     async def connect(
         self,
@@ -250,7 +316,27 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
             self.finish_handshake()
 
             try:
-                self.websocket = await self.connect_websocket()
+                if self._songbird_driver is not None:
+                    raise RuntimeError("Songbird driver already exists")
+
+                if self.token is None:
+                    raise RuntimeError("Voice token is None")
+
+                if self.endpoint is None:
+                    raise RuntimeError("Voice endpoint is None")
+
+                if self.session_id is None:
+                    raise RuntimeError("Voice session_id is None")
+
+                self._songbird_driver = SongbirdDriver(
+                    voice_token=self.token,
+                    endpoint=self.endpoint,
+                    session_id=self.session_id,
+                    guild_id=self.guild.id,
+                    channel_id=self.channel.id,
+                    user_id=self.user.id,
+                )
+                await self._songbird_driver.connect()
                 break
             except (discord.errors.ConnectionClosed, asyncio.TimeoutError):
                 if reconnect:
@@ -260,12 +346,8 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
                     continue
                 raise
 
-        if self._runner is discord.utils.MISSING:
-            self._runner = self.client.loop.create_task(self.poll_voice_ws(reconnect))
-
     async def potential_reconnect(self) -> bool:
         # Attempt to stop the player thread from playing early
-        self._connected.clear()
         self.prepare_handshake()
         self._potentially_reconnecting = True
         try:
@@ -282,81 +364,23 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         self.finish_handshake()
         self._potentially_reconnecting = False
         try:
-            self.websocket = await self.connect_websocket()
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            # todo: connect to songbird here
+            ...
+            # self.websocket = await self.connect_websocket()
         except (discord.errors.ConnectionClosed, asyncio.TimeoutError):
             return False
         return True
-
-    @property
-    def latency(self) -> float:
-        """:class:`float`: Latency between a HEARTBEAT and a HEARTBEAT_ACK in seconds.
-
-        This could be referred to as the Discord Voice WebSocket latency and is
-        an analogue of user's voice latencies as seen in the Discord client.
-
-        .. versionadded:: 1.4
-        """
-        return float("inf") if not self.websocket else self.websocket.latency
-
-    @property
-    def average_latency(self) -> float:
-        """:class:`float`: Average of most recent 20 HEARTBEAT latencies in seconds.
-
-        .. versionadded:: 1.4
-        """
-        return float("inf") if not self.websocket else self.websocket.average_latency
-
-    async def poll_voice_ws(self, reconnect: bool) -> None:
-        backoff = discord.backoff.ExponentialBackoff()
-        while True:
-            try:
-                await self.websocket.poll_event()
-            except (discord.errors.ConnectionClosed, asyncio.TimeoutError) as exc:
-                if isinstance(exc, discord.errors.ConnectionClosed):
-                    # The following close codes are undocumented so I will document
-                    # them here.
-                    # 1000 - normal closure (obviously)
-                    # 4014 - voice channel has been deleted.
-                    # 4015 - voice server has crashed
-                    if exc.code in (1000, 4015):
-                        _log.info(
-                            "Disconnecting from voice normally, close code %d.",
-                            exc.code,
-                        )
-                        await self.disconnect()
-                        break
-                    if exc.code == 4014:
-                        _log.info(
-                            "Disconnected from voice by force... "
-                            + "potentially reconnecting."
-                        )
-                        successful = await self.potential_reconnect()
-                        if not successful:
-                            _log.info(
-                                "Reconnect was unsuccessful, disconnecting "
-                                + "from voice normally..."
-                            )
-                            await self.disconnect()
-                            break
-                        continue
-
-                if not reconnect:
-                    await self.disconnect()
-                    raise
-
-                retry = backoff.delay()
-                _log.exception(
-                    "Disconnected from voice... Reconnecting in %.2fs.", retry
-                )
-                self._connected.clear()
-                await asyncio.sleep(retry)
-                await self.voice_disconnect()
-                try:
-                    await self.connect(reconnect=True, timeout=self.timeout)
-                except asyncio.TimeoutError:
-                    # at this point we've retried 5 times... let's continue the loop.
-                    _log.warning("Could not connect to voice... Retrying...")
-                    continue
 
     async def disconnect(self, *, force: bool = False) -> None:
         """|coro|
@@ -366,18 +390,17 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         if not force and not self.is_connected():
             return
 
-        # self.stop()
-        self._connected.clear()
+        if self._songbird_driver is not None:
+            await self._songbird_driver.stop()
 
         try:
-            if self.websocket:
-                await self.websocket.close()
+            if self._songbird_driver is not None:
+                await self._songbird_driver.disconnect()
+                self._songbird_driver = None
 
             await self.voice_disconnect()
         finally:
             self.cleanup()
-            if self.socket:
-                self.socket.close()
 
     async def move_to(self, channel: typing.Optional[discord.abc.Snowflake]) -> None:
         """|coro|
@@ -389,8 +412,14 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         channel: Optional[:class:`abc.Snowflake`]
             The channel to move to. Must be a voice channel.
         """
+        # todo: check songbird too?
+        # todo: check songbird too?
+        # todo: check songbird too?
+        # todo: check songbird too?
         await self.channel.guild.change_voice_state(channel=channel)
 
     def is_connected(self) -> bool:
         """Indicates if the voice client is connected to voice."""
-        return self._connected.is_set()
+        if self._songbird_driver is None:
+            return False
+        return self._songbird_driver.is_connected()

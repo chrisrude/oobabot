@@ -86,25 +86,6 @@ class AudioCommands:
                 )
                 return
 
-            # here is what we need to send to Songbird to connect to a voice channel:
-            songbird_connection_info = {
-                "channel_id": self.voice_client.channel.id,
-                "endpoint": self.voice_client.endpoint_ip,
-                "guild_id": self.voice_client.guild.id,
-                "session_id": self.voice_client.session_id,
-                "token": self.voice_client.token,
-                "user_id": self.voice_client.user.id,
-            }
-            print(songbird_connection_info)
-
-            # print("-------------=================-----------------")
-            # print("also....")
-            # print("voice_port: ", self.voice_client.voice_port)
-            # print("ip:         ", self.voice_client.ip)
-            # print("port:       ", self.voice_client.port)
-            # print("secret_key: ", self.voice_client.secret_key)
-            # print("ssrc:       ", self.voice_client.ssrc)
-
             if had_to_discover_guild:
                 message = (
                     f"Joining voice channel in {voice_channel.guild.name}: "
