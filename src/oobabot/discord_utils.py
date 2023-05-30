@@ -215,3 +215,20 @@ def generate_invite_url(ai_user_id: int) -> str:
 
 def setup_logging(**kwargs: typing.Any):
     discord.utils.setup_logging(**kwargs)
+
+
+async def fail_interaction(
+    interaction: discord.Interaction, reason: typing.Optional[str] = None
+):
+    msg = reason
+    if msg is None:
+        command = "command"
+        if interaction.command is not None:
+            command = interaction.command.name
+        fancy_logger.get().warning(
+            f"{command} called from an unexpected channel: "
+            + f"{interaction.channel_id}"
+        )
+        msg = f"{command} failed"
+
+    await interaction.response.send_message(msg, ephemeral=True, silent=True)

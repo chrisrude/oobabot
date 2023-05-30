@@ -6,6 +6,7 @@ import typing
 
 import discord
 
+from oobabot import audio_commands
 from oobabot import decide_to_respond
 from oobabot import discord_utils
 from oobabot import fancy_logger
@@ -32,27 +33,12 @@ class BotCommands:
         self.persona = persona
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.template_store = template_store
+        self.audio_commands = audio_commands.AudioCommands(persona)
 
     async def on_ready(self, client: discord.Client):
         """
         Register commands with Discord.
         """
-
-        async def fail(
-            interaction: discord.Interaction, reason: typing.Optional[str] = None
-        ):
-            msg = reason
-            if msg is None:
-                command = "command"
-                if interaction.command is not None:
-                    command = interaction.command.name
-                fancy_logger.get().warning(
-                    f"{command} called from an unexpected channel: "
-                    + f"{interaction.channel_id}"
-                )
-                msg = f"{command} failed"
-
-            await interaction.response.send_message(msg, ephemeral=True, silent=True)
 
         async def get_messageable(
             interaction: discord.Interaction,
@@ -92,7 +78,7 @@ class BotCommands:
         )
         async def say(interaction: discord.Interaction, text_to_send: str):
             if interaction.channel_id is None:
-                await fail(interaction)
+                await discord_utils.fail_interaction(interaction)
                 return
 
             # if reply_in_thread is True, we don't want our bot to
@@ -100,7 +86,7 @@ class BotCommands:
             if self.reply_in_thread:
                 channel = await get_messageable(interaction)
                 if channel is None or isinstance(channel, discord.TextChannel):
-                    await fail(
+                    await discord_utils.fail_interaction(
                         interaction, f"{self.persona.ai_name} may only speak in threads"
                     )
                     return
@@ -129,7 +115,7 @@ class BotCommands:
         async def lobotomize(interaction: discord.Interaction):
             channel = await get_messageable(interaction)
             if channel is None:
-                await fail(interaction)
+                await discord_utils.fail_interaction(interaction)
                 return
 
             # find the current message in this channel
@@ -167,6 +153,9 @@ class BotCommands:
         tree = discord.app_commands.CommandTree(client)
         tree.add_command(lobotomize)
         tree.add_command(say)
+
+        self.audio_commands.add_commands(tree)
+
         commands = await tree.sync(guild=None)
         for command in commands:
             fancy_logger.get().info(
