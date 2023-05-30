@@ -4,6 +4,8 @@ out.png
 config.yml
 config.yml.*
 
+--Frag*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
