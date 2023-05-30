@@ -98,10 +98,7 @@ class SongbirdDriver:
         fancy_logger.get().error("Unknown crypto mode: %s", crypto_mode)
         return None
 
-    async def play(
-        self,
-        url: str = "https://www.youtube.com/watch?v=y6120QOlsfU",
-    ):
+    async def play(self, url):
         if self.driver is None:
             raise RuntimeError("Driver not connected")
 
@@ -109,13 +106,19 @@ class SongbirdDriver:
 
         source = await songbird.songbird.Source.ytdl(url)
 
-        self.track_handle = await self.driver.play_source(source)
+        self.track_handle = await self.driver.play_only_source(source)
 
     async def stop(self):
         if self.track_handle is None:
             return
         self.track_handle.stop()
         self.track_handle = None
+
+    async def is_playing(self) -> bool:
+        if self.track_handle is None:
+            return False
+        info = await self.track_handle.get_info()
+        return songbird.songbird.PlayMode.Play == info.playing
 
 
 class SongbirdVoiceClient(discord.VoiceProtocol):
@@ -423,3 +426,21 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         if self._songbird_driver is None:
             return False
         return self._songbird_driver.is_connected()
+
+    async def play(self, youtube_url: str) -> None:
+        """Plays a youtube video in the voice channel."""
+        if self._songbird_driver is None:
+            raise RuntimeError("Songbird driver is None")
+        await self._songbird_driver.play(youtube_url)
+
+    async def is_playing(self) -> bool:
+        """Returns True if the bot is playing a youtube video."""
+        if self._songbird_driver is None:
+            raise RuntimeError("Songbird driver is None")
+        return await self._songbird_driver.is_playing()
+
+    async def stop(self) -> None:
+        """Stops the song."""
+        if self._songbird_driver is None:
+            raise RuntimeError("Songbird driver is None")
+        await self._songbird_driver.stop()
