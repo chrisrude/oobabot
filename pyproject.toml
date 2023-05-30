@@ -73,6 +73,8 @@ python-source = "src"
 macos-deployment-target = "10.9"
 
 [tool.pylint.'MAIN']
+extension-pkg-allow-list = ["songbird"]
+
 py-version = '3.8.1'
 j = 8
 [tool.pylint.'MESSAGES CONTROL']
