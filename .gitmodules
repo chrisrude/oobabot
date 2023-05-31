@@ -1,0 +1,3 @@
+[submodule "songbird-py"]
+	path = songbird-py
+	url = https://github.com/chrisrude/songbird-py.git

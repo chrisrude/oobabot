@@ -149,21 +149,21 @@ class AudioCommands:
                 interaction.user.name,
             )
 
-            if not await self.voice_client.is_playing():
-                await discord_utils.fail_interaction(
-                    interaction, "Not currently playing a song"
-                )
-                return
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            # if not await self.voice_client.is_playing():
+            #     await discord_utils.fail_interaction(
+            #         interaction, "Not currently playing a song"
+            #     )
+            #     return
 
             fancy_logger.get().debug("calling stop()")
 
             await self.voice_client.stop()
             fancy_logger.get().debug("stop() returned")
 
-            await interaction.response.send_message(
-                "Stopped",
-                ephemeral=True,
-                silent=True,
+            response_message = await interaction.original_response()
+            await response_message.edit(
+                content="Stopped",
             )
 
         @discord.app_commands.command(
