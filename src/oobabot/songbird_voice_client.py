@@ -20,106 +20,6 @@ from oobabot import fancy_logger
 _log = fancy_logger.get()
 
 
-class SongbirdDriver:
-    """
-    Connects to a single Chat instance aka voice connection.
-    """
-
-    voice_token: str
-    endpoint: str
-    session_id: str
-    guild_id: int
-    channel_id: int
-    user_id: int
-
-    driver: typing.Optional[songbird.songbird.Driver]
-    track_handle: typing.Optional[songbird.songbird.TrackHandle]
-
-    def __init__(
-        self,
-        voice_token: str,
-        endpoint: str,
-        session_id: str,
-        guild_id: int,
-        channel_id: int,
-        user_id: int,
-    ) -> None:
-        self.voice_token = voice_token
-        self.endpoint = endpoint
-        self.session_id = session_id
-        self.guild_id = guild_id
-        self.channel_id = channel_id
-        self.user_id = user_id
-
-        self.driver = None
-        self.track_handle = None
-
-    async def connect(self):
-        self.driver = await songbird.songbird.Driver.create()
-        # `server` is the server payload from the gateway.
-        # `state` is the voice state payload from the gateway.
-        await self.driver.connect(
-            token=self.voice_token,
-            endpoint=self.endpoint,
-            session_id=self.session_id,
-            guild_id=self.guild_id,
-            channel_id=self.channel_id,
-            user_id=self.user_id,
-        )
-
-    async def disconnect(self):
-        if self.driver is None:
-            return
-        await self.driver.stop()
-        self.driver = None
-
-    def is_connected(self):
-        # todo(rude): more than this?
-        return self.driver is not None
-
-    async def get_crypto_mode(self) -> typing.Optional[str]:
-        if self.driver is None:
-            return None
-        config = await self.driver.get_config()
-        crypto_mode = config.crypto_mode
-
-        # Normal => "xsalsa20_poly1305",
-        # Suffix => "xsalsa20_poly1305_suffix",
-        # Lite => "xsalsa20_poly1305_lite",
-        match crypto_mode:
-            case songbird.songbird.CryptoMode.Normal:
-                return "xsalsa20_poly1305"
-            case songbird.songbird.CryptoMode.Suffix:
-                return "xsalsa20_poly1305_suffix"
-            case songbird.songbird.CryptoMode.Lite:
-                return "xsalsa20_poly1305_lite"
-
-        fancy_logger.get().error("Unknown crypto mode: %s", crypto_mode)
-        return None
-
-    async def play(self, url):
-        if self.driver is None:
-            raise RuntimeError("Driver not connected")
-
-        await self.stop()
-
-        source = await songbird.songbird.Source.ytdl(url)
-
-        self.track_handle = await self.driver.play_only_source(source)
-
-    async def stop(self):
-        if self.track_handle is None:
-            return
-        self.track_handle.stop()
-        self.track_handle = None
-
-    async def is_playing(self) -> bool:
-        if self.track_handle is None:
-            return False
-        info = await self.track_handle.get_info()
-        return songbird.songbird.PlayMode.Play == info.playing
-
-
 class SongbirdVoiceClient(discord.VoiceProtocol):
     """Represents a Discord voice connection, implmemented by the
     Songbird rust library.
@@ -368,6 +268,7 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         self.finish_handshake()
         self._potentially_reconnecting = False
         try:
+            # todo: have songbird reconnect here
             # todo: have songbird reconnect here
             ...
             # self.websocket = await self.connect_websocket()
