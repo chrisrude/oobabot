@@ -14,119 +14,10 @@ import discord.opus
 import discord.state
 import discord.types
 from discord.types import voice  # this is so pylint doesn't complain
-import songbird
 
 from oobabot import fancy_logger
 
 _log = fancy_logger.get()
-
-
-# pylint: disable=broad-exception-caught
-class SongbirdDriver:
-    """
-    Connects to a single Chat instance aka voice connection.
-    """
-
-    voice_token: str
-    endpoint: str
-    session_id: str
-    guild_id: int
-    channel_id: int
-    user_id: int
-
-    driver: typing.Optional[songbird.songbird.Driver]
-    track_handle: typing.Optional[songbird.songbird.TrackHandle]
-
-    def __init__(
-        self,
-        voice_token: str,
-        endpoint: str,
-        session_id: str,
-        guild_id: int,
-        channel_id: int,
-        user_id: int,
-    ) -> None:
-        self.voice_token = voice_token
-        self.endpoint = endpoint
-        self.session_id = session_id
-        self.guild_id = guild_id
-        self.channel_id = channel_id
-        self.user_id = user_id
-
-        self.driver = None
-        self.track_handle = None
-
-    async def connect(self):
-        self.driver = await songbird.songbird.Driver.create()
-        await self.driver.connect(
-            token=self.voice_token,
-            endpoint=self.endpoint,
-            session_id=self.session_id,
-            guild_id=self.guild_id,
-            channel_id=self.channel_id,
-            user_id=self.user_id,
-        )
-
-    async def disconnect(self):
-        if self.driver is None:
-            return
-        await self.driver.stop()
-        self.driver = None
-
-    def is_connected(self):
-        # todo(rude): more than this?
-        return self.driver is not None
-
-    async def get_crypto_mode(self) -> typing.Optional[str]:
-        if self.driver is None:
-            return None
-        config = await self.driver.get_config()
-        crypto_mode = config.crypto_mode
-
-        # Normal => "xsalsa20_poly1305",
-        # Suffix => "xsalsa20_poly1305_suffix",
-        # Lite => "xsalsa20_poly1305_lite",
-        match crypto_mode:
-            case songbird.songbird.CryptoMode.Normal:
-                return "xsalsa20_poly1305"
-            case songbird.songbird.CryptoMode.Suffix:
-                return "xsalsa20_poly1305_suffix"
-            case songbird.songbird.CryptoMode.Lite:
-                return "xsalsa20_poly1305_lite"
-
-        fancy_logger.get().error("Unknown crypto mode: %s", crypto_mode)
-        return None
-
-    async def play(self, url):
-        if self.driver is None:
-            raise RuntimeError("Driver not connected")
-
-        await self.stop()
-
-        source = await songbird.songbird.Source.ytdl(url)
-
-        self.track_handle = await self.driver.play_only_source(source)
-
-    async def stop(self):
-        if self.track_handle is None:
-            return
-        self.track_handle.stop()
-        self.track_handle = None
-
-    async def is_playing(self) -> bool:
-        if self.track_handle is None:
-            return False
-        try:
-            info = await self.track_handle.get_info()
-        except Exception as err:
-            # this is super broad but songbird is supposedly throwing
-            # "module.TrackError" which is not exposed to us
-            fancy_logger.get().error("Error getting track info: %s", err)
-            return False
-        return songbird.songbird.PlayMode.Play == info.playing
-
-
-# pylint: enable=broad-exception-caught
 
 
 class SongbirdVoiceClient(discord.VoiceProtocol):
@@ -339,15 +230,15 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
                 if self.session_id is None:
                     raise RuntimeError("Voice session_id is None")
 
-                self._songbird_driver = SongbirdDriver(
-                    voice_token=self.token,
-                    endpoint=self.endpoint,
-                    session_id=self.session_id,
-                    guild_id=self.guild.id,
-                    channel_id=self.channel.id,
-                    user_id=self.user.id,
+                # todo: connect to songbird here
+                print(
+                    f"cargo run -- --channel-id {self.channel.id} "
+                    + f"--endpoint {self.endpoint} "
+                    + f"--guild-id {self.guild.id} "
+                    + f"--session-id {self.session_id} "
+                    + f"--token {self.token} "
+                    + f"--user-id {self.user.id}"
                 )
-                await self._songbird_driver.connect()
                 break
             except (discord.errors.ConnectionClosed, asyncio.TimeoutError):
                 if reconnect:
@@ -375,18 +266,7 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         self.finish_handshake()
         self._potentially_reconnecting = False
         try:
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
-            # todo: connect to songbird here
+            # todo: have songbird reconnect here
             ...
             # self.websocket = await self.connect_websocket()
         except (discord.errors.ConnectionClosed, asyncio.TimeoutError):
@@ -423,10 +303,7 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         channel: Optional[:class:`abc.Snowflake`]
             The channel to move to. Must be a voice channel.
         """
-        # todo: check songbird too?
-        # todo: check songbird too?
-        # todo: check songbird too?
-        # todo: check songbird too?
+        # todo: tell songbird to move channels
         await self.channel.guild.change_voice_state(channel=channel)
 
     def is_connected(self) -> bool:
