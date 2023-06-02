@@ -12,7 +12,6 @@ from oobabot import persona
 from oobabot import songbird_voice_client
 
 
-# pylint: disable=too-many-statements
 class AudioCommands:
     """
     Implementation of commands to join and leave voice channels.
@@ -103,70 +102,6 @@ class AudioCommands:
             )
 
         @discord.app_commands.command(
-            name="play",
-            description=f"Have {self.persona.ai_name} play a " + "song from YouTube.",
-        )
-        @discord.app_commands.describe(youtube_url="YouTube URL to play.")
-        async def play(
-            interaction: discord.Interaction,
-            youtube_url: str = "https://www.youtube.com/watch?v=y6120QOlsfU",
-        ):
-            if self.voice_client is None or not self.voice_client.is_connected():
-                await discord_utils.fail_interaction(
-                    interaction, "Not connected to a voice channel"
-                )
-                return
-
-            fancy_logger.get().debug(
-                "/play called by user '%s' with URL '%s'",
-                interaction.user.name,
-                youtube_url,
-            )
-            await interaction.response.defer(ephemeral=True, thinking=True)
-            await self.voice_client.play(youtube_url)
-            fancy_logger.get().debug("play() returned")
-
-            response_message = await interaction.original_response()
-            await response_message.edit(
-                content=f"Playing URL: '{youtube_url}'",
-            )
-
-        @discord.app_commands.command(
-            name="stop",
-            description=f"Have {self.persona.ai_name} stop playing a song.",
-        )
-        async def stop(
-            interaction: discord.Interaction,
-        ):
-            if self.voice_client is None or not self.voice_client.is_connected():
-                await discord_utils.fail_interaction(
-                    interaction, "Not connected to a voice channel"
-                )
-                return
-
-            fancy_logger.get().debug(
-                "/stop called by user '%s'",
-                interaction.user.name,
-            )
-
-            await interaction.response.defer(ephemeral=True, thinking=True)
-            # if not await self.voice_client.is_playing():
-            #     await discord_utils.fail_interaction(
-            #         interaction, "Not currently playing a song"
-            #     )
-            #     return
-
-            fancy_logger.get().debug("calling stop()")
-
-            await self.voice_client.stop()
-            fancy_logger.get().debug("stop() returned")
-
-            response_message = await interaction.original_response()
-            await response_message.edit(
-                content="Stopped",
-            )
-
-        @discord.app_commands.command(
             name="leave_voice",
             description=f"Have {self.persona.ai_name} leave the "
             + "voice channel it is in.",
@@ -200,9 +135,4 @@ class AudioCommands:
 
         fancy_logger.get().debug("Registering audio commands")
         tree.add_command(join_voice)
-        tree.add_command(play)
-        tree.add_command(stop)
         tree.add_command(leave_voice)
-
-
-# pylint: enable=too-many-statements

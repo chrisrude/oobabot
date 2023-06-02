@@ -76,7 +76,7 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         if self.channel.guild is None:
             raise ValueError("Channel does not have a guild.")
 
-        self._songbird_driver = None
+        self._connected = False
 
     @property
     def guild(self) -> discord.guild.Guild:
@@ -218,8 +218,8 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
             self.finish_handshake()
 
             try:
-                if self._songbird_driver is not None:
-                    raise RuntimeError("Songbird driver already exists")
+                if self._connected:
+                    raise RuntimeError("Already connected to voice")
 
                 if self.token is None:
                     raise RuntimeError("Voice token is None")
@@ -229,6 +229,8 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
 
                 if self.session_id is None:
                     raise RuntimeError("Voice session_id is None")
+
+                self._connected = True
 
                 # todo: connect to songbird here
                 print(
@@ -281,14 +283,7 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         if not force and not self.is_connected():
             return
 
-        if self._songbird_driver is not None:
-            await self._songbird_driver.stop()
-
         try:
-            if self._songbird_driver is not None:
-                await self._songbird_driver.disconnect()
-                self._songbird_driver = None
-
             await self.voice_disconnect()
         finally:
             self.cleanup()
@@ -308,24 +303,4 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
 
     def is_connected(self) -> bool:
         """Indicates if the voice client is connected to voice."""
-        if self._songbird_driver is None:
-            return False
-        return self._songbird_driver.is_connected()
-
-    async def play(self, youtube_url: str) -> None:
-        """Plays a youtube video in the voice channel."""
-        if self._songbird_driver is None:
-            raise RuntimeError("Songbird driver is None")
-        await self._songbird_driver.play(youtube_url)
-
-    async def is_playing(self) -> bool:
-        """Returns True if the bot is playing a youtube video."""
-        if self._songbird_driver is None:
-            raise RuntimeError("Songbird driver is None")
-        return await self._songbird_driver.is_playing()
-
-    async def stop(self) -> None:
-        """Stops the song."""
-        if self._songbird_driver is None:
-            raise RuntimeError("Songbird driver is None")
-        await self._songbird_driver.stop()
+        return self._connected
