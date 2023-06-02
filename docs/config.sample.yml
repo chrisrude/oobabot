@@ -1,4 +1,3 @@
-
 # Welcome to Oobabot!
 #
 # This is the configuration file for Oobabot.  It is a YAML file, and
@@ -12,7 +11,6 @@ version: 0.1.9
 # persona
 # .
 persona:
-
   # Name the AI will use to refer to itself
   #   default: oobabot
   ai_name:
@@ -41,10 +39,9 @@ persona:
 # discord
 # .
 discord:
-
   # Token to log into Discord with.  For security purposes it's strongly recommended that
   # you set this via the DISCORD_TOKEN environment variable instead, if possible.
-  discord_token: ''
+  discord_token: ""
 
   # Post the entire response as a single message, rather than splitting it into separate
   # messages by sentence.
@@ -91,7 +88,6 @@ discord:
 # oobabooga
 # .
 oobabooga:
-
   # Base URL for the oobabooga instance.  This should be ws://hostname[:port] for plain
   # websocket connections, or wss://hostname[:port] for websocket connections over TLS.
   #   default: ws://localhost:5005
@@ -116,6 +112,10 @@ oobabooga:
     temperature: 1.3
     top_p: 0.1
     typical_p: 1
+    epsilon_cutoff: 0
+    eta_cutoff: 0
+    tfs: 1
+    top_a: 0
     repetition_penalty: 1.18
     top_k: 40
     min_length: 0
@@ -124,9 +124,12 @@ oobabooga:
     penalty_alpha: 0
     length_penalty: 1
     early_stopping: false
+    mirostat_mode: 0
+    mirostat_tau: 5
+    mirostat_eta: 0.1
     seed: -1
     add_bos_token: true
-    truncation_length: 730
+    truncation_length: 2048
     ban_eos_token: false
     skip_special_tokens: true
     stopping_strings: []
@@ -135,7 +138,6 @@ oobabooga:
 # stable_diffusion
 # .
 stable_diffusion:
-
   # When one of these words is used in a message, the bot will generate an image.
   #   default: ['draw me', 'drawing', 'photo', 'pic', 'picture', 'image', 'sketch']
   image_words:
@@ -159,7 +161,7 @@ stable_diffusion:
     steps: 30
     width: 512
     height: 512
-    sampler: ''
+    sampler: ""
 
   # FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate image keywords from a
   # user's message.  It will then pass the keywords that Oobabooga produces to Stable
@@ -172,7 +174,6 @@ stable_diffusion:
 # template
 # .
 template:
-
   # The main prompt sent to Oobabooga to generate a response from the bot AI.  The AI's
   # reply to this prompt will be sent to discord as the bot's response.
   # .
