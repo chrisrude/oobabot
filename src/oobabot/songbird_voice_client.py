@@ -269,7 +269,6 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         self._potentially_reconnecting = False
         try:
             # todo: have songbird reconnect here
-            # todo: have songbird reconnect here
             ...
             # self.websocket = await self.connect_websocket()
         except (discord.errors.ConnectionClosed, asyncio.TimeoutError):
@@ -305,21 +304,3 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
     def is_connected(self) -> bool:
         """Indicates if the voice client is connected to voice."""
         return self._connected
-
-    async def play(self, youtube_url: str) -> None:
-        """Plays a youtube video in the voice channel."""
-        if self._songbird_driver is None:
-            raise RuntimeError("Songbird driver is None")
-        await self._songbird_driver.play(youtube_url)
-
-    async def is_playing(self) -> bool:
-        """Returns True if the bot is playing a youtube video."""
-        if self._songbird_driver is None:
-            raise RuntimeError("Songbird driver is None")
-        return await self._songbird_driver.is_playing()
-
-    async def stop(self) -> None:
-        """Stops the song."""
-        if self._songbird_driver is None:
-            raise RuntimeError("Songbird driver is None")
-        await self._songbird_driver.stop()
