@@ -2,13 +2,6 @@
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
-# build gotchas:
-# you need a conda env
-# you need to install maturin via pip
-# you need to install cmake
-# you need to install rust
-# you need to install libclang-dev
-
 [project]
 name = "oobabot"
 version = "0.2.0"
