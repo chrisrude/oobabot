@@ -1,11 +1,7 @@
 [package]
-name = "oobabot"
-version = "0.2.0"
+name = "discrivener"
+version = "0.1.1"
 edition = "2021"
-
-[lib]
-name = "oobabot"
-crate-type = ["cdylib"]
 
 # note: if this fails to build on osx, you might need
 # to install cmake
@@ -24,37 +20,6 @@ features = ["derive"]
 # just for etsting
 [dependencies.colored]
 version = "2.0.0"
-
-[dependencies.pyo3]
-version = "0.19.0"
-# Features:
-# + indoc
-# + macros
-# + pyo3-macros
-# + unindent
-# - abi3
-# - abi3-py310
-# - abi3-py311
-# - abi3-py37
-# - abi3-py38
-# - abi3-py39
-# - anyhow
-# - auto-initialize
-# - chrono
-# - experimental-inspect
-# - extension-module
-# - eyre
-# - full
-# - generate-import-lib
-# - hashbrown
-# - indexmap
-# - inventory
-# - multiple-pymethods
-# - nightly
-# - num-bigint
-# - num-complex
-# - rust_decimal
-# - serde
 
 # ring buffer, used to store audio data
 [dependencies.ringbuf]

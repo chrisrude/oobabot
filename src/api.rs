@@ -1,10 +1,8 @@
 use crate::api_types;
-use pyo3::prelude::*;
 
 use songbird::id::{ChannelId, GuildId, UserId};
 use songbird::ConnectionInfo;
 
-#[pyclass]
 pub struct Discrivener {
     model: crate::model::Model,
 }
