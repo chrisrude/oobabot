@@ -1,10 +1,9 @@
 use clap::Parser;
-use colored::Colorize;
 use std::sync::Arc;
 use tokio::signal;
 
-use discrivener::api;
-use discrivener::api_types;
+use oobabot::api;
+use oobabot::api_types;
 
 fn on_text(message: api_types::TranscribedMessage, log_performance: bool) {
     if message.text_segments.len() == 0 {

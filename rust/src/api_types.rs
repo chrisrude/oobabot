@@ -1,5 +1,8 @@
+use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
+#[pyclass]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Serialize, Deserialize)]
 pub struct TranscribedMessage {
     /// absolute time this message was received,
     /// as reported by the Discord server
@@ -22,6 +25,7 @@ pub struct TranscribedMessage {
     pub processing_time_ms: u32,
 }
 
+#[pyclass]
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Serialize, Deserialize)]
 pub struct TextSegment {
     pub text: String,
