@@ -479,6 +479,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "discrivener"
+version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "colored",
+ "pyo3",
+ "ringbuf",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "songbird",
+ "tokio",
+ "whisper-rs",
+]
+
+[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1117,23 +1134,6 @@ name = "once_cell"
 version = "1.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9670a07f94779e00908f3e686eab508878ebb390ba6e604d3a284c00e8d0487b"
-
-[[package]]
-name = "oobabot"
-version = "0.2.0"
-dependencies = [
- "async-trait",
- "clap",
- "colored",
- "pyo3",
- "ringbuf",
- "serde",
- "serde_json",
- "serde_with",
- "songbird",
- "tokio",
- "whisper-rs",
-]
 
 [[package]]
 name = "opaque-debug"

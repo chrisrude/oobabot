@@ -1,10 +1,9 @@
 [package]
-name = "oobabot"
+name = "discrivener"
 version = "0.2.0"
 edition = "2021"
 
 [lib]
-name = "oobabot"
 crate-type = ["cdylib"]
 
 # note: if this fails to build on osx, you might need
@@ -15,15 +14,6 @@ crate-type = ["cdylib"]
 # helper for async framework
 [dependencies.async-trait]
 version = "0.1.51"
-
-# command line argument parsing
-[dependencies.clap]
-version = "4.3.0"
-features = ["derive"]
-
-# just for etsting
-[dependencies.colored]
-version = "2.0.0"
 
 [dependencies.pyo3]
 version = "0.19.0"
@@ -101,3 +91,12 @@ version = "0.8.0"
 # - opencl
 # - simd
 # - test-with-tiny-model
+
+# command line argument parsing
+[dev-dependencies.clap]
+version = "4.3.0"
+features = ["derive"]
+
+# just for etsting
+[dev-dependencies.colored]
+version = "2.0.0"
