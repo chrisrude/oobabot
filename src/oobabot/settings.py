@@ -38,6 +38,16 @@ from oobabot import templates
 import oobabot.overengineered_settings_parser as oesp
 
 
+class SettingsError(Exception):
+    """
+    Base class for exceptions in this module.
+    """
+
+    def __init__(self, message: str, cause: Exception = None):
+        self.message = message
+        super().__init__(message, cause)
+
+
 def _console_wrapped(message):
     width = shutil.get_terminal_size().columns
     return "\n".join(textwrap.wrap(message, width))
@@ -649,10 +659,13 @@ class Settings:
     def write_to_file(self, filename: str) -> None:
         oesp.write_to_file(self.setting_groups, filename)
 
-    def _filename_from_args(self, args: typing.List[str]) -> str:
+    def _filename_from_args(self, args: typing.List[str]) -> typing.Tuple[str, bool]:
         """
         Get the configuration filename from the command line arguments.
         If none is supplied, return the default.
+
+        Returns a tuple with the file to open, and True if it came
+        from the default, rather than a CLI argument.
         """
 
         # we need to hack this in here because we want to know the filename
@@ -663,10 +676,10 @@ class Settings:
             for config_flag in config_setting.cli_args:
                 # find the element after config_flag in args
                 try:
-                    return args[args.index(config_flag) + 1]
+                    return (args[args.index(config_flag) + 1], False)
                 except (ValueError, IndexError):
                     continue
-        return config_setting.default
+        return (config_setting.default, True)
 
     def load_from_yaml_stream(self, stream: typing.TextIO) -> typing.Optional[str]:
         """
@@ -696,16 +709,28 @@ class Settings:
         cli_args is intended to be used when running from a standalone
         application, while config_file is intended to be used when
         running from inside another process.
+
+        raises SettingsError if a specific configuration file
+        was requested (either by the config_file argument or the CLI),
+        but it could not be found.
         """
 
+        is_default = False
         if config_file is None:
-            config_file = self._filename_from_args(cli_args)
+            config_file, is_default = self._filename_from_args(cli_args)
 
-        self.arg_parser = oesp.load(
-            cli_args=cli_args,
-            setting_groups=self.setting_groups,
-            config_file=config_file,
-        )
+        try:
+            self.arg_parser = oesp.load(
+                cli_args=cli_args,
+                setting_groups=self.setting_groups,
+                config_file=config_file,
+                raise_if_file_missing=not is_default,
+            )
+        except oesp.ConfigFileMissingError as err:
+            # get full path to config_file
+            config_file = os.path.abspath(config_file)
+            msg = f"Could not load config file at: {config_file}"
+            raise SettingsError(msg, err) from err
 
     def print_help(self):
         """

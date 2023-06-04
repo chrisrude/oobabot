@@ -15,6 +15,7 @@ import typing
 
 import discord
 
+import oobabot
 from oobabot import bot_commands
 from oobabot import decide_to_respond
 from oobabot import discord_bot
@@ -67,7 +68,14 @@ class Oobabot:
         self.startup_lock = threading.Lock()
         self.settings = settings.Settings()
 
-        self.settings.load(cli_args)
+        try:
+            self.settings.load(cli_args)
+        except settings.SettingsError as err:
+            print("\n".join([str(arg) for arg in list(err.args)]), file=sys.stderr)
+            if self._our_own_main():
+                sys.exit(1)
+            else:
+                raise
 
     def start(self):
         """
@@ -238,8 +246,12 @@ class Oobabot:
             signal.signal(signal.SIGTERM, exit_handler)
 
     def _prepare_connections(self):
-        ########################################################
-        # Test connection to services
+        """
+        Test connections to services, and prepare them for use.
+        """
+        fancy_logger.get().info(
+            "Starting oobabot, core version %s", oobabot.__version__
+        )
         for client in [self.ooba_client, self.stable_diffusion_client]:
             if client is None:
                 continue
