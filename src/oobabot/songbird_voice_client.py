@@ -234,12 +234,13 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
 
                 # todo: connect to songbird here
                 print(
-                    f"cargo run -- --channel-id {self.channel.id} "
+                    f"cargo run -r -- --channel-id {self.channel.id} "
                     + f"--endpoint {self.endpoint} "
                     + f"--guild-id {self.guild.id} "
                     + f"--session-id {self.session_id} "
-                    + f"--token {self.token} "
                     + f"--user-id {self.user.id}"
+                    + f"--voice-token {self.token} "
+                    + " ./ggml-base.en.bin"
                 )
                 break
             except (discord.errors.ConnectionClosed, asyncio.TimeoutError):
