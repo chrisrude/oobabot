@@ -1,0 +1,6 @@
+[submodule "whisper.cpp"]
+	path = whisper.cpp
+	url = https://github.com/ggerganov/whisper.cpp
+[submodule "songbird-py"]
+	path = songbird-py
+	url = https://github.com/chrisrude/songbird-py
