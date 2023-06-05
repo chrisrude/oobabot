@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::Colorize;
 use discrivener::api;
 use discrivener::api_types;
 use std::sync::Arc;

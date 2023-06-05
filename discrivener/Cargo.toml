@@ -4,7 +4,9 @@ version = "0.2.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
+
+# todo: use https://github.com/awestlake87/pyo3-asyncio
 
 # note: if this fails to build on osx, you might need
 # to install cmake
@@ -97,6 +99,9 @@ version = "0.8.0"
 version = "4.3.0"
 features = ["derive"]
 
-# just for etsting
+# just for testing
 [dev-dependencies.colored]
 version = "2.0.0"
+
+[dev-dependencies.discrivener]
+path = "./"

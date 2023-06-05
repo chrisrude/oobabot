@@ -485,6 +485,7 @@ dependencies = [
  "async-trait",
  "clap",
  "colored",
+ "discrivener",
  "pyo3",
  "ringbuf",
  "serde",
