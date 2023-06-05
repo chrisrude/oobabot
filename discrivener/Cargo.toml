@@ -87,7 +87,7 @@ features = ["full", "signal"]
 [dependencies.whisper-rs]
 version = "0.8.0"
 #features = ["cuda"]
-#path = "~/src/ai/whisper-rs"
+path = "../whisper-rs"
 # - coreml
 # - cuda
 # - opencl
