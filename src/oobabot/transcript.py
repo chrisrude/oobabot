@@ -2,6 +2,11 @@
 """
 Stores a transcript of a voice channel.
 """
+import asyncio
+import re
+import time
+import typing
+
 import discord
 
 from oobabot import discord_utils
@@ -14,9 +19,11 @@ class TranscriptLine:
     A single line of a transcript.
     """
 
-    timestamp: float
-    text: str
-    user: discord.User
+    def __init__(self, is_bot: bool, timestamp: float, text: str, user: discord.User):
+        self.is_bot = is_bot
+        self.timestamp = timestamp
+        self.text = text
+        self.user = user
 
     def __str__(self) -> str:
         return f"{self.timestamp:.1f} {self.user.name}: {self.text}"
@@ -27,12 +34,41 @@ class Transcript:
     Stores a transcript of a voice channel.
     """
 
-    _client: discord.client.Client
-    _buffer: discord_utils.RingBuffer[TranscriptLine]
+    NUM_LINES = 100
 
-    def __init__(self, client: discord.client.Client):
+    def __init__(self, client: discord.client.Client, wakewords: typing.List[str]):
         self._client = client
-        self._buffer = discord_utils.RingBuffer[TranscriptLine](100)
+        self._buffer = discord_utils.RingBuffer[TranscriptLine](self.NUM_LINES)
+        self._wakewords: typing.Set[str] = set(word.lower() for word in wakewords)
+        self.wakeword_event = asyncio.Event()
+
+    def get_lines(self) -> typing.List[TranscriptLine]:
+        """
+        Returns the current transcript lines.
+        """
+        return self._buffer.get()
+
+    def _on_wakeword(self):
+        fancy_logger.get().warning("transcript: wakeword detected!")
+        fancy_logger.get().warning("transcript: wakeword detected!")
+        fancy_logger.get().warning("transcript: wakeword detected!")
+        fancy_logger.get().warning("transcript: wakeword detected!")
+        fancy_logger.get().warning("transcript: wakeword detected!")
+        fancy_logger.get().warning("transcript: wakeword detected!")
+        fancy_logger.get().warning("transcript: wakeword detected!")
+
+    def add_bot_response(self, message: str):
+        """
+        Adds a bot response to the transcript.
+        """
+        user = self._client.user
+        line = TranscriptLine(
+            is_bot=True,
+            timestamp=time.time(),
+            text=message,
+            user=user,
+        )
+        self._buffer.append(line)
 
     def on_transcribed_message(self, message: discrivener.TranscribedMessage) -> None:
         if not message.segments:
@@ -40,25 +76,30 @@ class Transcript:
             # on the discrivener side?
             return
 
-        fancy_logger.get().debug("transcript: %s", message)
-
         user = self._client.get_user(message.user_id)
         if user is None:
             fancy_logger.get().warning("transcript: unknown user %s", message.user_id)
             return
 
-        dump_transcript = False
-        for segment in message.segments:
-            line = TranscriptLine()
-            line.timestamp = message.timestamp + (segment.start_offset_ms / 1000.0)
-            line.text = segment.text
-            line.user = user
-            self._buffer.append(line)
-            if not dump_transcript:
-                dump_transcript = "transcript" in segment.text.lower()
+        fancy_logger.get().info("transcript: %s", message)
 
-        if dump_transcript:
-            fancy_logger.get().info("transcript: dumping transcript")
-            fancy_logger.get().info("lines %d", len(self._buffer.get()))
-            for line in self._buffer.get():
-                fancy_logger.get().info("transcript: %s", line)
+        # todo: make use of decide_to_respond instead
+        wakeword_found = False
+        for segment in message.segments:
+            line = TranscriptLine(
+                is_bot=user.bot,
+                timestamp=message.timestamp + (segment.start_offset_ms / 1000.0),
+                text=segment.text,
+                user=user,
+            )
+            self._buffer.append(line)
+
+            if not wakeword_found:
+                for word in re.split(r"[ .,!?\"']", segment.text):
+                    if word.lower() in self._wakewords:
+                        wakeword_found = True
+                        break
+
+        if wakeword_found:
+            fancy_logger.get().error("transcript: wakeword detected!")
+            self.wakeword_event.set()

@@ -15,8 +15,11 @@ import discord.state
 import discord.types
 from discord.types import voice  # this is so pylint doesn't complain
 
+from oobabot import audio_responder
 from oobabot import discrivener
 from oobabot import fancy_logger
+from oobabot import ooba_client
+from oobabot import prompt_generator
 from oobabot import transcript
 
 
@@ -36,17 +39,9 @@ class VoiceClient(discord.VoiceProtocol):
     cls=voice_client.VoiceClient
     """
 
-    _discrivener: discrivener.Discrivener
-    _discrivener_connected: bool
-    _handshaking: bool
-    _oobabot_voice_connected: bool
-    _potentially_reconnecting: bool
-    _voice_state_complete: asyncio.Event
-    _voice_server_complete: asyncio.Event
-    _state: discord.state.ConnectionState
-    _session_id: str
-    _server_id: int
-    _transcript: transcript.Transcript
+    ooba_client: ooba_client.OobaClient
+    prompt_generator: prompt_generator.PromptGenerator
+    wakewords: typing.List[str] = []
 
     supported_modes: typing.Tuple[voice.SupportedModes, ...] = (
         "xsalsa20_poly1305",
@@ -74,7 +69,13 @@ class VoiceClient(discord.VoiceProtocol):
         self._state: discord.state.ConnectionState = client._connection
         self._session_id = discord.utils.MISSING
         self._server_id = discord.utils.MISSING
-        self._transcript = transcript.Transcript(client)
+        self._transcript = transcript.Transcript(client, self.wakewords)
+
+        self._audio_responder = audio_responder.AudioResponder(
+            self._transcript,
+            self.prompt_generator,
+            self.ooba_client,
+        )
 
     @property
     def guild(self) -> discord.guild.Guild:
@@ -177,7 +178,7 @@ class VoiceClient(discord.VoiceProtocol):
             self.user.id,
             token,
         )
-
+        await self._audio_responder.start()
         self._voice_server_complete.set()
 
     async def voice_connect(
@@ -196,6 +197,7 @@ class VoiceClient(discord.VoiceProtocol):
         self._oobabot_voice_connected = False
         await self.channel.guild.change_voice_state(channel=None)
         await self._discrivener.stop()
+        await self._audio_responder.stop()
 
     async def connect(
         self,

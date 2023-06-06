@@ -21,16 +21,11 @@ class Discrivener:
     DISCRIVENER_MODEL = "./discrivener/ggml-base.en.bin"
     KILL_TIMEOUT = 5
 
-    _handler: typing.Callable[["DiscrivenerMessage"], None]
-    _process: typing.Optional["asyncio.subprocess.Process"]
-    _stderr_reading_task: typing.Optional[asyncio.Task]
-    _stdout_reading_task: typing.Optional[asyncio.Task]
-
     def __init__(self, handler: typing.Callable[["DiscrivenerMessage"], None]):
-        self._handler = handler
-        self._process = None
-        self._stderr_reading_task = None
-        self._stdout_reading_task = None
+        self._handler: typing.Callable[["DiscrivenerMessage"], None] = handler
+        self._process: typing.Optional["asyncio.subprocess.Process"] = None
+        self._stderr_reading_task: typing.Optional[asyncio.Task] = None
+        self._stdout_reading_task: typing.Optional[asyncio.Task] = None
 
     async def run(
         self,
@@ -125,7 +120,13 @@ class Discrivener:
             try:
                 message_list = self._json_to_message_list(line)
                 for message in message_list:
-                    self._handler(message)
+                    try:
+                        self._handler(message)
+                    except Exception as err:
+                        fancy_logger.get().error(
+                            "Discrivener: error handling message: %s", err
+                        )
+                        raise
             except json.JSONDecodeError:
                 fancy_logger.get().error("Discrivener: could not parse %s", line)
 

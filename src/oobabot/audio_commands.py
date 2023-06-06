@@ -17,11 +17,11 @@ class AudioCommands:
     Implementation of commands to join and leave voice channels.
     """
 
-    voice_client: typing.Optional[voice_client.VoiceClient]
-
     def __init__(self, persona: persona.Persona):
+        voice_client.VoiceClient.wakewords = persona.wakewords
+
         self.persona = persona
-        self.voice_client = None
+        self.voice_client: typing.Optional[voice_client.VoiceClient] = None
 
     def _discover_voice_channel(
         self, interaction: discord.Interaction
