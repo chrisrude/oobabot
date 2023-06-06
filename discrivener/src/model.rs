@@ -15,7 +15,7 @@ impl Model {
     pub fn load(
         model_path: String,
         dump_everything_to_a_file: Option<String>,
-        text_callback: Arc<dyn Fn(api_types::TranscribedMessage) + Send + Sync>,
+        event_callback: Arc<dyn Fn(api_types::VoiceChannelEvent) + Send + Sync>,
     ) -> Self {
         let mut config = songbird::Config::default();
         config.decode_mode = songbird::driver::DecodeMode::Decode; // convert incoming audio from Opus to PCM
@@ -24,11 +24,12 @@ impl Model {
 
         let mut model = Self { driver };
 
-        let whisper = whisper::Whisper::load(model_path, text_callback);
+        let whisper = whisper::Whisper::load(model_path, event_callback.clone());
 
         let handler_arc = Arc::new(packet_handler::PacketHandler::new(
             Arc::new(move |user_id, audio| whisper.on_audio_complete(user_id, audio)),
             dump_everything_to_a_file,
+            event_callback.clone(),
         ));
 
         // event handlers for the songbird driver
@@ -46,6 +47,18 @@ impl Model {
         );
         model.driver.add_global_event(
             songbird::CoreEvent::ClientDisconnect.into(),
+            VoicePacketHandlerWrapper::new(handler_arc.clone()),
+        );
+        model.driver.add_global_event(
+            songbird::CoreEvent::DriverConnect.into(),
+            VoicePacketHandlerWrapper::new(handler_arc.clone()),
+        );
+        model.driver.add_global_event(
+            songbird::CoreEvent::DriverDisconnect.into(),
+            VoicePacketHandlerWrapper::new(handler_arc.clone()),
+        );
+        model.driver.add_global_event(
+            songbird::CoreEvent::DriverReconnect.into(),
             VoicePacketHandlerWrapper::new(handler_arc.clone()),
         );
 

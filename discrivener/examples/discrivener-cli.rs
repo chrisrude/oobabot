@@ -30,7 +30,7 @@ fn on_text(message: api_types::TranscribedMessage, log_performance: bool) {
             );
             first = false;
         } else {
-            println!("\t\t\t\t {}", text_segment.text.bold());
+            println!("\t\t\t {}", text_segment.text.bold());
         }
     }
 }
@@ -40,7 +40,47 @@ async fn tokio_main(cli: Cli) {
     let log_performance = cli.log_performance;
     let mut discrivener = api::Discrivener::load(
         cli.model_path,
-        Arc::new(move |message| on_text(message, log_performance)),
+        Arc::new(move |event| match event {
+            api_types::VoiceChannelEvent::TranscribedMessage(message) => {
+                on_text(message, log_performance)
+            }
+            api_types::VoiceChannelEvent::Connect(status) => {
+                println!(
+                    "Connection status: {} to channel #{}",
+                    "connected".bright_green(),
+                    if let Some(channel_id) = status.channel_id {
+                        channel_id.to_string().bright_green()
+                    } else {
+                        "unknown".bright_red()
+                    }
+                )
+            }
+            api_types::VoiceChannelEvent::UserJoin(user_data) => {
+                println!(
+                    "User {} {}",
+                    user_data.user_id,
+                    if user_data.joined {
+                        "joined".bright_green()
+                    } else {
+                        "left".bright_purple()
+                    }
+                )
+            }
+            api_types::VoiceChannelEvent::Reconnect(status) => {
+                println!(
+                    "Connection status: {} to channel #{}",
+                    "reconnected".bright_green(),
+                    if let Some(channel_id) = status.channel_id {
+                        channel_id.to_string().bright_green()
+                    } else {
+                        "unknown".bright_red()
+                    }
+                )
+            }
+            api_types::VoiceChannelEvent::Disconnect(_) => {
+                println!("Connection status: {}", "disconnected".bright_red());
+            }
+        }),
         cli.save_everything_to_file,
     );
 

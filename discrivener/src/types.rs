@@ -8,6 +8,8 @@ use serde_with::serde_as;
 use songbird::events::context_data;
 use songbird::model::payload;
 
+use crate::api_types;
+
 pub const AUDIO_CHANNELS: usize = 2;
 
 pub const DISCORD_SAMPLES_PER_SECOND: usize = 48000;
@@ -75,6 +77,77 @@ impl MyVoiceData {
     }
 }
 
+impl api_types::ConnectData {
+    pub fn from(other: &songbird::events::context_data::ConnectData) -> Self {
+        Self {
+            channel_id: if let Some(id) = other.channel_id {
+                Some(id.0)
+            } else {
+                None
+            },
+            guild_id: other.guild_id.0,
+            session_id: other.session_id.clone().to_string(),
+            server: other.server.clone().to_string(),
+            ssrc: other.ssrc,
+        }
+    }
+}
+
+impl api_types::DisconnectKind {
+    pub fn from(other: &songbird::events::context_data::DisconnectKind) -> Self {
+        match other {
+            songbird::events::context_data::DisconnectKind::Connect => Self::Connect,
+            songbird::events::context_data::DisconnectKind::Reconnect => Self::Reconnect,
+            songbird::events::context_data::DisconnectKind::Runtime => Self::Runtime,
+            _ => panic!("Unknown disconnect kind: {:?}", other),
+        }
+    }
+}
+
+impl api_types::DisconnectReason {
+    pub fn from(other: &songbird::events::context_data::DisconnectReason) -> Self {
+        match other {
+            songbird::events::context_data::DisconnectReason::AttemptDiscarded => {
+                Self::AttemptDiscarded
+            }
+            songbird::events::context_data::DisconnectReason::Internal => Self::Internal,
+            songbird::events::context_data::DisconnectReason::Io => Self::Io,
+            songbird::events::context_data::DisconnectReason::ProtocolViolation => {
+                Self::ProtocolViolation
+            }
+            songbird::events::context_data::DisconnectReason::TimedOut => Self::TimedOut,
+            songbird::events::context_data::DisconnectReason::WsClosed(code) => {
+                if code.is_none() {
+                    Self::WsClosed(None)
+                } else {
+                    Self::WsClosed(Some(code.unwrap() as u32))
+                }
+            }
+            _ => panic!("Unknown disconnect reason: {:?}", other),
+        }
+    }
+}
+
+impl api_types::DisconnectData {
+    pub fn from(other: &songbird::events::context_data::DisconnectData) -> Self {
+        Self {
+            kind: api_types::DisconnectKind::from(&other.kind),
+            reason: if let Some(reason) = &other.reason {
+                Some(api_types::DisconnectReason::from(reason))
+            } else {
+                None
+            },
+            channel_id: if let Some(id) = other.channel_id {
+                Some(id.0)
+            } else {
+                None
+            },
+            guild_id: other.guild_id.0,
+            session_id: other.session_id.clone().to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum MyEventContext {
     /// Speaking state update, typically describing how another voice
@@ -89,6 +162,12 @@ pub enum MyEventContext {
     VoicePacket(MyVoiceData),
     /// Fired whenever a client disconnects.
     ClientDisconnect(payload::ClientDisconnect),
+    /// Fires when this driver successfully connects to a voice channel.
+    DriverConnect(api_types::ConnectData),
+    /// Fires when this driver successfully reconnects after a network error.
+    DriverReconnect(api_types::ConnectData),
+    /// Fires when this driver fails to connect to, or drops from, a voice channel.
+    DriverDisconnect(api_types::DisconnectData),
 }
 
 impl MyEventContext {
@@ -113,7 +192,15 @@ impl MyEventContext {
                 }
                 Some(Self::VoicePacket(MyVoiceData::from(s)))
             }
-            songbird::EventContext::ClientDisconnect(s) => Some(Self::ClientDisconnect(s.clone())),
+            songbird::EventContext::DriverConnect(connect_data) => Some(Self::DriverConnect(
+                api_types::ConnectData::from(connect_data),
+            )),
+            songbird::EventContext::DriverReconnect(reconnect_data) => Some(Self::DriverConnect(
+                api_types::ConnectData::from(reconnect_data),
+            )),
+            songbird::EventContext::DriverDisconnect(disconnect_data) => Some(
+                Self::DriverDisconnect(api_types::DisconnectData::from(disconnect_data)),
+            ),
             _ => None,
         }
     }

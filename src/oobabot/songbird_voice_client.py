@@ -106,6 +106,12 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
         channel_id = data["channel_id"]
 
         if not self._handshaking or self._potentially_reconnecting:
+            fancy_logger.get().debug(
+                "Server-initiated voice state update for Channel ID %s (Guild ID %s)",
+                channel_id,
+                self.guild.id,
+            )
+
             # If we're done handshaking then we just need to update ourselves
             # If we're potentially reconnecting due to a 4014, then we need to
             # differentiate
@@ -127,6 +133,11 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
                     return
                 self.channel = channel
         else:
+            fancy_logger.get().debug(
+                "Voice state complete for Channel ID %s (Guild ID %s) during handshake",
+                channel_id,
+                self.guild.id,
+            )
             self._voice_state_complete.set()
 
     async def on_voice_server_update(
@@ -209,6 +220,9 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
             # Start the connection flow
             await self.voice_connect(self_deaf=self_deaf, self_mute=self_mute)
 
+            # todo: set _voice_state_complete when exec is connected
+            self._voice_state_complete.set()
+
             try:
                 await discord.utils.sane_wait_for(futures, timeout=timeout)
             except asyncio.TimeoutError:
@@ -234,13 +248,14 @@ class SongbirdVoiceClient(discord.VoiceProtocol):
 
                 # todo: connect to songbird here
                 print(
-                    f"cargo run -r -- --channel-id {self.channel.id} "
+                    "./target/release/examples/discrivener-json "
+                    + f"--channel-id {self.channel.id} "
                     + f"--endpoint {self.endpoint} "
                     + f"--guild-id {self.guild.id} "
                     + f"--session-id {self.session_id} "
-                    + f"--user-id {self.user.id}"
+                    + f"--user-id {self.user.id} "
                     + f"--voice-token {self.token} "
-                    + " ./ggml-base.en.bin"
+                    + "./ggml-base.en.bin"
                 )
                 break
             except (discord.errors.ConnectionClosed, asyncio.TimeoutError):

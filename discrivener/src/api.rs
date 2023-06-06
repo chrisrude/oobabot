@@ -1,10 +1,8 @@
 use crate::api_types;
-use pyo3::prelude::*;
 
 use songbird::id::{ChannelId, GuildId, UserId};
 use songbird::ConnectionInfo;
 
-#[pyclass]
 pub struct Discrivener {
     model: crate::model::Model,
 }
@@ -12,11 +10,11 @@ pub struct Discrivener {
 impl Discrivener {
     pub fn load(
         model_path: String,
-        text_callback: std::sync::Arc<dyn Fn(api_types::TranscribedMessage) + Send + Sync>,
+        event_callback: std::sync::Arc<dyn Fn(api_types::VoiceChannelEvent) + Send + Sync>,
         dump_everything_to_a_file: Option<String>,
     ) -> Self {
         return Discrivener {
-            model: crate::model::Model::load(model_path, dump_everything_to_a_file, text_callback),
+            model: crate::model::Model::load(model_path, dump_everything_to_a_file, event_callback),
         };
     }
 

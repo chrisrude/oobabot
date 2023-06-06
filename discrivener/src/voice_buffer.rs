@@ -41,10 +41,6 @@ impl<'a> VoiceBuffer {
         let (mut producer, consumer) = buffer.split_ref();
 
         if producer.free_len() < audio.len() {
-            println!("buffer is full, flushing");
-            println!("producer free len: {}", producer.free_len());
-            println!("consumer len: {}", consumer.len());
-            println!("audio len: {}", audio.len());
             self._flush_buffer(&producer, consumer);
         }
 

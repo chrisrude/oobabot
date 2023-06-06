@@ -11,7 +11,7 @@ use crate::types;
 pub const MIN_AUDIO_THRESHOLD_MS: u32 = 500;
 
 pub struct Whisper {
-    text_callback: Arc<dyn Fn(api_types::TranscribedMessage) + Send + Sync>,
+    event_callback: Arc<dyn Fn(api_types::VoiceChannelEvent) + Send + Sync>,
     whisper_context: Arc<WhisperContext>,
 }
 
@@ -30,7 +30,7 @@ impl Whisper {
     /// Load a model from the given path
     pub fn load(
         model_path: String,
-        text_callback: Arc<dyn Fn(api_types::TranscribedMessage) + Send + Sync>,
+        event_callback: Arc<dyn Fn(api_types::VoiceChannelEvent) + Send + Sync>,
     ) -> Self {
         let path = Path::new(model_path.as_str());
         if !path.exists() {
@@ -44,7 +44,7 @@ impl Whisper {
             Arc::new(WhisperContext::new(model_path.as_str()).expect("failed to load model"));
 
         return Self {
-            text_callback,
+            event_callback,
             whisper_context,
         };
     }
@@ -59,28 +59,40 @@ impl Whisper {
             // very short messages are usually just noise, ignore them
             return;
         }
+        // get our unixtime in ms
+        let start_time = std::time::SystemTime::now();
+        let unixsecs = start_time
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
 
         // make clones of everything so that the closure can own them, if
         let audio_copy = audio.clone();
-        let callback_copy = self.text_callback.clone();
+        let callback_copy = self.event_callback.clone();
         let whisper_context_copy = self.whisper_context.clone();
-        task::spawn(async move {
-            let start_time = std::time::Instant::now();
 
+        // todo: if we're running too far behind, we should drop audio in order to catch up
+        // todo: if we're always running too far behind, we should display some kind of warning
+        // todo: try quantized model?
+
+        task::spawn(async move {
             let whisper_audio = resample_audio_from_discord_to_whisper(audio_copy);
             let text_segments = audio_to_text(whisper_context_copy, whisper_audio);
 
-            let processing_time_ms = (start_time - std::time::Instant::now()).as_millis() as u32;
-
+            let end_time = std::time::SystemTime::now();
+            let processing_time_ms =
+                end_time.duration_since(start_time).unwrap().as_millis() as u32;
             let transcribed_message = api_types::TranscribedMessage {
-                timestamp: 0, // TODO!!!
+                timestamp: unixsecs,
                 user_id,
                 text_segments,
                 audio_duration_ms,
                 processing_time_ms,
             };
 
-            callback_copy(transcribed_message);
+            callback_copy(api_types::VoiceChannelEvent::TranscribedMessage(
+                transcribed_message,
+            ));
         });
     }
 }
@@ -107,6 +119,8 @@ fn resample_audio_from_discord_to_whisper(
     let mut audio_out = vec![0.0 as types::WhisperAudioSample; out_len];
 
     let mut audio_max: types::WhisperAudioSample = 0.0;
+
+    // todo: drop audio which is very low signal?  It has had issues transcribing well.
 
     // iterate through the audio vector, taking pairs of samples and averaging them
     // while doing so, look for max and min values so that we can normalize later
@@ -142,6 +156,11 @@ fn audio_to_text(
 
     // actually convert audio to text.  Takes a while.
     state.full(make_params(), &audio_data[..]).unwrap();
+
+    // todo: use a different context / token history for each user
+    // todo: keep part of the audio for the next iteration?
+    // todo: add segments from last session as well?
+    // see https://github.com/ggerganov/whisper.cpp/blob/57543c169e27312e7546d07ed0d8c6eb806ebc36/examples/stream/stream.cpp
 
     let num_segments = state.full_n_segments().unwrap();
     let mut result = Vec::<api_types::TextSegment>::with_capacity(num_segments as usize);

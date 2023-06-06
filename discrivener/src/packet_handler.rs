@@ -5,6 +5,9 @@ use std::io::Write;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use tokio::task;
+
+use crate::api_types;
 use crate::types;
 use crate::voice_buffer;
 
@@ -23,12 +26,15 @@ pub struct PacketHandler {
     audio_complete_callback: types::AudioCallback,
 
     maybe_log_file_mutex: Option<Arc<Mutex<std::fs::File>>>,
+
+    event_callback: Arc<dyn Fn(api_types::VoiceChannelEvent) + Send + Sync>,
 }
 
 impl PacketHandler {
     pub fn new(
         audio_complete_callback: types::AudioCallback,
         dump_everything_to_a_file: Option<String>,
+        event_callback: Arc<dyn Fn(api_types::VoiceChannelEvent) + Send + Sync>,
     ) -> Self {
         let mut maybe_log_file_mutex = None;
         if let Some(everything_file) = dump_everything_to_a_file {
@@ -41,6 +47,7 @@ impl PacketHandler {
             ))),
             audio_complete_callback,
             maybe_log_file_mutex,
+            event_callback,
         }
     }
 
@@ -53,7 +60,6 @@ impl PacketHandler {
         let buffer_mutex = self.ssrc_to_user_voice_data.clone();
         let mut ssrc_to_user_voice_data = buffer_mutex.lock().unwrap();
         if let Some(user_voice_data) = ssrc_to_user_voice_data.get_mut(&ssrc) {
-            // println!("found existing buffer for ssrc {}", ssrc);
             assert!(user_voice_data.user_id == user_id);
             user_voice_data.on_start_talking();
         }
@@ -87,6 +93,29 @@ impl PacketHandler {
         let buffer_mutex = self.ssrc_to_user_voice_data.clone();
         let mut ssrc_to_voice_buffer = buffer_mutex.lock().unwrap();
         ssrc_to_voice_buffer.retain(|_, user_voice_data| user_voice_data.user_id != user_id);
+
+        self._fire_callback(api_types::VoiceChannelEvent::UserJoin(
+            api_types::UserJoinData {
+                user_id: user_id,
+                joined: false,
+            },
+        ));
+    }
+
+    fn on_driver_connect(&self, connect_data: &api_types::ConnectData) {
+        self._fire_callback(api_types::VoiceChannelEvent::Connect(connect_data.clone()));
+    }
+
+    fn on_driver_disconnect(&self, disconnect_data: &api_types::DisconnectData) {
+        self._fire_callback(api_types::VoiceChannelEvent::Disconnect(
+            disconnect_data.clone(),
+        ));
+    }
+
+    fn on_driver_reconnect(&self, reconnect_data: &api_types::ConnectData) {
+        self._fire_callback(api_types::VoiceChannelEvent::Reconnect(
+            reconnect_data.clone(),
+        ));
     }
 
     fn _with_ssrc(&self, ssrc: types::Ssrc, f: impl FnOnce(&mut voice_buffer::VoiceBufferForUser)) {
@@ -97,6 +126,13 @@ impl PacketHandler {
         } else {
             eprintln!("no buffer for ssrc {}", ssrc);
         }
+    }
+
+    fn _fire_callback(&self, event: api_types::VoiceChannelEvent) {
+        let callback_copy = self.event_callback.clone();
+        task::spawn(async move {
+            callback_copy(event);
+        });
     }
 
     /// Fires on receipt of a voice packet from another stream in the voice call.
@@ -207,6 +243,7 @@ impl PacketHandler {
                 // containing the decoded data.
                 self.on_audio(data.ssrc, &data.audio);
             }
+
             Ctx::ClientDisconnect(songbird::model::payload::ClientDisconnect {
                 user_id, ..
             }) => {
@@ -215,9 +252,14 @@ impl PacketHandler {
                 // You will typically need to map the User ID to their SSRC; observed when
                 // first speaking.
                 self.on_user_leave(user_id.0);
-
-                println!("Client disconnected: user {:?}", user_id);
             }
+            Ctx::DriverConnect(connect_data) => {
+                self.on_driver_connect(connect_data);
+            }
+            Ctx::DriverDisconnect(disconnect_data) => {
+                self.on_driver_disconnect(disconnect_data);
+            }
+            Ctx::DriverReconnect(connect_data) => self.on_driver_reconnect(connect_data),
         }
 
         None
