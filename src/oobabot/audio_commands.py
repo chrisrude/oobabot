@@ -9,7 +9,7 @@ import discord
 from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import persona
-from oobabot import songbird_voice_client
+from oobabot import voice_client
 
 
 class AudioCommands:
@@ -17,7 +17,7 @@ class AudioCommands:
     Implementation of commands to join and leave voice channels.
     """
 
-    voice_client: typing.Optional[songbird_voice_client.SongbirdVoiceClient]
+    voice_client: typing.Optional[voice_client.VoiceClient]
 
     def __init__(self, persona: persona.Persona):
         self.persona = persona
@@ -76,7 +76,7 @@ class AudioCommands:
                 self.voice_client = None
 
             self.voice_client = await voice_channel.connect(
-                cls=songbird_voice_client.SongbirdVoiceClient,
+                cls=voice_client.VoiceClient,
             )
             if self.voice_client is None:
                 await discord_utils.fail_interaction(
