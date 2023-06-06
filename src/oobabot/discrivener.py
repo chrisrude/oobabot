@@ -88,6 +88,10 @@ class Discrivener:
         self._process.send_signal(signal.SIGINT)
         try:
             await asyncio.wait_for(self._process.wait(), timeout=self.KILL_TIMEOUT)
+            fancy_logger.get().info(
+                "Discrivener process (PID %d) stopped gracefully", self._process.pid
+            )
+
         except asyncio.TimeoutError:
             fancy_logger.get().warning(
                 "Discrivener process (PID %d) did not exit after %d seconds, killing",
@@ -96,6 +100,9 @@ class Discrivener:
             )
             self._process.kill()
             await asyncio.wait_for(self._process.wait(), timeout=self.KILL_TIMEOUT)
+            fancy_logger.get().warning(
+                "Discrivener process (PID %d) force-killed", self._process.pid
+            )
         finally:
             self._process = None
             self._stderr_reading_task.cancel()
@@ -133,10 +140,13 @@ class Discrivener:
             except asyncio.IncompleteReadError:
                 break
             line = line_bytes.decode("utf-8").strip()
-            if "whisper_init_state: " in line:
+            if (
+                "whisper_init_state: " in line
+                or "whisper_init_from_file_no_state: " in line
+                or "whisper_model_load: " in line
+            ):
                 # workaround nonsense noise in whisper.cpp
                 continue
-            fancy_logger.get().error("Discrivener: %s", line)
         fancy_logger.get().info("Discrivener stderr reader exited")
 
     def _json_to_message_list(self, message: str) -> typing.List["DiscrivenerMessage"]:

@@ -23,6 +23,31 @@ class AudioCommands:
         self.persona = persona
         self.voice_client = None
 
+    def _discover_voice_channel(
+        self, interaction: discord.Interaction
+    ) -> typing.Optional[discord.VoiceChannel]:
+        if isinstance(interaction.user, discord.Member):
+            # if invoked from a guild channel, join the voice channel
+            # the invoker is in, within that guild
+            if interaction.user.voice is not None:
+                return interaction.user.voice.channel
+
+        # if invoked from a private message, look at all guilds
+        # which have both the bot and the invoking user as a member,
+        # find find the first such guild where the user is in a voice
+        # channel.
+        for guild in interaction.user.mutual_guilds:
+            # get member of guild
+            member = guild.get_member(interaction.user.id)
+            if member is None:
+                continue
+            if member.voice is None:
+                continue
+            if member.voice.channel is None:
+                continue
+            return (member.voice.channel, True)
+        return None
+
     def add_commands(self, tree):
         @discord.app_commands.command(
             name="join_voice",
@@ -37,30 +62,7 @@ class AudioCommands:
                 "/join_voice called by user '%s'", interaction.user.name
             )
 
-            voice_channel = None
-            had_to_discover_guild = False
-            if isinstance(interaction.user, discord.Member):
-                # if invoked from a guild channel, join the voice channel
-                # the invoker is in, within that guild
-                if interaction.user.voice is not None:
-                    voice_channel = interaction.user.voice.channel
-            else:
-                # if invoked from a private message, look at all guilds
-                # which have both the bot and the invoking user as a member,
-                # find find the first such guild where the user is in a voice
-                # channel.
-                had_to_discover_guild = True
-                for guild in interaction.user.mutual_guilds:
-                    # get member of guild
-                    member = guild.get_member(interaction.user.id)
-                    if member is None:
-                        continue
-                    if member.voice is None:
-                        continue
-                    if member.voice.channel is None:
-                        continue
-                    voice_channel = member.voice.channel
-
+            voice_channel = self._discover_voice_channel(interaction)
             if voice_channel is None:
                 await discord_utils.fail_interaction(
                     interaction, "You must be in a voice channel to use this command"
@@ -75,29 +77,26 @@ class AudioCommands:
                 await self.voice_client.disconnect()
                 self.voice_client = None
 
-            self.voice_client = await voice_channel.connect(
-                cls=voice_client.VoiceClient,
+            await interaction.response.defer(
+                ephemeral=True,
+                thinking=True,
             )
-            if self.voice_client is None:
-                await discord_utils.fail_interaction(
-                    interaction, "Failed to connect to voice channel"
+
+            try:
+                self.voice_client = await voice_channel.connect(
+                    cls=voice_client.VoiceClient,
+                )
+                message = f"Joined voice channel #{voice_channel.name}"
+            except discord.DiscordException as err:
+                fancy_logger.get().error(
+                    "Failed to connect to voice channel #%d: %s", voice_channel.id, err
+                )
+                message = (
+                    f"Failed to connect to voice channel #{voice_channel.name}: {err}"
                 )
                 return
 
-            if had_to_discover_guild:
-                message = (
-                    f"Joining voice channel in {voice_channel.guild.name}: "
-                    + voice_channel.name
-                )
-            else:
-                message = f"Joining voice channel: {voice_channel.name}"
-
-            await interaction.response.send_message(
-                message,
-                ephemeral=True,
-                silent=True,
-                suppress_embeds=True,
-            )
+            await interaction.followup.send(message)
 
         @discord.app_commands.command(
             name="leave_voice",
@@ -113,7 +112,7 @@ class AudioCommands:
             )
 
             # are we already connected to a voice channel?  If so, disconnect
-            if self.voice_client is None or not self.voice_client.is_connected():
+            if self.voice_client is None:
                 await discord_utils.fail_interaction(
                     interaction, "Not connected to a voice channel"
                 )

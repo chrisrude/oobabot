@@ -17,6 +17,7 @@ from discord.types import voice  # this is so pylint doesn't complain
 
 from oobabot import discrivener
 from oobabot import fancy_logger
+from oobabot import transcript
 
 
 class VoiceClientError(Exception):
@@ -45,6 +46,7 @@ class VoiceClient(discord.VoiceProtocol):
     _state: discord.state.ConnectionState
     _session_id: str
     _server_id: int
+    _transcript: transcript.Transcript
 
     supported_modes: typing.Tuple[voice.SupportedModes, ...] = (
         "xsalsa20_poly1305",
@@ -53,7 +55,9 @@ class VoiceClient(discord.VoiceProtocol):
     )
 
     def __init__(
-        self, client: discord.client.Client, channel: discord.abc.Connectable
+        self,
+        client: discord.client.Client,
+        channel: discord.abc.Connectable,
     ) -> None:
         super().__init__(client, channel)
 
@@ -70,6 +74,7 @@ class VoiceClient(discord.VoiceProtocol):
         self._state: discord.state.ConnectionState = client._connection
         self._session_id = discord.utils.MISSING
         self._server_id = discord.utils.MISSING
+        self._transcript = transcript.Transcript(client)
 
     @property
     def guild(self) -> discord.guild.Guild:
@@ -279,20 +284,45 @@ class VoiceClient(discord.VoiceProtocol):
 
     def _handle_discrivener_output(self, message: discrivener.DiscrivenerMessage):
         fancy_logger.get().debug("discrivener messsage: %s", message)
+
         if message.type in (
             discrivener.DiscrivenerMessageType.CONNECT,
             discrivener.DiscrivenerMessageType.RECONNECT,
         ):
             self._voice_state_complete.set()
             self._discrivener_connected = True
-        elif discrivener.DiscrivenerMessageType.DISCONNECT == message.type:
+            return
+
+        if discrivener.DiscrivenerMessageType.DISCONNECT == message.type:
             self._voice_state_complete.set()
             self._discrivener_connected = False
-        elif discrivener.DiscrivenerMessageType.USER_JOIN == message.type:
+
+            # we're disconnected, so have the voice_client disconnect
+            # too... however we can't call disconnect() here because
+            # we would create a deadlock.  The disconnect() method
+            # will terminate the process, then wait for its notification
+            # threads to exit... and we're on the notification thread
+            # right now.  So to break the loop, use asyncio to schedule
+            # the disconnect() call to happen later.
+            loop = asyncio.get_event_loop()
+            if loop is None:
+                fancy_logger.get().warning(
+                    "No event loop to schedule voice_client.disconnect() call"
+                )
+                return
+            loop.call_soon_threadsafe(self.disconnect)
             return
-        elif discrivener.DiscrivenerMessageType.TRANSCRIBED_MESSAGE == message.type:
+
+        if discrivener.DiscrivenerMessageType.USER_JOIN == message.type:
             return
-        else:
-            fancy_logger.get().warning(
-                "Unknown discrivener message type: %s", message.type
-            )
+
+        if discrivener.DiscrivenerMessageType.TRANSCRIBED_MESSAGE == message.type:
+            if not isinstance(message, discrivener.TranscribedMessage):
+                fancy_logger.get().warning(
+                    "Transcribed message type but not TranscribedMessage"
+                )
+                return
+            self._transcript.on_transcribed_message(message)
+            return
+
+        fancy_logger.get().warning("Unknown discrivener message type: %s", message.type)

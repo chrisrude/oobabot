@@ -249,3 +249,100 @@ async def fail_interaction(
     )
 
     await interaction.response.send_message(reason, ephemeral=True, silent=True)
+
+
+# the following class was modified from O'Reilly's Python Cookbook,
+# chapter 5, section 19.  Its use is allowed under this license:
+# Copyright (c) 2001, Sébastien Keim
+# All rights reserved.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above
+#      copyright notice, this list of conditions and the following
+#      disclaimer in the documentation and/or other materials provided
+#      with the distribution.
+#    * Neither the name of the <ORGANIZATION> nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS
+# OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+# ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+T = typing.TypeVar("T")
+
+
+class RingBuffer(typing.Generic[T]):
+    """
+    A generic ring buffer.
+    """
+
+    def __init__(self, size_max: int):
+        self.cur = 0
+        self.max = size_max
+        self.data: typing.List[T] = []
+
+    class _FullRingBuffer:
+        """
+        Class implementing the RingBuffer when it's full.
+        With python class magic, this class is swapped in when the
+        buffer becomes full.
+        """
+
+        cur: int
+        max: int
+        data: typing.List[T]
+
+        def append(self, val: T) -> None:
+            """
+            Append an element overwriting the oldest one.
+            """
+            self.data[self.cur] = val
+            self.cur = (self.cur + 1) % self.max
+
+        def get(self) -> typing.List[T]:
+            """
+            Return a list of elements from the oldest to the newest.
+            """
+            return self.data[self.cur :] + self.data[: self.cur]
+
+        def size(self) -> int:
+            """
+            Return the size of the buffer.
+            """
+            return self.max
+
+    def append(self, val: T) -> None:
+        """
+        Append an element at the end of the buffer.
+        """
+        self.data.append(val)
+        if len(self.data) == self.max:
+            self.cur = 0
+            # Permanently change self's class from non-full to full
+            self.__class__ = self._FullRingBuffer
+
+    def get(self) -> typing.List[T]:
+        """
+        Return a list of elements from the oldest to the newest.
+        """
+        return self.data
+
+    def size(self) -> int:
+        """
+        Return the number of elements currently in the buffer.
+        """
+        return len(self.data)
+
+
+# end of O'Reilly code
