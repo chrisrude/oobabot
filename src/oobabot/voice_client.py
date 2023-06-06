@@ -283,17 +283,17 @@ class VoiceClient(discord.VoiceProtocol):
         return self._discrivener_connected
 
     def _handle_discrivener_output(self, message: discrivener.DiscrivenerMessage):
-        fancy_logger.get().debug("discrivener messsage: %s", message)
-
         if message.type in (
             discrivener.DiscrivenerMessageType.CONNECT,
             discrivener.DiscrivenerMessageType.RECONNECT,
         ):
+            fancy_logger.get().debug("discrivener messsage: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = True
             return
 
         if discrivener.DiscrivenerMessageType.DISCONNECT == message.type:
+            fancy_logger.get().debug("discrivener messsage: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = False
 
@@ -314,6 +314,7 @@ class VoiceClient(discord.VoiceProtocol):
             return
 
         if discrivener.DiscrivenerMessageType.USER_JOIN == message.type:
+            fancy_logger.get().debug("discrivener messsage: %s", message)
             return
 
         if discrivener.DiscrivenerMessageType.TRANSCRIBED_MESSAGE == message.type:
