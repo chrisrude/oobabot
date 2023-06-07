@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use tokio::sync::Mutex;
 use tokio::task;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
 
@@ -10,8 +11,40 @@ use crate::types;
 /// If an audio clip is less than this length, we'll ignore it.
 pub const MIN_AUDIO_THRESHOLD_MS: u32 = 500;
 
+#[derive(Clone)]
+pub struct LastTranscriptionData {
+    tokens: Vec<i32>,
+    timestamp: u64,
+    user_id: types::UserId,
+}
+
+const MAX_TOKENS_PER_SEGMENT: usize = 100;
+
+impl LastTranscriptionData {
+    fn from_transcribed_message(
+        whisper_context: &WhisperContext,
+        message: api_types::TranscribedMessage,
+        end_timestmap: u64,
+    ) -> LastTranscriptionData {
+        let tokens = message
+            .text_segments
+            .iter()
+            .map(|segment| whisper_context.tokenize(segment.text.as_str(), MAX_TOKENS_PER_SEGMENT))
+            .filter_map(|x| x.ok())
+            .collect::<Vec<_>>()
+            .concat();
+
+        return LastTranscriptionData {
+            tokens,
+            timestamp: end_timestmap,
+            user_id: message.user_id,
+        };
+    }
+}
+
 pub struct Whisper {
     event_callback: Arc<dyn Fn(api_types::VoiceChannelEvent) + Send + Sync>,
+    last_transcription: Arc<Mutex<Option<LastTranscriptionData>>>,
     whisper_context: Arc<WhisperContext>,
 }
 
@@ -43,8 +76,11 @@ impl Whisper {
         let whisper_context =
             Arc::new(WhisperContext::new(model_path.as_str()).expect("failed to load model"));
 
+        let last_transcription = Arc::new(Mutex::new(None));
+
         return Self {
             event_callback,
+            last_transcription,
             whisper_context,
         };
     }
@@ -69,6 +105,7 @@ impl Whisper {
         // make clones of everything so that the closure can own them, if
         let audio_copy = audio.clone();
         let callback_copy = self.event_callback.clone();
+        let last_transcription_copy = self.last_transcription.clone();
         let whisper_context_copy = self.whisper_context.clone();
 
         // todo: if we're running too far behind, we should drop audio in order to catch up
@@ -77,7 +114,32 @@ impl Whisper {
 
         task::spawn(async move {
             let whisper_audio = resample_audio_from_discord_to_whisper(audio_copy);
-            let text_segments = audio_to_text(whisper_context_copy, whisper_audio);
+
+            // get the last transcription, and pass it in if:
+            // - it's from the same user
+            // - the last transcription ended less than 5 seconds ago
+            let mut last_transcription_context: Option<LastTranscriptionData> = None;
+            {
+                let last_transcription = last_transcription_copy.lock().await;
+                let lt = last_transcription.clone();
+                if let Some(last_transcription) = lt {
+                    if (unixsecs - last_transcription.timestamp) < 5 {
+                        if last_transcription.user_id == user_id {
+                            last_transcription_context = Some(last_transcription);
+                        }
+                    }
+                }
+            }
+            let text_segments = audio_to_text(
+                &whisper_context_copy,
+                whisper_audio,
+                last_transcription_context,
+            );
+
+            // if there's nothing in the last transcription, then just stop
+            if text_segments.len() == 0 {
+                return;
+            }
 
             let end_time = std::time::SystemTime::now();
             let processing_time_ms =
@@ -89,6 +151,19 @@ impl Whisper {
                 audio_duration_ms,
                 processing_time_ms,
             };
+
+            // this is now our last transcription
+            let last_data = LastTranscriptionData::from_transcribed_message(
+                &whisper_context_copy,
+                transcribed_message.clone(),
+                end_time
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            );
+            {
+                last_transcription_copy.lock().await.replace(last_data);
+            }
 
             callback_copy(api_types::VoiceChannelEvent::TranscribedMessage(
                 transcribed_message,
@@ -149,17 +224,25 @@ fn resample_audio_from_discord_to_whisper(
 /// ctx came from load_model
 /// audio data should be is f32, 16KHz, mono
 fn audio_to_text(
-    whisper_context: Arc<WhisperContext>,
+    whisper_context: &Arc<WhisperContext>,
     audio_data: Vec<types::WhisperAudioSample>,
+    last_transcription: Option<LastTranscriptionData>,
 ) -> Vec<api_types::TextSegment> {
     let mut state = whisper_context.create_state().unwrap();
 
+    let mut params = make_params();
+
+    // if we have a last_transcription, add it to the state
+    let last_tokens;
+    if last_transcription.is_some() {
+        last_tokens = last_transcription.unwrap().tokens;
+        params.set_tokens(&last_tokens[..]);
+    }
+
     // actually convert audio to text.  Takes a while.
-    state.full(make_params(), &audio_data[..]).unwrap();
+    state.full(params, &audio_data[..]).unwrap();
 
     // todo: use a different context / token history for each user
-    // todo: keep part of the audio for the next iteration?
-    // todo: add segments from last session as well?
     // see https://github.com/ggerganov/whisper.cpp/blob/57543c169e27312e7546d07ed0d8c6eb806ebc36/examples/stream/stream.cpp
 
     let num_segments = state.full_n_segments().unwrap();

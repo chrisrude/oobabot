@@ -75,6 +75,7 @@ class VoiceClient(discord.VoiceProtocol):
             self._transcript,
             self.prompt_generator,
             self.ooba_client,
+            self.channel,
         )
 
     @property

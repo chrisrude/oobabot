@@ -8,6 +8,8 @@ then queues a response.
 import asyncio
 import typing
 
+import discord
+
 from oobabot import fancy_logger
 from oobabot import ooba_client
 from oobabot import prompt_generator
@@ -29,12 +31,14 @@ class AudioResponder:
         transcript: transcript.Transcript,
         prompt_generator: prompt_generator.PromptGenerator,
         ooba_client: ooba_client.OobaClient,
+        voice_channel: discord.VoiceChannel,
     ):
         self._abort = False
         self._prompt_generator = prompt_generator
         self._ooba_client = ooba_client
         self._transcript = transcript
         self._task: typing.Optional[asyncio.Task] = None
+        self._voice_channel = voice_channel
 
     async def start(self):
         await self.stop()
@@ -73,13 +77,16 @@ class AudioResponder:
             image_requested=False,
         )
 
-        fancy_logger.get().info("audio_responder: prompt: %s", prompt_prefix)
         response = await self._ooba_client.request_as_string(prompt_prefix)
+
+        # wait for silence before responding
+        await self._transcript.silence_event.wait()
 
         # shove response into history
         self._transcript.add_bot_response(response)
-
         fancy_logger.get().info("audio_responder: response: %s", response)
+
+        await self._voice_channel.send(response)
 
     def _transcript_history_iterator(
         self,

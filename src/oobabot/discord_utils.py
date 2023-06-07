@@ -62,7 +62,13 @@ def discord_message_to_generic_message(
     if isinstance(raw_message.channel, discord.DMChannel):
         return types.DirectMessage(**generic_args)
     if isinstance(
-        raw_message.channel, (discord.TextChannel, discord.GroupChannel, discord.Thread)
+        raw_message.channel,
+        (
+            discord.TextChannel,
+            discord.GroupChannel,
+            discord.Thread,
+            discord.VoiceChannel,
+        ),
     ):
         return types.ChannelMessage(
             mentions=[mention.id for mention in raw_message.mentions],

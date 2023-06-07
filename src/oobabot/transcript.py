@@ -50,15 +50,6 @@ class Transcript:
         """
         return self._buffer.get()
 
-    def _on_wakeword(self):
-        fancy_logger.get().warning("transcript: wakeword detected!")
-        fancy_logger.get().warning("transcript: wakeword detected!")
-        fancy_logger.get().warning("transcript: wakeword detected!")
-        fancy_logger.get().warning("transcript: wakeword detected!")
-        fancy_logger.get().warning("transcript: wakeword detected!")
-        fancy_logger.get().warning("transcript: wakeword detected!")
-        fancy_logger.get().warning("transcript: wakeword detected!")
-
     def add_bot_response(self, message: str):
         """
         Adds a bot response to the transcript.
@@ -83,8 +74,6 @@ class Transcript:
             fancy_logger.get().warning("transcript: unknown user %s", message.user_id)
             return
 
-        fancy_logger.get().info("transcript: %s", message)
-
         # todo: make use of decide_to_respond instead
         wakeword_found = False
         for segment in message.segments:
@@ -95,6 +84,7 @@ class Transcript:
                 user=user,
             )
             self._buffer.append(line)
+            fancy_logger.get().debug("transcript: %s", str(line))
 
             if not wakeword_found:
                 for word in re.split(r"[ .,!?\"']", segment.text):
@@ -103,7 +93,7 @@ class Transcript:
                         break
 
         if wakeword_found:
-            fancy_logger.get().error("transcript: wakeword detected!")
+            fancy_logger.get().info("transcript: wakeword detected!")
             self.wakeword_event.set()
 
     def on_voice_activity(self, activity: discrivener.VoiceActivityData) -> None:
@@ -117,8 +107,6 @@ class Transcript:
             self._speaking_user_ids.discard(activity.user_id)
 
         if not self._speaking_user_ids:
-            fancy_logger.get().info("transcript: silence detected")
             self.silence_event.set()
         else:
-            fancy_logger.get().info("transcript: speaking detected")
             self.silence_event.clear()
