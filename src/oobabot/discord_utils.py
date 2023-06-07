@@ -292,7 +292,7 @@ class RingBuffer(typing.Generic[T]):
         self.max = size_max
         self.data: typing.List[T] = []
 
-    class _FullRingBuffer:
+    class _FullRingBuffer(typing.Generic[T]):
         """
         Class implementing the RingBuffer when it's full.
         With python class magic, this class is swapped in when the

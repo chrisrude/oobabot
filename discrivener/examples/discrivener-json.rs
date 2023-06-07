@@ -22,10 +22,8 @@ async fn tokio_main(cli: Cli) {
             cli.voice_token.as_str(),
         )
         .await;
-    if let Ok(_) = connection_result {
-        eprintln!("Joined voice channel");
-    } else {
-        eprintln!("Error joining voice channel");
+    if let Err(e) = connection_result {
+        eprintln!("Error joining voice channel: {}", e);
     }
 
     signal::ctrl_c().await.unwrap();

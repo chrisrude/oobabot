@@ -148,6 +148,8 @@ class Discrivener:
             ):
                 # workaround nonsense noise in whisper.cpp
                 continue
+            fancy_logger.get().error("Discrivener: %s", line)
+
         fancy_logger.get().info("Discrivener stderr reader exited")
 
     def _json_to_message_list(self, message: str) -> typing.List["DiscrivenerMessage"]:
@@ -155,9 +157,13 @@ class Discrivener:
         return [
             self._json_part_to_message(name, params)
             for name, params in message_dict.items()
+            if name is not None
         ]
 
-    def _json_part_to_message(self, message_name, params: dict) -> "DiscrivenerMessage":
+    # pylint: disable=too-many-return-statements
+    def _json_part_to_message(
+        self, message_name, params: dict
+    ) -> typing.Optional["DiscrivenerMessage"]:
         if "Connect" == message_name:
             return ConnectData(params)
 
@@ -175,7 +181,13 @@ class Discrivener:
         if "TranscribedMessage" == message_name:
             return TranscribedMessage(params)
 
-        raise ValueError(f"Unknown message type: {message_name}")
+        if "VoiceActivity" == message_name:
+            return VoiceActivityData(params)
+
+        fancy_logger.get().warning("Discrivener: unknown message type %s", message_name)
+        return None
+
+    # pylint: enable=too-many-return-statements
 
 
 class DiscrivenerMessageType(enum.Enum):
@@ -188,6 +200,7 @@ class DiscrivenerMessageType(enum.Enum):
     DISCONNECT = "Disconnect"
     USER_JOIN = "UserJoin"
     TRANSCRIBED_MESSAGE = "TranscribedMessage"
+    VOICE_ACTIVITY = "VoiceActivity"
 
 
 class DiscrivenerMessage:
@@ -293,6 +306,22 @@ class TranscribedMessageTextSegment:
             f"TranscribedMessageTextSegment(text={self.text}, "
             + f"start_offset_ms={self.start_offset_ms}, "
             + f"end_offset_ms={self.end_offset_ms})"
+        )
+
+
+class VoiceActivityData:
+    """
+    Represents voice activity data.
+    """
+
+    def __init__(self, data: dict):
+        self.type = DiscrivenerMessageType.VOICE_ACTIVITY
+        self.user_id = data.get("user_id")
+        self.speaking = data.get("speaking")
+
+    def __repr__(self):
+        return (
+            f"VoiceActivityData(user_id={self.user_id}, " + f"speaking={self.speaking}"
         )
 
 

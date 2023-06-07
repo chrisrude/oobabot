@@ -292,9 +292,8 @@ class VoiceClient(discord.VoiceProtocol):
             fancy_logger.get().debug("discrivener messsage: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = True
-            return
 
-        if discrivener.DiscrivenerMessageType.DISCONNECT == message.type:
+        elif discrivener.DiscrivenerMessageType.DISCONNECT == message.type:
             fancy_logger.get().debug("discrivener messsage: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = False
@@ -313,19 +312,17 @@ class VoiceClient(discord.VoiceProtocol):
                 )
                 return
             loop.call_soon_threadsafe(self.disconnect)
-            return
 
-        if discrivener.DiscrivenerMessageType.USER_JOIN == message.type:
+        elif discrivener.DiscrivenerMessageType.USER_JOIN == message.type:
             fancy_logger.get().debug("discrivener messsage: %s", message)
-            return
 
-        if discrivener.DiscrivenerMessageType.TRANSCRIBED_MESSAGE == message.type:
-            if not isinstance(message, discrivener.TranscribedMessage):
-                fancy_logger.get().warning(
-                    "Transcribed message type but not TranscribedMessage"
-                )
-                return
+        elif discrivener.DiscrivenerMessageType.TRANSCRIBED_MESSAGE == message.type:
             self._transcript.on_transcribed_message(message)
-            return
 
-        fancy_logger.get().warning("Unknown discrivener message type: %s", message.type)
+        elif discrivener.DiscrivenerMessageType.VOICE_ACTIVITY == message.type:
+            self._transcript.on_voice_activity(message)
+
+        else:
+            fancy_logger.get().warning(
+                "Unknown discrivener message type: %s", message.type
+            )

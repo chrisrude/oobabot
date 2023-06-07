@@ -72,6 +72,13 @@ impl PacketHandler {
     fn on_start_talking(&self, ssrc: types::Ssrc) {
         self._with_ssrc(ssrc, |user_voice_data| {
             user_voice_data.on_start_talking();
+
+            self._fire_callback(api_types::VoiceChannelEvent::VoiceActivity(
+                api_types::VoiceActivityData {
+                    user_id: user_voice_data.user_id,
+                    speaking: true,
+                },
+            ))
         });
     }
 
@@ -86,6 +93,12 @@ impl PacketHandler {
         // false then flush the buffer.
         self._with_ssrc(ssrc, |user_voice_data| {
             user_voice_data.on_stop_talking();
+            self._fire_callback(api_types::VoiceChannelEvent::VoiceActivity(
+                api_types::VoiceActivityData {
+                    user_id: user_voice_data.user_id,
+                    speaking: false,
+                },
+            ))
         });
     }
 
@@ -124,6 +137,14 @@ impl PacketHandler {
         if let Some(mut user_voice_data) = ssrc_to_voice_buffer.get_mut(&ssrc) {
             f(&mut user_voice_data);
         } else {
+            // This is used when we're first starting to suppress errors
+            // from users who were talking before we joined the channel.
+            // It will only suppress errors for a single user, so there still
+            // will be some noise if multiple users are talking simultaneously
+            // when we join the channel, but that's ok.
+            if ssrc_to_voice_buffer.is_empty() {
+                return;
+            }
             eprintln!("no buffer for ssrc {}", ssrc);
         }
     }

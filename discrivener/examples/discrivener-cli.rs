@@ -80,6 +80,7 @@ async fn tokio_main(cli: Cli) {
             api_types::VoiceChannelEvent::Disconnect(_) => {
                 println!("Connection status: {}", "disconnected".bright_red());
             }
+            api_types::VoiceChannelEvent::VoiceActivity(_) => {}
         }),
         cli.save_everything_to_file,
     );

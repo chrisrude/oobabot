@@ -34,13 +34,15 @@ class Transcript:
     Stores a transcript of a voice channel.
     """
 
-    NUM_LINES = 100
+    NUM_LINES = 50
 
     def __init__(self, client: discord.client.Client, wakewords: typing.List[str]):
         self._client = client
         self._buffer = discord_utils.RingBuffer[TranscriptLine](self.NUM_LINES)
+        self._speaking_user_ids = set()
         self._wakewords: typing.Set[str] = set(word.lower() for word in wakewords)
         self.wakeword_event = asyncio.Event()
+        self.silence_event = asyncio.Event()
 
     def get_lines(self) -> typing.List[TranscriptLine]:
         """
@@ -103,3 +105,20 @@ class Transcript:
         if wakeword_found:
             fancy_logger.get().error("transcript: wakeword detected!")
             self.wakeword_event.set()
+
+    def on_voice_activity(self, activity: discrivener.VoiceActivityData) -> None:
+        if activity.user_id is None:
+            fancy_logger.get().warning("transcript: on_voice_activity, missing user_id")
+            return
+
+        if activity.speaking:
+            self._speaking_user_ids.add(activity.user_id)
+        else:
+            self._speaking_user_ids.discard(activity.user_id)
+
+        if not self._speaking_user_ids:
+            fancy_logger.get().info("transcript: silence detected")
+            self.silence_event.set()
+        else:
+            fancy_logger.get().info("transcript: speaking detected")
+            self.silence_event.clear()
