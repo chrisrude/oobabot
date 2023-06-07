@@ -39,6 +39,8 @@ class VoiceClient(discord.VoiceProtocol):
     cls=voice_client.VoiceClient
     """
 
+    discrivener_location: str
+    discrivener_model_location: str
     ooba_client: ooba_client.OobaClient
     prompt_generator: prompt_generator.PromptGenerator
     wakewords: typing.List[str] = []
@@ -59,7 +61,11 @@ class VoiceClient(discord.VoiceProtocol):
         if channel.guild is None:
             raise ValueError("Channel does not have a guild.")
 
-        self._discrivener = discrivener.Discrivener(self._handle_discrivener_output)
+        self._discrivener = discrivener.Discrivener(
+            self.discrivener_location,
+            self.discrivener_model_location,
+            self._handle_discrivener_output,
+        )
         self._discrivener_connected = False
         self._handshaking = False
         self._oobabot_voice_connected = False

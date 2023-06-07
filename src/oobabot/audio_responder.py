@@ -55,7 +55,7 @@ class AudioResponder:
         except asyncio.TimeoutError:
             fancy_logger.get().warning("audio_responder: task did not quit in time")
         except asyncio.CancelledError:
-            fancy_logger.get().info("audio_responder: task cancelled")
+            fancy_logger.get().info("audio_responder: task stopped")
         self._task = None
         self._abort = False
 

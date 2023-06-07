@@ -448,7 +448,35 @@ class Settings:
                 ],
             )
         )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[int](
+                name="discrivener_location",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Path to the Discrivener executable.
+                        Will enable prototype voice integration.
+                        """
+                    )
+                ],
+            )
+        )
 
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[int](
+                name="discrivener_model_location",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Path to the Discrivener model to
+                        load.  Required if discrivener_location is set.
+                        """
+                    )
+                ],
+            )
+        )
         ###########################################################
         # Oobabooga Settings
 

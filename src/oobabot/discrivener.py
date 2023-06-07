@@ -17,11 +17,16 @@ class Discrivener:
     Launches and handles the Discrivener process.
     """
 
-    EXEC_PATH = "./discrivener/target/release/examples/discrivener-json"
-    DISCRIVENER_MODEL = "./discrivener/ggml-base.en.bin"
     KILL_TIMEOUT = 5
 
-    def __init__(self, handler: typing.Callable[["DiscrivenerMessage"], None]):
+    def __init__(
+        self,
+        discrivener_location: str,
+        discrivener_model_location: str,
+        handler: typing.Callable[["DiscrivenerMessage"], None],
+    ):
+        self._discrivener_location = discrivener_location
+        self._discrivener_model_location = discrivener_model_location
         self._handler: typing.Callable[["DiscrivenerMessage"], None] = handler
         self._process: typing.Optional["asyncio.subprocess.Process"] = None
         self._stderr_reading_task: typing.Optional[asyncio.Task] = None
@@ -52,7 +57,7 @@ class Discrivener:
             str(user_id),
             "--voice-token",
             voice_token,
-            self.DISCRIVENER_MODEL,
+            self._discrivener_model_location,
         )
         await self._launch_process(args)
 
@@ -64,10 +69,15 @@ class Discrivener:
         return self._process is not None
 
     async def _launch_process(self, args: dict):
-        fancy_logger.get().info("Launching Discrivener process: %s", self.EXEC_PATH)
+        fancy_logger.get().info(
+            "Launching Discrivener process: %s", self._discrivener_location
+        )
+        fancy_logger.get().debug(
+            "Using Discrivener model file: %s", self._discrivener_model_location
+        )
 
         self._process = await asyncio.create_subprocess_exec(
-            self.EXEC_PATH,
+            self._discrivener_location,
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

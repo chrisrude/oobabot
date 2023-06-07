@@ -30,7 +30,6 @@ from oobabot import response_stats
 from oobabot import sd_client
 from oobabot import settings
 from oobabot import templates
-from oobabot import voice_client
 
 
 # this warning causes more harm than good here
@@ -222,11 +221,9 @@ class Oobabot:
             persona=self.persona,
             discord_settings=self.settings.discord_settings.get_all(),
             template_store=self.template_store,
+            ooba_client=self.ooba_client,
+            prompt_generator=self.prompt_generator,
         )
-
-        # todo: HACK FIX THIS
-        voice_client.VoiceClient.ooba_client = self.ooba_client
-        voice_client.VoiceClient.prompt_generator = self.prompt_generator
 
         self.discord_bot = None
 

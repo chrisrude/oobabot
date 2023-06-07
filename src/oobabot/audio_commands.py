@@ -8,7 +8,9 @@ import discord
 
 from oobabot import discord_utils
 from oobabot import fancy_logger
+from oobabot import ooba_client
 from oobabot import persona
+from oobabot import prompt_generator
 from oobabot import voice_client
 
 
@@ -17,11 +19,24 @@ class AudioCommands:
     Implementation of commands to join and leave voice channels.
     """
 
-    def __init__(self, persona: persona.Persona):
+    def __init__(
+        self,
+        persona: persona.Persona,
+        ooba_client: ooba_client.OobaClient,
+        prompt_generator: prompt_generator.PromptGenerator,
+        discrivener_location: str,
+        discrivener_model_location: str,
+    ):
         voice_client.VoiceClient.wakewords = persona.wakewords
 
+        self.discrivener_location = discrivener_location
         self.persona = persona
         self.voice_client: typing.Optional[voice_client.VoiceClient] = None
+
+        voice_client.VoiceClient.discrivener_location = discrivener_location
+        voice_client.VoiceClient.discrivener_model_location = discrivener_model_location
+        voice_client.VoiceClient.ooba_client = ooba_client
+        voice_client.VoiceClient.prompt_generator = prompt_generator
 
     def _discover_voice_channel(
         self, interaction: discord.Interaction
