@@ -596,6 +596,10 @@ class DiscordBot(discord.Client):
                 # filter out multiple blank lines in a row
                 continue
 
+            if not line.strip():
+                # filter out lines that are entirely made of whitespace
+                continue
+
             good_lines.append(line)
         return ("\n".join(good_lines), abort_response)
 
