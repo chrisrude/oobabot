@@ -4,6 +4,7 @@ Discrivener process launcher and handler.
 """
 
 import asyncio
+import datetime
 import enum
 import json
 import signal
@@ -130,13 +131,7 @@ class Discrivener:
             try:
                 message_list = self._json_to_message_list(line)
                 for message in message_list:
-                    try:
-                        self._handler(message)
-                    except Exception as err:
-                        fancy_logger.get().error(
-                            "Discrivener: error handling message: %s", err
-                        )
-                        raise
+                    self._handler(message)
             except json.JSONDecodeError:
                 fancy_logger.get().error("Discrivener: could not parse %s", line)
 
@@ -185,14 +180,17 @@ class Discrivener:
         if "Disconnect" == message_name:
             return DisconnectData(params)
 
+        if "ChannelSilent" == message_name:
+            return ChannelSilentData(params)
+
         if "UserJoin" == message_name:
             return UserJoinData(params)
 
-        if "TranscribedMessage" == message_name:
-            return TranscribedMessage(params)
+        if "UserLeave" == message_name:
+            return UserLeaveData(params)
 
-        if "VoiceActivity" == message_name:
-            return VoiceActivityData(params)
+        if "Transcription" == message_name:
+            return Transcription(params)
 
         fancy_logger.get().warning("Discrivener: unknown message type %s", message_name)
         return None
@@ -205,12 +203,13 @@ class DiscrivenerMessageType(enum.Enum):
     Enumerates the different types of Discrivener messages.
     """
 
+    CHANNEL_SILENT = "ChannelSilent"
     CONNECT = "Connect"
-    RECONNECT = "Reconnect"
     DISCONNECT = "Disconnect"
+    RECONNECT = "Reconnect"
+    TRANSCRIPTION = "Transcription"
     USER_JOIN = "UserJoin"
-    TRANSCRIBED_MESSAGE = "TranscribedMessage"
-    VOICE_ACTIVITY = "VoiceActivity"
+    USER_LEAVE = "UserLeave"
 
 
 class DiscrivenerMessage:
@@ -221,16 +220,23 @@ class DiscrivenerMessage:
     type: DiscrivenerMessageType
 
 
+class ChannelSilentData(DiscrivenerMessage):
+    """
+    Represents whether any user is speaking in the channel.
+    """
+
+    def __init__(self, data: dict):
+        self.type = DiscrivenerMessageType.CHANNEL_SILENT
+        self.silent = bool(data)
+
+    def __repr__(self):
+        return f"ChannelSilent(silent={self.silent})"
+
+
 class ConnectData(DiscrivenerMessage):
     """
     Represents us connecting or reconnecting to the voice channel.
     """
-
-    channel_id: int
-    guild_id: int
-    session_id: str
-    server: str
-    ssrc: int
 
     def __init__(self, data: dict):
         self.type = DiscrivenerMessageType.CONNECT
@@ -255,19 +261,13 @@ class DisconnectData(DiscrivenerMessage):
     Represents a disconnect from the voice channel.
     """
 
-    kind: str
-    reason: str
-    channel_id: int
-    guild_id: int
-    session_id: str
-
     def __init__(self, data: dict):
         self.type = DiscrivenerMessageType.DISCONNECT
-        self.kind = data.get("kind")
-        self.reason = data.get("reason")
-        self.channel_id = data.get("channel_id")
-        self.guild_id = data.get("guild_id")
-        self.session_id = data.get("session_id")
+        self.kind: str = data.get("kind")
+        self.reason: str = data.get("reason")
+        self.channel_id: int = data.get("channel_id")
+        self.guild_id: int = data.get("guild_id")
+        self.session_id: int = data.get("session_id")
 
     def __repr__(self):
         return (
@@ -281,61 +281,92 @@ class DisconnectData(DiscrivenerMessage):
 
 class UserJoinData(DiscrivenerMessage):
     """
-    Represents a user joining or leaving a voice channel.
+    Represents a user joining a voice channel.
     """
-
-    user_id: int
-    joined: bool
 
     def __init__(self, data: dict):
         self.type = DiscrivenerMessageType.USER_JOIN
-        self.user_id = data.get("user_id")
-        self.joined = data.get("joined")
+        self.user_id: int = data
 
     def __str__(self):
-        joined_str = "joined" if self.joined else "left"
-        return f"User #{self.user_id} {joined_str} voice channel"
+        return f"User #{self.user_id} joined voice channel"
 
 
-class TranscribedMessageTextSegment:
+class UserLeaveData(DiscrivenerMessage):
+    """
+    Represents a user leaving a voice channel.
+    """
+
+    def __init__(self, data: dict):
+        self.type = DiscrivenerMessageType.USER_LEAVE
+        self.user_id: int = data
+
+    def __str__(self):
+        return f"User #{self.user_id} left voice channel"
+
+
+class TokenWithProbability:
+    """
+    Represents a token with a probability.
+    """
+
+    def __init__(self, data: dict):
+        self.probability: int = data.get("probability")
+        self.token_id: int = data.get("token_id")
+        self.token_text: str = str(data.get("token_text"))
+
+    def __repr__(self):
+        return (
+            "TokenWithProbability("
+            + f"probability={self.probability}, "
+            + f"token_id={self.token_id}, "
+            + f"token_text={self.token_text})"
+        )
+
+
+def to_datetime(message: dict) -> datetime.datetime:
+    """
+    Converts a message into a datetime object.
+    """
+    seconds: int = message.get("secs_since_epoch")
+    nanos: int = message.get("nanos_since_epoch")
+    return datetime.datetime.fromtimestamp(seconds + nanos / 1e9)
+
+
+def to_duration(message: dict) -> datetime.timedelta:
+    """
+    Converts a message into a timedelta object.
+    """
+    seconds: int = message.get("secs")
+    nanos: int = message.get("nanos")
+    return datetime.timedelta(seconds=seconds, microseconds=nanos / 1e3)
+
+
+class TextSegment:
     """
     Represents a single text segment of a transcribed message.
     """
 
-    text: str
-    start_offset_ms: int
-    end_offset_ms: int
-
     def __init__(self, message: dict):
-        self.text = message.get("text")
-        self.start_offset_ms = message.get("start_offset_ms")
-        self.end_offset_ms = message.get("end_offset_ms")
+        self.tokens_with_probability = [
+            TokenWithProbability(data)
+            for data in message.get("tokens_with_probability")
+        ]
+        self.start_offset_ms: int = message.get("start_offset_ms")
+        self.end_offset_ms: int = message.get("end_offset_ms")
 
     def __repr__(self):
         return (
-            f"TranscribedMessageTextSegment(text={self.text}, "
+            f"TextSegment(tokens_with_probability={self.tokens_with_probability}, "
             + f"start_offset_ms={self.start_offset_ms}, "
             + f"end_offset_ms={self.end_offset_ms})"
         )
 
-
-class VoiceActivityData:
-    """
-    Represents voice activity data.
-    """
-
-    def __init__(self, data: dict):
-        self.type = DiscrivenerMessageType.VOICE_ACTIVITY
-        self.user_id = data.get("user_id")
-        self.speaking = data.get("speaking")
-
-    def __repr__(self):
-        return (
-            f"VoiceActivityData(user_id={self.user_id}, " + f"speaking={self.speaking}"
-        )
+    def __str__(self) -> str:
+        return "".join([t.token_text for t in self.tokens_with_probability])
 
 
-class TranscribedMessage(DiscrivenerMessage):
+class Transcription(DiscrivenerMessage):
     """
     Represents a transcribed message.
     """
@@ -344,21 +375,19 @@ class TranscribedMessage(DiscrivenerMessage):
     user_id: int
     audio_duration_ms: int
     processing_time_ms: int
-    segments: typing.List[TranscribedMessageTextSegment]
+    segments: typing.List[TextSegment]
 
     def __init__(self, message: dict):
-        self.type = DiscrivenerMessageType.TRANSCRIBED_MESSAGE
-        self.timestamp = message.get("timestamp")
+        self.type = DiscrivenerMessageType.TRANSCRIPTION
+        self.timestamp = to_datetime(message.get("start_timestamp"))
         self.user_id = message.get("user_id")
-        self.audio_duration_ms = message.get("audio_duration_ms")
-        self.processing_time_ms = message.get("processing_time_ms")
-        self.segments = [
-            TranscribedMessageTextSegment(s) for s in message.get("text_segments")
-        ]
+        self.audio_duration_ms = to_duration(message.get("audio_duration"))
+        self.processing_time_ms = to_duration(message.get("processing_time"))
+        self.segments = [TextSegment(s) for s in message.get("segments")]
 
     def __repr__(self) -> str:
         return (
-            f"TranscribedMessage(timestamp={self.timestamp}, "
+            f"Transcription(timestamp={self.timestamp}, "
             + f"user_id={self.user_id}, "
             + f"audio_duration_ms={self.audio_duration_ms}, "
             + f"processing_time_ms={self.processing_time_ms}, "
