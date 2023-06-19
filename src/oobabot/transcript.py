@@ -5,7 +5,6 @@ Stores a transcript of a voice channel.
 import asyncio
 import datetime
 import re
-import time
 import typing
 
 import discord
@@ -20,11 +19,13 @@ class TranscriptLine:
     A single line of a transcript.
     """
 
-    def __init__(self, is_bot: bool, timestamp: float, text: str, user: discord.User):
-        self.is_bot = is_bot
-        self.timestamp = timestamp
-        self.text = text
-        self.user = user
+    def __init__(
+        self, is_bot: bool, timestamp: datetime.datetime, text: str, user: discord.User
+    ):
+        self.is_bot: bool = is_bot
+        self.timestamp: datetime.datetime = timestamp
+        self.text: str = text
+        self.user: discord.User = user
 
     def __str__(self) -> str:
         return f"{self.timestamp} {self.user.name}: {self.text}"
@@ -57,7 +58,7 @@ class Transcript:
         user = self._client.user
         line = TranscriptLine(
             is_bot=True,
-            timestamp=time.time(),
+            timestamp=datetime.datetime.now(),
             text=message,
             user=user,
         )
