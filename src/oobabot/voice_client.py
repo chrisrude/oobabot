@@ -318,6 +318,7 @@ class VoiceClient(discord.VoiceProtocol):
                     "No event loop to schedule voice_client.disconnect() call"
                 )
                 return
+            # todo: how to wait for a result here?
             loop.call_soon_threadsafe(self.disconnect)
 
         elif discrivener.DiscrivenerMessageType.USER_JOIN == message.type:

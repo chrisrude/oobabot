@@ -88,6 +88,14 @@ class Transcript:
                         wakeword_found = True
                         break
 
+        # print message lag
+        if message.timestamp:
+            message_end_time = message.timestamp + message.audio_duration
+            lag = datetime.datetime.now() - message_end_time
+            fancy_logger.get().debug(
+                "transcript: message lag: %s seconds", lag.total_seconds()
+            )
+
         if wakeword_found:
             fancy_logger.get().info("transcript: wakeword detected!")
             self.wakeword_event.set()

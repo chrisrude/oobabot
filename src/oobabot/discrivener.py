@@ -371,25 +371,25 @@ class Transcription(DiscrivenerMessage):
     Represents a transcribed message.
     """
 
-    timestamp: int
-    user_id: int
-    audio_duration_ms: int
-    processing_time_ms: int
-    segments: typing.List[TextSegment]
-
     def __init__(self, message: dict):
         self.type = DiscrivenerMessageType.TRANSCRIPTION
-        self.timestamp = to_datetime(message.get("start_timestamp"))
-        self.user_id = message.get("user_id")
-        self.audio_duration_ms = to_duration(message.get("audio_duration"))
-        self.processing_time_ms = to_duration(message.get("processing_time"))
-        self.segments = [TextSegment(s) for s in message.get("segments")]
+        self.timestamp: datetime.datetime = to_datetime(message.get("start_timestamp"))
+        self.user_id: int = message.get("user_id")
+        self.audio_duration: datetime.timedelta = to_duration(
+            message.get("audio_duration")
+        )
+        self.processing_time: datetime.timedelta = to_duration(
+            message.get("processing_time")
+        )
+        self.segments: typing.List[TextSegment] = [
+            TextSegment(s) for s in message.get("segments")
+        ]
 
     def __repr__(self) -> str:
         return (
             f"Transcription(timestamp={self.timestamp}, "
             + f"user_id={self.user_id}, "
-            + f"audio_duration_ms={self.audio_duration_ms}, "
-            + f"processing_time_ms={self.processing_time_ms}, "
+            + f"audio_duration={self.audio_duration}, "
+            + f"processing_time={self.processing_time}, "
             + f"segments={self.segments})"
         )
