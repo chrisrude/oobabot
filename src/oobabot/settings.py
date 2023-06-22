@@ -436,6 +436,32 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
+            oesp.ConfigSetting[float](
+                name="stream_responses_speed_limit",
+                default=0.2,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: When streaming responses, cap the
+                        rate at which we send updates to Discord to be no
+                        more than once per this many seconds.
+
+                        This does not guarantee that updates will be sent
+                        this fast.  Only that they will not be sent any
+                        faster than this rate.
+
+                        This is useful because Discord has a rate limit on
+                        how often you can send messages, and if you exceed
+                        it, the updates will suddenly become slow.
+
+                        Example: 0.2 means we will send updates no faster
+                        than 5 times per second.
+                        """
+                    )
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
             oesp.ConfigSetting[int](
                 name="unsolicited_channel_cap",
                 default=3,

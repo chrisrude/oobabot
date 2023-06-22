@@ -56,6 +56,9 @@ class DiscordBot(discord.Client):
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.stop_markers = discord_settings["stop_markers"]
         self.stream_responses = discord_settings["stream_responses"]
+        self.stream_responses_speed_limit = discord_settings[
+            "stream_responses_speed_limit"
+        ]
 
         # add stopping_strings to stop_markers
         self.stop_markers.extend(self.ooba_client.get_stopping_strings())
@@ -373,7 +376,9 @@ class DiscordBot(discord.Client):
         sent_message_count = 0
         try:
             if self.stream_responses:
-                generator = self.ooba_client.request_as_grouped_tokens(prompt_prefix)
+                generator = self.ooba_client.request_as_grouped_tokens(
+                    prompt_prefix, interval=self.stream_responses_speed_limit
+                )
                 last_sent_message = await self._render_streaming_response(
                     generator,
                     this_response_stat,
