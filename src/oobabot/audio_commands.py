@@ -60,7 +60,7 @@ class AudioCommands:
                 continue
             if member.voice.channel is None:
                 continue
-            return (member.voice.channel, True)
+            return member.voice.channel
         return None
 
     def add_commands(self, tree):
