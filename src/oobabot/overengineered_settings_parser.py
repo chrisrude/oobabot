@@ -25,6 +25,13 @@ YAML_WIDTH = 88
 DIVIDER = "# " * (YAML_WIDTH >> 1)
 INDENT_UNIT = 2
 
+
+class ConfigFileMissingError(Exception):
+    """
+    Raised when the config file is missing.
+    """
+
+
 SettingDictType = typing.Dict[
     str, typing.Union[bool, int, float, str, typing.List[str]]
 ]
@@ -347,7 +354,6 @@ def load_from_dict(
     """
     Load settings from a dictionary
     """
-    print(f"settings_dict: {settings_dict}")
     for group in setting_groups:
         group.set_values_from_dict(settings_dict)
 
@@ -356,6 +362,7 @@ def load(
     cli_args: typing.List[str],
     setting_groups: typing.List["ConfigSettingGroup"],
     config_file: str,
+    raise_if_file_missing: bool,
 ) -> argparse.ArgumentParser:
     """
     Load settings from defaults, config.yml, and command line arguments
@@ -364,7 +371,10 @@ def load(
     Returns the argparse parser, which can be used to print out the help
     message.
     """
-    load_from_yaml(config_file, setting_groups)
+    load_error_message = load_from_yaml(config_file, setting_groups)
+    if load_error_message and raise_if_file_missing:
+        raise ConfigFileMissingError(load_error_message)
+
     namespace = load_from_cli(cli_args, setting_groups)
 
     # returning this since it can print out the help message

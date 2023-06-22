@@ -42,6 +42,19 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         "txt2img": STABLE_DIFFUSION_API_URI_PATH + "txt2img",
         # txt2img: POST only
         #   takes a prompt, generates an image and returns it
+        "sd-models": STABLE_DIFFUSION_API_URI_PATH + "sd-models",
+        # sd-models: GET only
+        # [
+        #   {
+        #     "title": "Anything-V3.0.ckpt [812cd9f9d9]",
+        #     "model_name": "Anything-V3.0",
+        #     "hash": "812cd9f9d9",
+        #     "sha256": "812cd9f9d9a0cb62aaad605173fd64dea1....",
+        #     "filename": "...long..path.../models/Stable-diffusion/Anything-V3.0.ckpt",
+        #     "config": null
+        #   },
+        # ...
+        # ]
     }
 
     def __init__(
@@ -52,6 +65,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
 
         self.extra_prompt_text = settings["extra_prompt_text"]
         self.request_params = settings["request_params"]
+        self.sd_models = []
 
         # when we're in a "age restricted" channel, we'll swap
         # the "negative_prompt" in the request_params with this
@@ -130,14 +144,22 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
                 raise http_client.OobaHttpClientError(response)
             await response.json()
 
-    async def get_samplers(self) -> typing.List[str]:
-        url = self.API_COMMAND_URLS["get_samplers"]
+    async def _call_and_extract_field(
+        self, command: str, field: str
+    ) -> typing.List[str]:
+        url = self.API_COMMAND_URLS[command]
         async with self._get_session().get(url) as response:
             if response.status != 200:
                 raise http_client.OobaHttpClientError(response)
             response = await response.json()
-            samplers = [str(sampler["name"]) for sampler in response]
-            return samplers
+            values = [str(value[field]) for value in response]
+            return values
+
+    async def get_samplers(self) -> typing.List[str]:
+        return await self._call_and_extract_field("get_samplers", "name")
+
+    async def get_models(self) -> typing.List[str]:
+        return await self._call_and_extract_field("sd-models", "model_name")
 
     def generate_image(
         self,
@@ -159,6 +181,22 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         request["prompt"] = prompt
         if is_channel_nsfw:
             request["negative_prompt"] = self.negative_prompt_nsfw
+
+        # try to extract a model name from the prompt.  If we do,
+        # set it via ['override_settings']['sd_model_checkpoint']
+        lower_prompt = prompt.lower()
+        for model in self.sd_models:
+            if model.lower() in lower_prompt:
+                if "override_settings" not in request:
+                    request["override_settings"] = {}
+                request["override_settings"]["sd_model_checkpoint"] = model
+
+                fancy_logger.get().debug(
+                    "Stable Diffusion:  setting model to '%s'", model
+                )
+                # remove the model name from the prompt itself
+                request["prompt"] = request["prompt"].replace(model, "")
+                break
 
         if self.extra_prompt_text:
             request["prompt"] += ", " + self.extra_prompt_text
@@ -246,6 +284,10 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     async def _setup(self):
         await self.verify_sampler_available()
         await self.set_options()
+        self.sd_models = await self.get_models()
+        fancy_logger.get().info(
+            "Stable Diffusion: Available models: %s", ", ".join(self.sd_models)
+        )
         fancy_logger.get().debug(
             "Stable Diffusion: Using negative prompt: %s...",
             str(self.request_params.get("negative_prompt", ""))[:20],
