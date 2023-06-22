@@ -748,19 +748,6 @@ class Settings:
         """
         return oesp.load_from_yaml_stream(stream, setting_groups=self.setting_groups)
 
-    def load_from_yaml_stream(self, stream: typing.TextIO) -> typing.Optional[str]:
-        """
-        Load the config from a YAML stream.
-
-        params:
-            stream: stream to load the config from
-
-        returns:
-            None if the config was loaded successfully, otherwise a string
-            containing an error message.
-        """
-        return oesp.load_from_yaml_stream(stream, setting_groups=self.setting_groups)
-
     def load(
         self,
         cli_args: typing.List[str],
