@@ -2,14 +2,18 @@
 """
 Implementation of the bot's slash commands.
 """
+import pathlib
 import typing
 
 import discord
 
+from oobabot import audio_commands
 from oobabot import decide_to_respond
 from oobabot import discord_utils
 from oobabot import fancy_logger
+from oobabot import ooba_client
 from oobabot import persona
+from oobabot import prompt_generator
 from oobabot import repetition_tracker
 from oobabot import templates
 
@@ -26,33 +30,28 @@ class BotCommands:
         persona: persona.Persona,
         discord_settings: dict,
         template_store: templates.TemplateStore,
+        ooba_client: ooba_client.OobaClient,
+        prompt_generator: prompt_generator.PromptGenerator,
     ):
         self.decide_to_respond = decide_to_respond
         self.repetition_tracker = repetition_tracker
         self.persona = persona
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.template_store = template_store
+        self.discrivener_location = discord_settings["discrivener_location"]
+        self.discrivener_model_location = discord_settings["discrivener_model_location"]
+        self.audio_commands = audio_commands.AudioCommands(
+            persona,
+            ooba_client,
+            prompt_generator,
+            self.discrivener_location,
+            self.discrivener_model_location,
+        )
 
     async def on_ready(self, client: discord.Client):
         """
         Register commands with Discord.
         """
-
-        async def fail(
-            interaction: discord.Interaction, reason: typing.Optional[str] = None
-        ):
-            msg = reason
-            if msg is None:
-                command = "command"
-                if interaction.command is not None:
-                    command = interaction.command.name
-                fancy_logger.get().warning(
-                    f"{command} called from an unexpected channel: "
-                    + f"{interaction.channel_id}"
-                )
-                msg = f"{command} failed"
-
-            await interaction.response.send_message(msg, ephemeral=True, silent=True)
 
         async def get_messageable(
             interaction: discord.Interaction,
@@ -92,7 +91,7 @@ class BotCommands:
         )
         async def say(interaction: discord.Interaction, text_to_send: str):
             if interaction.channel_id is None:
-                await fail(interaction)
+                await discord_utils.fail_interaction(interaction)
                 return
 
             # if reply_in_thread is True, we don't want our bot to
@@ -100,7 +99,7 @@ class BotCommands:
             if self.reply_in_thread:
                 channel = await get_messageable(interaction)
                 if channel is None or isinstance(channel, discord.TextChannel):
-                    await fail(
+                    await discord_utils.fail_interaction(
                         interaction, f"{self.persona.ai_name} may only speak in threads"
                     )
                     return
@@ -129,7 +128,7 @@ class BotCommands:
         async def lobotomize(interaction: discord.Interaction):
             channel = await get_messageable(interaction)
             if channel is None:
-                await fail(interaction)
+                await discord_utils.fail_interaction(interaction)
                 return
 
             # find the current message in this channel
@@ -167,8 +166,45 @@ class BotCommands:
         tree = discord.app_commands.CommandTree(client)
         tree.add_command(lobotomize)
         tree.add_command(say)
+
+        if self.is_discrivener_installed():
+            self.audio_commands.add_commands(tree)
+
         commands = await tree.sync(guild=None)
         for command in commands:
             fancy_logger.get().info(
                 "Registered command: %s: %s", command.name, command.description
             )
+
+    def is_discrivener_installed(self):
+        """
+        Verify that the file at self.discrivener_location exists
+        and is a file.
+
+        If that passes, also checks that discrivener_model_location
+        exists and is a file.
+        """
+        if not self.discrivener_location:
+            return False
+
+        discrivener_location = pathlib.Path(self.discrivener_location)
+        if not discrivener_location.is_file():
+            fancy_logger.get().warning(
+                "Discrivener not found at %s.  Audio integration not enabled.",
+                discrivener_location,
+            )
+            return False
+
+        fancy_logger.get().info("Discrivener found at %s", discrivener_location)
+
+        model_location = pathlib.Path(self.discrivener_model_location)
+        if not model_location.is_file():
+            fancy_logger.get().warning(
+                "Discrivener model not found at %s.  Audio integration not enabled.",
+                model_location,
+            )
+            return False
+
+        fancy_logger.get().info("Discrivener model found at %s", model_location)
+
+        return True

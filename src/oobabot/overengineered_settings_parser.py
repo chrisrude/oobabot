@@ -71,14 +71,6 @@ class ConfigSetting(typing.Generic[T]):
     An individual setting that can be exposed through CLI and/or YAML
     """
 
-    data_type: T
-    description_lines: typing.List[str]
-    cli_args: typing.List[str]
-    include_in_argparse: bool
-    include_in_yaml: bool
-    show_default_in_yaml: bool
-    fn_on_set: typing.Callable[[T], None]
-
     def __init__(
         self,
         name: str,
@@ -206,10 +198,6 @@ class ConfigSettingGroup:
     """
     A group of related settings that can be exposed through CLI and/or YAML
     """
-
-    name: str
-    description: str
-    settings: typing.Dict[str, ConfigSetting]
 
     def __init__(
         self,

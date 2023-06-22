@@ -484,7 +484,35 @@ class Settings:
                 ],
             )
         )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[int](
+                name="discrivener_location",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Path to the Discrivener executable.
+                        Will enable prototype voice integration.
+                        """
+                    )
+                ],
+            )
+        )
 
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[int](
+                name="discrivener_model_location",
+                default="",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Path to the Discrivener model to
+                        load.  Required if discrivener_location is set.
+                        """
+                    )
+                ],
+            )
+        )
         ###########################################################
         # Oobabooga Settings
 
@@ -706,6 +734,19 @@ class Settings:
                 except (ValueError, IndexError):
                     continue
         return (config_setting.default, True)
+
+    def load_from_yaml_stream(self, stream: typing.TextIO) -> typing.Optional[str]:
+        """
+        Load the config from a YAML stream.
+
+        params:
+            stream: stream to load the config from
+
+        returns:
+            None if the config was loaded successfully, otherwise a string
+            containing an error message.
+        """
+        return oesp.load_from_yaml_stream(stream, setting_groups=self.setting_groups)
 
     def load_from_yaml_stream(self, stream: typing.TextIO) -> typing.Optional[str]:
         """

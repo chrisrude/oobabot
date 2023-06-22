@@ -229,6 +229,8 @@ class Oobabot:
             persona=self.persona,
             discord_settings=self.settings.discord_settings.get_all(),
             template_store=self.template_store,
+            ooba_client=self.ooba_client,
+            prompt_generator=self.prompt_generator,
         )
 
         self.discord_bot = None
