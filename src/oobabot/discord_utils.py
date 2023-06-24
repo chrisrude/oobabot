@@ -9,6 +9,7 @@ Discord library.
 
 
 import base64
+import pathlib
 import re
 import typing
 
@@ -255,6 +256,42 @@ async def fail_interaction(
     )
 
     await interaction.response.send_message(reason, ephemeral=True, silent=True)
+
+
+def is_discrivener_installed(
+    discrivener_location: str, discrivener_model_location: str
+):
+    """
+    Verify that the file discrivener_location exists
+    and is a file.
+
+    If that passes, also checks that discrivener_model_location
+    exists and is a file.
+    """
+    if not discrivener_location:
+        return False
+
+    discrivener_location = pathlib.Path(discrivener_location)
+    if not discrivener_location.is_file():
+        fancy_logger.get().warning(
+            "Discrivener not found at %s.  Audio integration not enabled.",
+            discrivener_location,
+        )
+        return False
+
+    fancy_logger.get().info("Discrivener found at %s", discrivener_location)
+
+    model_location = pathlib.Path(discrivener_model_location)
+    if not model_location.is_file():
+        fancy_logger.get().warning(
+            "Discrivener model not found at %s.  Audio integration not enabled.",
+            model_location,
+        )
+        return False
+
+    fancy_logger.get().info("Discrivener model found at %s", model_location)
+
+    return True
 
 
 # the following class was modified from O'Reilly's Python Cookbook,

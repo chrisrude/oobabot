@@ -2,7 +2,6 @@
 """
 Implementation of the bot's slash commands.
 """
-import pathlib
 import typing
 
 import discord
@@ -167,7 +166,10 @@ class BotCommands:
         tree.add_command(lobotomize)
         tree.add_command(say)
 
-        if self.is_discrivener_installed():
+        if discord_utils.is_discrivener_installed(
+            self.discrivener_location,
+            self.discrivener_model_location,
+        ):
             self.audio_commands.add_commands(tree)
 
         commands = await tree.sync(guild=None)
@@ -175,36 +177,3 @@ class BotCommands:
             fancy_logger.get().info(
                 "Registered command: %s: %s", command.name, command.description
             )
-
-    def is_discrivener_installed(self):
-        """
-        Verify that the file at self.discrivener_location exists
-        and is a file.
-
-        If that passes, also checks that discrivener_model_location
-        exists and is a file.
-        """
-        if not self.discrivener_location:
-            return False
-
-        discrivener_location = pathlib.Path(self.discrivener_location)
-        if not discrivener_location.is_file():
-            fancy_logger.get().warning(
-                "Discrivener not found at %s.  Audio integration not enabled.",
-                discrivener_location,
-            )
-            return False
-
-        fancy_logger.get().info("Discrivener found at %s", discrivener_location)
-
-        model_location = pathlib.Path(self.discrivener_model_location)
-        if not model_location.is_file():
-            fancy_logger.get().warning(
-                "Discrivener model not found at %s.  Audio integration not enabled.",
-                model_location,
-            )
-            return False
-
-        fancy_logger.get().info("Discrivener model found at %s", model_location)
-
-        return True

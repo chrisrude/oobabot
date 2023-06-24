@@ -387,8 +387,32 @@ class Oobabot:
         ai_user_id = discord_utils.get_user_id_from_token(discord_token)
         return discord_utils.generate_invite_url(ai_user_id)
 
+    # pylint: enable=W0201
 
-# pylint: enable=W0201
+    def is_audio_enabled(self) -> bool:
+        """
+        Returns True if the bot is configured to play audio.
+
+        This checks that both:
+         a. discrivener is configured
+         b. discrivener is installed
+        """
+        return discord_utils.is_discrivener_installed(
+            self.settings.discord_settings.get_str("discrivener_location"),
+            self.settings.discord_settings.get_str("discrivener_model_location"),
+        )
+
+    def current_voice_transcript(
+        self,
+    ) -> typing.Optional["oobabot.transcript.Transcript"]:
+        """
+        If the bot is currently in a voice channel, returns the transcript
+        of what's being said.  Otherwise, returns None.
+        """
+        current_instance = self.discord_bot.current_voice_instance()
+        if current_instance is None:
+            return None
+        return current_instance.current_transcript()
 
 
 def main():

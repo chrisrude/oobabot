@@ -438,7 +438,7 @@ class Settings:
         self.discord_settings.add_setting(
             oesp.ConfigSetting[float](
                 name="stream_responses_speed_limit",
-                default=0.2,
+                default=0.7,
                 description_lines=[
                     textwrap.dedent(
                         """
@@ -582,6 +582,22 @@ class Settings:
                 include_in_argparse=False,
                 show_default_in_yaml=False,
                 place_default_in_yaml=True,
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[bool](
+                name="plugin_auto_start",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        When running inside the Oobabooga plugin, automatically
+                        connect to Discord when Oobabooga starts.  This has no effect
+                        when running from the command line.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
             )
         )
 

@@ -41,6 +41,7 @@ class VoiceClient(discord.VoiceProtocol):
 
     discrivener_location: str
     discrivener_model_location: str
+    current_instance: typing.Optional["VoiceClient"] = None
     ooba_client: ooba_client.OobaClient
     prompt_generator: prompt_generator.PromptGenerator
     wakewords: typing.List[str] = []
@@ -205,6 +206,7 @@ class VoiceClient(discord.VoiceProtocol):
         await self.channel.guild.change_voice_state(channel=None)
         await self._discrivener.stop()
         await self._audio_responder.stop()
+        VoiceClient.current_instance = None
 
     async def connect(
         self,
@@ -248,6 +250,7 @@ class VoiceClient(discord.VoiceProtocol):
 
         fancy_logger.get().info("Voice handshake complete.")
         self._handshaking = False
+        VoiceClient.current_instance = self
 
     async def potential_reconnect(self) -> bool:
         # Attempt to stop the player thread from playing early
@@ -337,3 +340,6 @@ class VoiceClient(discord.VoiceProtocol):
             fancy_logger.get().warning(
                 "Unknown discrivener message type: %s", message.type
             )
+
+    def current_transcript(self) -> typing.Optional[transcript.Transcript]:
+        return self._transcript

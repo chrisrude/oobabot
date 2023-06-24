@@ -20,15 +20,26 @@ class TranscriptLine:
     """
 
     def __init__(
-        self, is_bot: bool, timestamp: datetime.datetime, text: str, user: discord.User
+        self,
+        is_bot: bool,
+        timestamp: datetime.datetime,
+        original_message: typing.Optional[discrivener.Transcription],
+        text: str,
+        user: typing.Optional[discord.user.BaseUser],
     ):
         self.is_bot: bool = is_bot
+        # only for non-bot messages
+        self.original_message = original_message
         self.timestamp: datetime.datetime = timestamp
         self.text: str = text
-        self.user: discord.User = user
+        # only for non-bot messages
+        self.user: typing.Optional[discord.user.BaseUser] = user
 
     def __str__(self) -> str:
-        return f"{self.timestamp} {self.user.name}: {self.text}"
+        if self.is_bot:
+            # todo: use persona name
+            return f"{self.timestamp} bot response: {self.text}"
+        return f"{self.timestamp} {self.user.display_name}: {self.text}"
 
 
 class Transcript:
@@ -36,7 +47,7 @@ class Transcript:
     Stores a transcript of a voice channel.
     """
 
-    NUM_LINES = 50
+    NUM_LINES = 300
 
     def __init__(self, client: discord.client.Client, wakewords: typing.List[str]):
         self._client = client
@@ -55,12 +66,12 @@ class Transcript:
         """
         Adds a bot response to the transcript.
         """
-        user = self._client.user
         line = TranscriptLine(
             is_bot=True,
+            original_message=None,
             timestamp=datetime.datetime.now(),
             text=message,
-            user=user,
+            user=self._client.user,
         )
         self._buffer.append(line)
 
@@ -77,6 +88,7 @@ class Transcript:
                 is_bot=user.bot,
                 timestamp=message.timestamp
                 + datetime.timedelta(milliseconds=segment.start_offset_ms),
+                original_message=message,
                 text=str(segment),
                 user=user,
             )

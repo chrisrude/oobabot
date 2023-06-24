@@ -311,7 +311,7 @@ class TokenWithProbability:
     """
 
     def __init__(self, data: dict):
-        self.probability: int = data.get("probability")
+        self.probability: int = data.get("p")
         self.token_id: int = data.get("token_id")
         self.token_text: str = str(data.get("token_text"))
 
@@ -384,6 +384,7 @@ class Transcription(DiscrivenerMessage):
         self.segments: typing.List[TextSegment] = [
             TextSegment(s) for s in message.get("segments")
         ]
+        self.latency: datetime.timedelta = datetime.datetime.now() - self.timestamp
 
     def __repr__(self) -> str:
         return (
@@ -392,4 +393,5 @@ class Transcription(DiscrivenerMessage):
             + f"audio_duration={self.audio_duration}, "
             + f"processing_time={self.processing_time}, "
             + f"segments={self.segments})"
+            + f"latency={self.latency})"
         )
