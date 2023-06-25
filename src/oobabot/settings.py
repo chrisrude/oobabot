@@ -74,6 +74,10 @@ class Settings:
     # This section is for constants which are not yet
     # customizable by the user.
 
+    # when trying to stop the bot, wait this long before
+    # giving up and just exiting
+    STOP_LOCK_TIMEOUT: float = 5.0
+
     # This is a table of the probability that the bot will respond
     # in an unsolicited manner (i.e. it isn't specifically pinged)
     # to a message, based on how long ago it was pinged in that

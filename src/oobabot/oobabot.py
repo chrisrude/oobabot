@@ -95,14 +95,26 @@ class Oobabot:
 
         asyncio.run(self.runtime.run())
 
-    def stop(self):
+    # pylint: disable=R1732
+    def stop(self) -> bool:
         """
         Stop the bot.  Blocks until the bot exits.
         """
-        with self.runtime_lock:
-            if self.runtime is not None:
-                self.runtime.stop()
-                self.runtime = None
+        result = self.runtime_lock.acquire(timeout=5)
+        if result:
+            try:
+                if self.runtime is not None:
+                    self.runtime.stop()
+            finally:
+                self.runtime_lock.release()
+        else:
+            fancy_logger.get().error(
+                "Failed to acquire runtime lock, could not shutdown gracefully"
+            )
+        self.runtime = None
+        return result
+
+    # pylint: enable=R1732
 
     @classmethod
     def test_discord_token(cls, discord_token: str) -> bool:
@@ -176,8 +188,8 @@ def run_cli():
     def exit_handler(signum, _frame):
         sig_name = signal.Signals(signum).name
         fancy_logger.get().info("Received signal %s, exiting...", sig_name)
-        oobabot.stop()
-        sys.exit(0)
+        result = oobabot.stop()
+        sys.exit(not result)
 
     signal.signal(signal.SIGINT, exit_handler)
     signal.signal(signal.SIGTERM, exit_handler)
