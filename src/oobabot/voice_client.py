@@ -59,8 +59,14 @@ class VoiceClient(discord.VoiceProtocol):
     ) -> None:
         super().__init__(client, channel)
 
+        if not isinstance(channel, discord.VoiceChannel):
+            raise ValueError("Channel is not a voice channel.")
+
         if channel.guild is None:
             raise ValueError("Channel does not have a guild.")
+
+        if client.user is None:
+            raise ValueError("Client does not have a user.")
 
         self._discrivener = discrivener.Discrivener(
             self.discrivener_location,
@@ -77,12 +83,14 @@ class VoiceClient(discord.VoiceProtocol):
         self._session_id = discord.utils.MISSING
         self._server_id = discord.utils.MISSING
         self._transcript = transcript.Transcript(client, self.wakewords)
+        self._guild_channel = channel
+        self._user = client.user
 
         self._audio_responder = audio_responder.AudioResponder(
-            self._transcript,
+            channel,
             self.prompt_generator,
             self.ooba_client,
-            self.channel,
+            self._transcript,
         )
 
     @property
@@ -90,14 +98,14 @@ class VoiceClient(discord.VoiceProtocol):
         """
         :class:`Guild`: The guild we're connected to.
         """
-        return self.channel.guild
+        return self._guild_channel.guild
 
     @property
     def user(self) -> discord.user.ClientUser:
         """
         :class:`ClientUser`: The user connected to voice (i.e. ourselves).
         """
-        return self._state.user
+        return self._user
 
     @property
     def session_id(self) -> str:
@@ -137,9 +145,9 @@ class VoiceClient(discord.VoiceProtocol):
                         self.guild.id,
                     )
                     return
-                if not isinstance(channel, discord.channel.VocalGuildChannel):
+                if not isinstance(channel, discord.VoiceChannel):
                     fancy_logger.get().warning(
-                        "Channel ID %s not a VocalGuildChannel.", channel_id
+                        "Channel ID %s not a VoiceChannel.", channel_id
                     )
                     return
                 self.channel = channel
@@ -179,7 +187,7 @@ class VoiceClient(discord.VoiceProtocol):
         # this will start the process, we'll get a callback when the connection
         # is made
         await self._discrivener.run(
-            self.channel.id,
+            self._guild_channel.id,
             endpoint,
             guild_id,
             self.session_id,
@@ -192,18 +200,18 @@ class VoiceClient(discord.VoiceProtocol):
     async def voice_connect(
         self, self_deaf: bool = False, self_mute: bool = False
     ) -> None:
-        await self.channel.guild.change_voice_state(
-            channel=self.channel, self_deaf=self_deaf, self_mute=self_mute
+        await self._guild_channel.guild.change_voice_state(
+            channel=self._guild_channel, self_deaf=self_deaf, self_mute=self_mute
         )
 
     async def voice_disconnect(self) -> None:
         fancy_logger.get().info(
             "The voice handshake is being terminated for Channel ID %s (Guild ID %s)",
-            self.channel.id,
+            self._guild_channel.id,
             self.guild.id,
         )
         self._oobabot_voice_connected = False
-        await self.channel.guild.change_voice_state(channel=None)
+        await self._guild_channel.guild.change_voice_state(channel=None)
         await self._discrivener.stop()
         await self._audio_responder.stop()
         VoiceClient.current_instance = None
@@ -256,6 +264,7 @@ class VoiceClient(discord.VoiceProtocol):
         # Attempt to stop the player thread from playing early
         # self._potentially_reconnecting = True
         fancy_logger.get().warning("voice_client::potential_reconnect: not implemented")
+        return False
 
     async def disconnect(self, *, force: bool = False) -> None:
         """|coro|
@@ -282,7 +291,7 @@ class VoiceClient(discord.VoiceProtocol):
         """
         # todo: tell songbird to move channels
         fancy_logger.get().warning("voice_client::move_to: not implemented")
-        await self.channel.guild.change_voice_state(channel=channel)
+        await self._guild_channel.guild.change_voice_state(channel=channel)
 
     def is_connected(self) -> bool:
         """Indicates if the voice client is connected to voice."""
@@ -331,10 +340,20 @@ class VoiceClient(discord.VoiceProtocol):
             fancy_logger.get().debug("discrivener message: %s", message)
 
         elif discrivener.DiscrivenerMessageType.TRANSCRIPTION == message.type:
-            self._transcript.on_transcription(message)
+            if isinstance(message, discrivener.Transcription):
+                self._transcript.on_transcription(message)
+            else:
+                fancy_logger.get().warning(
+                    "Unexpected message value %s", type(message).__name__
+                )
 
         elif discrivener.DiscrivenerMessageType.CHANNEL_SILENT == message.type:
-            self._transcript.on_channel_silent(message)
+            if isinstance(message, discrivener.ChannelSilentData):
+                self._transcript.on_channel_silent(message)
+            else:
+                fancy_logger.get().warning(
+                    "Unexpected message value %s", type(message).__name__
+                )
 
         else:
             fancy_logger.get().warning(

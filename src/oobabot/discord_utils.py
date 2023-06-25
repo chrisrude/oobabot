@@ -271,25 +271,27 @@ def is_discrivener_installed(
     if not discrivener_location:
         return False
 
-    discrivener_location = pathlib.Path(discrivener_location)
-    if not discrivener_location.is_file():
+    discrivener_location_path = pathlib.Path(discrivener_location)
+    if not discrivener_location_path.is_file():
         fancy_logger.get().warning(
             "Discrivener not found at %s.  Audio integration not enabled.",
-            discrivener_location,
+            discrivener_location_path,
         )
         return False
 
-    fancy_logger.get().info("Discrivener found at %s", discrivener_location)
+    fancy_logger.get().info("Discrivener found at %s", discrivener_location_path)
 
-    model_location = pathlib.Path(discrivener_model_location)
-    if not model_location.is_file():
+    discrivener_model_location_path = pathlib.Path(discrivener_model_location)
+    if not discrivener_model_location_path.is_file():
         fancy_logger.get().warning(
             "Discrivener model not found at %s.  Audio integration not enabled.",
-            model_location,
+            discrivener_model_location_path,
         )
         return False
 
-    fancy_logger.get().info("Discrivener model found at %s", model_location)
+    fancy_logger.get().info(
+        "Discrivener model found at %s", discrivener_model_location_path
+    )
 
     return True
 
@@ -323,6 +325,7 @@ def is_discrivener_installed(
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 T = typing.TypeVar("T")
+S = typing.TypeVar("S")
 
 
 class RingBuffer(typing.Generic[T]):
@@ -335,7 +338,7 @@ class RingBuffer(typing.Generic[T]):
         self.max = size_max
         self.data: typing.List[T] = []
 
-    class _FullRingBuffer(typing.Generic[T]):
+    class _FullRingBuffer(typing.Generic[S]):
         """
         Class implementing the RingBuffer when it's full.
         With python class magic, this class is swapped in when the
@@ -344,16 +347,16 @@ class RingBuffer(typing.Generic[T]):
 
         cur: int
         max: int
-        data: typing.List[T]
+        data: typing.List[S]
 
-        def append(self, val: T) -> None:
+        def append(self, val: S) -> None:
             """
             Append an element overwriting the oldest one.
             """
             self.data[self.cur] = val
             self.cur = (self.cur + 1) % self.max
 
-        def get(self) -> typing.List[T]:
+        def get(self) -> typing.List[S]:
             """
             Return a list of elements from the oldest to the newest.
             """

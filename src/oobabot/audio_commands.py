@@ -44,7 +44,11 @@ class AudioCommands:
         if isinstance(interaction.user, discord.Member):
             # if invoked from a guild channel, join the voice channel
             # the invoker is in, within that guild
-            if interaction.user.voice is not None:
+            if (
+                interaction.user.voice is not None
+                and interaction.user.voice.channel is not None
+                and isinstance(interaction.user.voice.channel, discord.VoiceChannel)
+            ):
                 return interaction.user.voice.channel
 
         # if invoked from a private message, look at all guilds
@@ -54,13 +58,13 @@ class AudioCommands:
         for guild in interaction.user.mutual_guilds:
             # get member of guild
             member = guild.get_member(interaction.user.id)
-            if member is None:
-                continue
-            if member.voice is None:
-                continue
-            if member.voice.channel is None:
-                continue
-            return member.voice.channel
+            if (
+                member is not None
+                and member.voice is not None
+                and member.voice.channel is not None
+                and isinstance(member.voice.channel, discord.VoiceChannel)
+            ):
+                return member.voice.channel
         return None
 
     def add_commands(self, tree):
@@ -141,7 +145,7 @@ class AudioCommands:
             self.voice_client = None
 
             await interaction.response.send_message(
-                f"Left voice channel: {channel.name}",
+                "Left voice channel",
                 ephemeral=True,
                 silent=True,
             )

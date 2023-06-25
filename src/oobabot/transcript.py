@@ -39,6 +39,8 @@ class TranscriptLine:
         if self.is_bot:
             # todo: use persona name
             return f"{self.timestamp} bot response: {self.text}"
+        if self.user is None:
+            return f"{self.timestamp} unknown user: {self.text}"
         return f"{self.timestamp} {self.user.display_name}: {self.text}"
 
 
@@ -55,6 +57,8 @@ class Transcript:
         self._wakewords: typing.Set[str] = set(word.lower() for word in wakewords)
         self.wakeword_event = asyncio.Event()
         self.silence_event = asyncio.Event()
+        # todo: only for building test data
+        # self.out_file = open("transcript.json", "a")
 
     def get_lines(self) -> typing.List[TranscriptLine]:
         """
@@ -75,11 +79,18 @@ class Transcript:
         )
         self._buffer.append(line)
 
-    def on_transcription(self, message: discrivener.Transcription) -> None:
+    def on_transcription(
+        self,
+        message: discrivener.Transcription,
+        receive_time: datetime.datetime = datetime.datetime.now(),
+    ) -> None:
         user = self._client.get_user(message.user_id)
         if user is None:
             fancy_logger.get().warning("transcript: unknown user %s", message.user_id)
             return
+
+        # write to file
+        # self.out_file.write(json.dumps(vars(message)) + "\n")
 
         # todo: make use of decide_to_respond instead
         wakeword_found = False
@@ -104,7 +115,7 @@ class Transcript:
         # print message lag
         if message.timestamp:
             message_end_time = message.timestamp + message.audio_duration
-            lag = datetime.datetime.now() - message_end_time
+            lag = receive_time - message_end_time
             fancy_logger.get().debug(
                 "transcript: message lag: %s seconds", lag.total_seconds()
             )

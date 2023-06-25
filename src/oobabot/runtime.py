@@ -169,8 +169,7 @@ class Runtime:
                 if err.__cause__ is not None:
                     fancy_logger.get().error("Reason: %s", err.__cause__)
                 return False
-
-            return True
+        return True
 
     async def run(self):
         """

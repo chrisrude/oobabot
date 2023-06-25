@@ -28,17 +28,17 @@ class AudioResponder:
 
     def __init__(
         self,
-        transcript: transcript.Transcript,
+        channel: discord.VoiceChannel,
         prompt_generator: prompt_generator.PromptGenerator,
         ooba_client: ooba_client.OobaClient,
-        voice_channel: discord.VoiceChannel,
+        transcript: transcript.Transcript,
     ):
         self._abort = False
+        self._channel = channel
         self._prompt_generator = prompt_generator
         self._ooba_client = ooba_client
         self._transcript = transcript
         self._task: typing.Optional[asyncio.Task] = None
-        self._voice_channel = voice_channel
 
     async def start(self):
         await self.stop()
@@ -86,7 +86,7 @@ class AudioResponder:
         self._transcript.add_bot_response(response)
         fancy_logger.get().info("audio_responder: response: %s", response)
 
-        await self._voice_channel.send(response)
+        await self._channel.send(response)
 
     def _transcript_history_iterator(
         self,
@@ -98,16 +98,18 @@ class AudioResponder:
         # in the transcript
         async def _gen():
             for line in lines:
+                author_id = line.user.id if line.user else 0
+                author_name = line.user.name if line.user else "-unknown-"
                 yield types.GenericMessage(
-                    author_id=line.user.id,
-                    author_name=line.user.name,
+                    author_id=author_id,
+                    author_name=author_name,
                     channel_id=0,
                     channel_name="",
                     message_id=0,
                     reference_message_id=0,
                     body_text=line.text,
                     author_is_bot=False,
-                    send_timestamp=line.timestamp,
+                    send_timestamp=line.timestamp.timestamp(),
                 )
 
         return _gen()

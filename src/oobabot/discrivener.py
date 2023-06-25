@@ -69,7 +69,7 @@ class Discrivener:
     def is_running(self):
         return self._process is not None
 
-    async def _launch_process(self, args: dict):
+    async def _launch_process(self, args: typing.Tuple[str, ...]):
         fancy_logger.get().info(
             "Launching Discrivener process: %s", self._discrivener_location
         )
@@ -91,6 +91,8 @@ class Discrivener:
         self._stdout_reading_task = asyncio.create_task(self._read_stdout())
 
     async def _kill_process(self):
+        if self._process is None:
+            return
         self._process.send_signal(signal.SIGINT)
         try:
             await asyncio.wait_for(self._process.wait(), timeout=self.KILL_TIMEOUT)
@@ -111,19 +113,28 @@ class Discrivener:
             )
         finally:
             self._process = None
-            self._stderr_reading_task.cancel()
-            self._stdout_reading_task.cancel()
+            if self._stderr_reading_task is not None:
+                self._stderr_reading_task.cancel()
+            if self._stdout_reading_task is not None:
+                self._stdout_reading_task.cancel()
 
         # terminate stdout and stderr reading tasks
-        await asyncio.wait_for(self._stderr_reading_task, timeout=self.KILL_TIMEOUT)
-        self._stderr_reading_task = None
+        if self._stderr_reading_task is not None:
+            await asyncio.wait_for(self._stderr_reading_task, timeout=self.KILL_TIMEOUT)
+            self._stderr_reading_task = None
 
-        await asyncio.wait_for(self._stdout_reading_task, timeout=self.KILL_TIMEOUT)
-        self._stdout_reading_task = None
+        if self._stdout_reading_task is not None:
+            await asyncio.wait_for(self._stdout_reading_task, timeout=self.KILL_TIMEOUT)
+            self._stdout_reading_task = None
 
     async def _read_stdout(self):
         while True:
             try:
+                if self._process is None or self._process.stdout is None:
+                    fancy_logger.get().debug(
+                        "Discrivener stdout reader: _process went away, exiting"
+                    )
+                    break
                 line_bytes = await self._process.stdout.readuntil()
             except asyncio.IncompleteReadError:
                 break
@@ -142,6 +153,11 @@ class Discrivener:
         # loop until EOF, printing everything to stderr
         while True:
             try:
+                if self._process is None or self._process.stderr is None:
+                    fancy_logger.get().debug(
+                        "Discrivener stderr reader: _process went away, exiting"
+                    )
+                    break
                 line_bytes = await self._process.stderr.readuntil()
             except asyncio.IncompleteReadError:
                 break
@@ -159,11 +175,15 @@ class Discrivener:
 
     def _json_to_message_list(self, message: str) -> typing.List["DiscrivenerMessage"]:
         message_dict = json.loads(message)
-        return [
-            self._json_part_to_message(name, params)
-            for name, params in message_dict.items()
-            if name is not None
-        ]
+        result = []
+        for name, params in message_dict.items():
+            if name is None:
+                continue
+            message_part = self._json_part_to_message(name, params)
+            if message_part is None:
+                continue
+            result.append(message_part)
+        return result
 
     # pylint: disable=too-many-return-statements
     def _json_part_to_message(
@@ -311,8 +331,8 @@ class TokenWithProbability:
     """
 
     def __init__(self, data: dict):
-        self.probability: int = data.get("p")
-        self.token_id: int = data.get("token_id")
+        self.probability: int = data.get("p", 0)
+        self.token_id: int = data.get("token_id", 0)
         self.token_text: str = str(data.get("token_text"))
 
     def __repr__(self):
@@ -328,8 +348,8 @@ def to_datetime(message: dict) -> datetime.datetime:
     """
     Converts a message into a datetime object.
     """
-    seconds: int = message.get("secs_since_epoch")
-    nanos: int = message.get("nanos_since_epoch")
+    seconds: int = message.get("secs_since_epoch", 0)
+    nanos: int = message.get("nanos_since_epoch", 0)
     return datetime.datetime.fromtimestamp(seconds + nanos / 1e9)
 
 
@@ -337,8 +357,8 @@ def to_duration(message: dict) -> datetime.timedelta:
     """
     Converts a message into a timedelta object.
     """
-    seconds: int = message.get("secs")
-    nanos: int = message.get("nanos")
+    seconds: int = message.get("secs", 0)
+    nanos: int = message.get("nanos", 0)
     return datetime.timedelta(seconds=seconds, microseconds=nanos / 1e3)
 
 
