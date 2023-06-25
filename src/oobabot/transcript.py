@@ -57,8 +57,6 @@ class Transcript:
         self._wakewords: typing.Set[str] = set(word.lower() for word in wakewords)
         self.wakeword_event = asyncio.Event()
         self.silence_event = asyncio.Event()
-        # todo: only for building test data
-        # self.out_file = open("transcript.json", "a")
 
     def get_lines(self) -> typing.List[TranscriptLine]:
         """
@@ -88,9 +86,6 @@ class Transcript:
         if user is None:
             fancy_logger.get().warning("transcript: unknown user %s", message.user_id)
             return
-
-        # write to file
-        # self.out_file.write(json.dumps(vars(message)) + "\n")
 
         # todo: make use of decide_to_respond instead
         wakeword_found = False

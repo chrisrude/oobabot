@@ -20,11 +20,13 @@ class Discrivener:
 
     KILL_TIMEOUT = 5
 
+    # pylint: disable=R1732
     def __init__(
         self,
         discrivener_location: str,
         discrivener_model_location: str,
         handler: typing.Callable[["DiscrivenerMessage"], None],
+        log_file: typing.Optional[str] = None,
     ):
         self._discrivener_location = discrivener_location
         self._discrivener_model_location = discrivener_model_location
@@ -32,6 +34,12 @@ class Discrivener:
         self._process: typing.Optional["asyncio.subprocess.Process"] = None
         self._stderr_reading_task: typing.Optional[asyncio.Task] = None
         self._stdout_reading_task: typing.Optional[asyncio.Task] = None
+        if log_file is not None:
+            self._log_file = open(log_file, "a", encoding="utf-8")
+        else:
+            self._log_file = None
+
+    # pylint: enable=R1732
 
     async def run(
         self,
@@ -139,6 +147,14 @@ class Discrivener:
             except asyncio.IncompleteReadError:
                 break
             line = line_bytes.decode("utf-8").strip()
+
+            if self._log_file is not None:
+                try:
+                    self._log_file.write(line + "\n")
+                except (IOError, OSError) as err:
+                    fancy_logger.get().warning(
+                        "transcript: failed to log to file: %s", err
+                    )
             try:
                 message_list = self._json_to_message_list(line)
                 for message in message_list:
@@ -218,7 +234,7 @@ class Discrivener:
     # pylint: enable=too-many-return-statements
 
 
-class DiscrivenerMessageType(enum.Enum):
+class DiscrivenerMessageType(str, enum.Enum):
     """
     Enumerates the different types of Discrivener messages.
     """
