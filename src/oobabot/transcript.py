@@ -7,41 +7,10 @@ import datetime
 import re
 import typing
 
-import discord
-
 from oobabot import discord_utils
-from oobabot import discrivener
+from oobabot import discrivener_message
 from oobabot import fancy_logger
-
-
-class TranscriptLine:
-    """
-    A single line of a transcript.
-    """
-
-    def __init__(
-        self,
-        is_bot: bool,
-        timestamp: datetime.datetime,
-        original_message: typing.Optional[discrivener.Transcription],
-        text: str,
-        user: typing.Optional[discord.user.BaseUser],
-    ):
-        self.is_bot: bool = is_bot
-        # only for non-bot messages
-        self.original_message = original_message
-        self.timestamp: datetime.datetime = timestamp
-        self.text: str = text
-        # only for non-bot messages
-        self.user: typing.Optional[discord.user.BaseUser] = user
-
-    def __str__(self) -> str:
-        if self.is_bot:
-            # todo: use persona name
-            return f"{self.timestamp} bot response: {self.text}"
-        if self.user is None:
-            return f"{self.timestamp} unknown user: {self.text}"
-        return f"{self.timestamp} {self.user.display_name}: {self.text}"
+from oobabot import types
 
 
 class Transcript:
@@ -51,76 +20,82 @@ class Transcript:
 
     NUM_LINES = 300
 
-    def __init__(self, client: discord.client.Client, wakewords: typing.List[str]):
-        self._client = client
-        self._buffer = discord_utils.RingBuffer[TranscriptLine](self.NUM_LINES)
+    def __init__(
+        self,
+        bot_user_id: int,
+        wakewords: typing.List[str],
+    ):
+        self._bot_user_id = bot_user_id
         self._wakewords: typing.Set[str] = set(word.lower() for word in wakewords)
-        self.wakeword_event = asyncio.Event()
+
+        self.message_buffer = discord_utils.RingBuffer[types.VoiceMessage](
+            self.NUM_LINES
+        )
         self.silence_event = asyncio.Event()
+        self.wakeword_event = asyncio.Event()
 
-    def get_lines(self) -> typing.List[TranscriptLine]:
-        """
-        Returns the current transcript lines.
-        """
-        return self._buffer.get()
-
-    def add_bot_response(self, message: str):
+    def on_bot_response(self, text: str):
         """
         Adds a bot response to the transcript.
         """
-        line = TranscriptLine(
-            is_bot=True,
-            original_message=None,
-            timestamp=datetime.datetime.now(),
-            text=message,
-            user=self._client.user,
-        )
-        self._buffer.append(line)
+        self.message_buffer.append(BotVoiceMessage(self._bot_user_id, text))
 
     def on_transcription(
         self,
-        message: discrivener.Transcription,
-        receive_time: datetime.datetime = datetime.datetime.now(),
+        message: discrivener_message.UserVoiceMessage,
     ) -> None:
-        user = self._client.get_user(message.user_id)
-        if user is None:
-            fancy_logger.get().warning("transcript: unknown user %s", message.user_id)
-            return
+        self.message_buffer.append(message)
 
-        # todo: make use of decide_to_respond instead
+        fancy_logger.get().debug("transcript: received message: %s", message.text)
+
+        # todo: what about wakewords which span segments?
         wakeword_found = False
-        for segment in message.segments:
-            line = TranscriptLine(
-                is_bot=user.bot,
-                timestamp=message.timestamp
-                + datetime.timedelta(milliseconds=segment.start_offset_ms),
-                original_message=message,
-                text=str(segment),
-                user=user,
-            )
-            self._buffer.append(line)
-            fancy_logger.get().debug("transcript: %s", str(line))
-
-            if not wakeword_found:
-                for word in re.split(r"[ .,!?\"']", line.text):
-                    if word.lower() in self._wakewords:
-                        wakeword_found = True
-                        break
-
-        # print message lag
-        if message.timestamp:
-            message_end_time = message.timestamp + message.audio_duration
-            lag = receive_time - message_end_time
-            fancy_logger.get().debug(
-                "transcript: message lag: %s seconds", lag.total_seconds()
-            )
+        for word in re.split(r"[ .,!?\"']", message.text):
+            if word.lower() in self._wakewords:
+                wakeword_found = True
+                break
 
         if wakeword_found:
             fancy_logger.get().info("transcript: wakeword detected!")
             self.wakeword_event.set()
 
-    def on_channel_silent(self, activity: discrivener.ChannelSilentData) -> None:
+    def on_channel_silent(
+        self, activity: discrivener_message.ChannelSilentData
+    ) -> None:
         if activity.silent:
             self.silence_event.set()
         else:
             self.silence_event.clear()
+
+
+class BotVoiceMessage(types.VoiceMessage):
+    """
+    Represents a fake "transcribed" message generated by
+    the bot.  This isn't a real transcription, because we got
+    it from the bot, not from Discrivener.  But we're creating
+    a similar object to store it in, so that we can use similar
+    code to store and display it.
+    """
+
+    def __init__(
+        self,
+        bot_user_id: int,
+        text: str,
+    ):
+        self._text = text
+        super().__init__(
+            user_id=bot_user_id,
+            start_time=datetime.datetime.now(),
+            duration=datetime.timedelta(seconds=1),
+        )
+
+    @property
+    def text(self) -> str:
+        return self._text
+
+    @property
+    def is_bot(self) -> bool:
+        """
+        Returns whether the user is a bot.
+        """
+        return True

@@ -392,3 +392,27 @@ class RingBuffer(typing.Generic[T]):
 
 
 # end of O'Reilly code
+
+
+def author_from_user_id(
+    user_id: int,
+    guild: discord.Guild,
+) -> typing.Optional["types.FancyAuthor"]:
+    member = guild.get_member(user_id)
+    if member is None:
+        return None
+    if member.avatar:
+        avatar_url = member.avatar.url
+    else:
+        avatar_url = None
+    if member.accent_color:
+        accent_color = member.accent_color.to_rgb()
+    else:
+        accent_color = (0, 0, 0)
+    return types.FancyAuthor(
+        user_id=user_id,
+        author_is_bot=member.bot,
+        author_name=member.display_name,
+        author_accent_color=accent_color,
+        author_avatar_url=avatar_url,
+    )

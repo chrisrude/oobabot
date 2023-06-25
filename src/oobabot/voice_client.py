@@ -17,6 +17,7 @@ from discord.types import voice  # this is so pylint doesn't complain
 
 from oobabot import audio_responder
 from oobabot import discrivener
+from oobabot import discrivener_message
 from oobabot import fancy_logger
 from oobabot import ooba_client
 from oobabot import prompt_generator
@@ -82,7 +83,7 @@ class VoiceClient(discord.VoiceProtocol):
         self._state: discord.state.ConnectionState = client._connection
         self._session_id = discord.utils.MISSING
         self._server_id = discord.utils.MISSING
-        self._transcript = transcript.Transcript(client, self.wakewords)
+        self._transcript = transcript.Transcript(client.user.id, self.wakewords)
         self._guild_channel = channel
         self._user = client.user
 
@@ -303,16 +304,18 @@ class VoiceClient(discord.VoiceProtocol):
             return False
         return self._discrivener_connected
 
-    def _handle_discrivener_output(self, message: discrivener.DiscrivenerMessage):
+    def _handle_discrivener_output(
+        self, message: discrivener_message.DiscrivenerMessage
+    ):
         if message.type in (
-            discrivener.DiscrivenerMessageType.CONNECT,
-            discrivener.DiscrivenerMessageType.RECONNECT,
+            discrivener_message.DiscrivenerMessageType.CONNECT,
+            discrivener_message.DiscrivenerMessageType.RECONNECT,
         ):
             fancy_logger.get().debug("discrivener message: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = True
 
-        elif discrivener.DiscrivenerMessageType.DISCONNECT == message.type:
+        elif discrivener_message.DiscrivenerMessageType.DISCONNECT == message.type:
             fancy_logger.get().debug("discrivener message: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = False
@@ -333,22 +336,22 @@ class VoiceClient(discord.VoiceProtocol):
             # todo: how to wait for a result here?
             loop.call_soon_threadsafe(self.disconnect)
 
-        elif discrivener.DiscrivenerMessageType.USER_JOIN == message.type:
+        elif discrivener_message.DiscrivenerMessageType.USER_JOIN == message.type:
             fancy_logger.get().debug("discrivener message: %s", message)
 
-        elif discrivener.DiscrivenerMessageType.USER_LEAVE == message.type:
+        elif discrivener_message.DiscrivenerMessageType.USER_LEAVE == message.type:
             fancy_logger.get().debug("discrivener message: %s", message)
 
-        elif discrivener.DiscrivenerMessageType.TRANSCRIPTION == message.type:
-            if isinstance(message, discrivener.Transcription):
+        elif discrivener_message.DiscrivenerMessageType.TRANSCRIPTION == message.type:
+            if isinstance(message, discrivener_message.UserVoiceMessage):
                 self._transcript.on_transcription(message)
             else:
                 fancy_logger.get().warning(
                     "Unexpected message value %s", type(message).__name__
                 )
 
-        elif discrivener.DiscrivenerMessageType.CHANNEL_SILENT == message.type:
-            if isinstance(message, discrivener.ChannelSilentData):
+        elif discrivener_message.DiscrivenerMessageType.CHANNEL_SILENT == message.type:
+            if isinstance(message, discrivener_message.ChannelSilentData):
                 self._transcript.on_channel_silent(message)
             else:
                 fancy_logger.get().warning(

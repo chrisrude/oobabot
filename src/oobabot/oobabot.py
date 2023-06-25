@@ -16,7 +16,7 @@ from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import runtime
 from oobabot import settings
-from oobabot import transcript
+from oobabot import types
 from oobabot import voice_client
 
 
@@ -34,7 +34,11 @@ class Oobabot:
         is_voice_enabled: Returns True if the bot is configured to
             participate in voice channels.
         current_voice_transcript (property): Returns the current
-            voice transcript, or None if voice is not enabled.
+            voice transcript, or an empty list if the bot is not
+            in a voice channel.
+        fancy_author_info: Given a Discord user_id, returns a struct
+            describing a user's display name, accent color, and icon.
+            Bot must be running for this to work.
 
     Class Methods:
         test_discord_token: Test a discord token to see if it's valid.
@@ -153,15 +157,32 @@ class Oobabot:
     @property
     def current_voice_transcript(
         self,
-    ) -> typing.Optional["transcript.Transcript"]:
+    ) -> typing.List["types.VoiceMessage"]:
         """
         If the bot is currently in a voice channel, returns the transcript
-        of what's being said.  Otherwise, returns None.
+        of what's being said.  Otherwise, returns an empty list.
         """
         client = voice_client.VoiceClient.current_instance
         if client is None:
-            return None
-        return client.current_transcript()
+            return []
+        return client.current_transcript().message_buffer.get()
+
+    def fancy_author_info(self, user_id: int) -> typing.Optional["types.FancyAuthor"]:
+        """
+        Returns a FancyAuthor object for the given user_id.
+
+        This will only work if the bot is running and connected
+        to a voice channel, and then only for users who are
+        in that discord server.
+
+        We do this instead of a more general lookup because
+        this is what lets us get more information, including
+        the server-specific nickname, color, and icon.
+        """
+        client = voice_client.VoiceClient.current_instance
+        if client is None:
+            return []
+        return discord_utils.author_from_user_id(user_id, client.guild)
 
 
 def run_cli():
