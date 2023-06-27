@@ -4,6 +4,7 @@ Stores a transcript of a voice channel.
 """
 import asyncio
 import datetime
+import random
 import re
 import typing
 
@@ -33,6 +34,7 @@ class Transcript:
         )
         self.silence_event = asyncio.Event()
         self.wakeword_event = asyncio.Event()
+        self.last_mention = datetime.datetime.min
 
     def on_bot_response(self, text: str):
         """
@@ -55,16 +57,37 @@ class Transcript:
                 wakeword_found = True
                 break
 
+        now = datetime.datetime.now()
         if wakeword_found:
             fancy_logger.get().info("transcript: wakeword detected!")
+            self.last_mention = now
             self.wakeword_event.set()
+        else:
+            # chance of replying within 5 minutes of last reply
+            seconds_since_mention = (now - self.last_mention).seconds
+            if seconds_since_mention > 5 * 60:
+                chance = 0.05
+            else:
+                chance = 0.95 ** (1 - (seconds_since_mention / 60))
+            # also, divide chance by number of human speakers
+            # in the message history
+            humans = set()
+            for msg in self.message_buffer.get():
+                if not msg.is_bot:
+                    humans.add(msg.user_id)
+            chance /= 3 * len(humans)
+            fancy_logger.get().debug(
+                "transcript: chance of replying: %f (+seconds: %d, humans: %d)",
+                chance,
+                seconds_since_mention,
+                len(humans),
+            )
+            if chance > 0.0 and chance > random.random():
+                self.wakeword_event.set()
 
     def on_channel_silent(
         self, activity: discrivener_message.ChannelSilentData
     ) -> None:
-        fancy_logger.get().debug(
-            "transcript: channel silent: %s", "yes" if activity.silent else "no"
-        )
         if activity.silent:
             self.silence_event.set()
         else:
