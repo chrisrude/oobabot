@@ -62,6 +62,9 @@ class Transcript:
     def on_channel_silent(
         self, activity: discrivener_message.ChannelSilentData
     ) -> None:
+        fancy_logger.get().debug(
+            "transcript: channel silent: %s", "yes" if activity.silent else "no"
+        )
         if activity.silent:
             self.silence_event.set()
         else:

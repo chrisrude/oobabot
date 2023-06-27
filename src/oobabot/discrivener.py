@@ -94,6 +94,7 @@ class Discrivener:
         self._process = await asyncio.create_subprocess_exec(
             self._discrivener_location,
             *args,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -196,3 +197,11 @@ class Discrivener:
             fancy_logger.get().error("Discrivener: %s", line)
 
         fancy_logger.get().info("Discrivener stderr reader exited")
+
+    def speak(self, text: str):
+        if self._process is None or self._process.stdin is None:
+            fancy_logger.get().error("Discrivener: _process is not running")
+            return
+
+        fancy_logger.get().debug("Discrivener: saying '%s'", text)
+        self._process.stdin.write(text.encode("utf-8") + b"\n")

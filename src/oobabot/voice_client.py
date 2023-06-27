@@ -89,8 +89,9 @@ class VoiceClient(discord.VoiceProtocol):
 
         self._audio_responder = audio_responder.AudioResponder(
             channel,
-            self.prompt_generator,
+            self._discrivener,
             self.ooba_client,
+            self.prompt_generator,
             self._transcript,
         )
 

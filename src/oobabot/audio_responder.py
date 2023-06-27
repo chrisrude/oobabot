@@ -10,6 +10,8 @@ import typing
 
 import discord
 
+from oobabot import discord_utils
+from oobabot import discrivener
 from oobabot import fancy_logger
 from oobabot import ooba_client
 from oobabot import prompt_generator
@@ -29,14 +31,16 @@ class AudioResponder:
     def __init__(
         self,
         channel: discord.VoiceChannel,
-        prompt_generator: prompt_generator.PromptGenerator,
+        discrivener: discrivener.Discrivener,
         ooba_client: ooba_client.OobaClient,
+        prompt_generator: prompt_generator.PromptGenerator,
         transcript: transcript.Transcript,
     ):
         self._abort = False
         self._channel = channel
-        self._prompt_generator = prompt_generator
+        self._discrivener = discrivener
         self._ooba_client = ooba_client
+        self._prompt_generator = prompt_generator
         self._transcript = transcript
         self._task: typing.Optional[asyncio.Task] = None
 
@@ -67,49 +71,64 @@ class AudioResponder:
             fancy_logger.get().info("audio_responder: wakeword detected")
             self._transcript.wakeword_event.clear()
             await self._respond()
+
         fancy_logger.get().info("audio_responder: exiting")
 
     async def _respond(self):
         fancy_logger.get().info("audio_responder: responding")
+        fancy_logger.get().debug("getting transcript history")
         transcript_history = self._transcript_history_iterator()
+        fancy_logger.get().debug("generating prompt")
         prompt_prefix = await self._prompt_generator.generate(
             message_history=transcript_history,
             image_requested=False,
         )
 
+        fancy_logger.get().debug("asking for response")
+
         response = await self._ooba_client.request_as_string(prompt_prefix)
+        fancy_logger.get().debug("received response: '%s'", response)
 
         # wait for silence before responding
         await self._transcript.silence_event.wait()
 
         # shove response into history
-        self._transcript.add_bot_response(response)
+        self._transcript.on_bot_response(response)
         fancy_logger.get().info("audio_responder: response: %s", response)
 
+        self._discrivener.speak(response)
         await self._channel.send(response)
 
     def _transcript_history_iterator(
         self,
     ) -> typing.AsyncIterator[types.GenericMessage]:
-        lines = self._transcript.get_lines()
-        lines.sort(key=lambda line: line.timestamp, reverse=True)
+        voice_messages = self._transcript.message_buffer.get()
+        voice_messages.sort(key=lambda message: message.start_time, reverse=True)
 
         # create an async generator which iterates over the lines
         # in the transcript
         async def _gen():
-            for line in lines:
-                author_id = line.user.id if line.user else 0
-                author_name = line.user.name if line.user else "-unknown-"
+            for message in voice_messages:
+                author = discord_utils.author_from_user_id(
+                    message.user_id,
+                    self._channel.guild,
+                )
+                if author is None:
+                    author_name = f"user #{message.author_id}"
+                    author_is_bot = message.is_bot
+                else:
+                    author_name = author.author_name
+                    author_is_bot = author.author_is_bot
                 yield types.GenericMessage(
-                    author_id=author_id,
+                    author_id=message.user_id,
                     author_name=author_name,
                     channel_id=0,
                     channel_name="",
                     message_id=0,
                     reference_message_id=0,
-                    body_text=line.text,
-                    author_is_bot=False,
-                    send_timestamp=line.timestamp.timestamp(),
+                    body_text=message.text,
+                    author_is_bot=author_is_bot,
+                    send_timestamp=message.start_time,
                 )
 
         return _gen()
