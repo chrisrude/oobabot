@@ -252,7 +252,6 @@ class OobaClient(http_client.SerializedHttpClient):
                 # {"event": "text_stream", "message_num": 3, "text": " okay"}
                 # {"event": "text_stream", "message_num": 4, "text": "."}
                 # {"event": "stream_end", "message_num": 5}
-                # get_logger().debug(f"Received message: {msg}")
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     # bdata = typing.cast(bytes, msg.data)
                     # get_logger().debug(f"Received data: {bdata}")

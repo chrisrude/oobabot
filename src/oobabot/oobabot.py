@@ -242,6 +242,8 @@ def run_cli():
         print(url)
         return
 
+    sys.excepthook = fancy_logger.excepthook
+
     oobabot.start()
 
 

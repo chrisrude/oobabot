@@ -5,6 +5,7 @@ Logging with colors
 
 import html
 import logging
+import sys
 import textwrap
 import typing
 
@@ -288,3 +289,32 @@ class RingBufferedHandler(logging.Handler):
 
 
 recent_logs = RingBufferedHandler()
+
+
+# def log_async_task(fn_inner):
+#     """
+#     Decorator for async tasks that logs unhandled exceptions.
+#     This is useful for tasks that won't be awaited until the
+#     program exits.  With this, the error will be logged as it
+#     happens, rather than when the task is awaited.
+#     """
+
+#     @functools.wraps(fn_inner)
+#     async def wrapper(*args, **kwargs):
+#         try:
+#             return await fn_inner(*args, **kwargs)
+#         except (KeyboardInterrupt, SystemExit):
+#             get().info("Exiting async task due to interrupt")
+#             raise
+#         except Exception as err:
+#             get().error("Unhandled exception from async task", exc_info=err)
+#             raise
+
+#     return wrapper
+
+
+def excepthook(*exc_info):
+    exc_type = exc_info[0]
+    if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
+        sys.__excepthook__(*exc_info)
+    get().error("Unhandled exception", exc_info=exc_info)

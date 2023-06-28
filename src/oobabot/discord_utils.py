@@ -9,6 +9,7 @@ Discord library.
 
 
 import base64
+import functools
 import pathlib
 import re
 import typing
@@ -167,7 +168,7 @@ async def test_discord_token(discord_token: str) -> bool:
         # should get fired in this case, but it doesn't
         if err.code != 4014:
             raise
-        fancy_logger.get().error(
+        fancy_logger.get().warning(
             "The bot token you provided does not have the required "
             + "gateway intents.  Did you remember to enable both "
             + "'SERVER MEMBERS INTENT' and 'MESSAGE CONTENT INTENT' "
@@ -394,6 +395,7 @@ class RingBuffer(typing.Generic[T]):
 # end of O'Reilly code
 
 
+@functools.lru_cache
 def author_from_user_id(
     user_id: int,
     guild: discord.Guild,

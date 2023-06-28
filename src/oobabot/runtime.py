@@ -160,12 +160,12 @@ class Runtime:
                 client.test_connection()
                 fancy_logger.get().info("Connected to %s!", client.service_name)
             except (ValueError, http_client.OobaHttpClientError) as err:
-                fancy_logger.get().error(
+                fancy_logger.get().warning(
                     "Could not connect to %s server: [%s]",
                     client.service_name,
                     client.base_url,
                 )
-                fancy_logger.get().error("Please check the URL and try again.")
+                fancy_logger.get().warning("Please check the URL and try again.")
                 if err.__cause__ is not None:
                     fancy_logger.get().error("Reason: %s", err.__cause__)
                 return False
@@ -193,8 +193,8 @@ class Runtime:
                 fancy_logger.get().info("Discord bot exited.")
 
             except discord.errors.PrivilegedIntentsRequired as err:
-                fancy_logger.get().error("Could not log in to Discord: %s", err)
-                fancy_logger.get().error(
+                fancy_logger.get().warning("Could not log in to Discord: %s", err)
+                fancy_logger.get().warning(
                     "The bot token you provided does not have the required "
                     + "gateway intents.  Did you remember to enable both "
                     + "'SERVER MEMBERS INTENT' and 'MESSAGE CONTENT INTENT' "
@@ -205,8 +205,8 @@ class Runtime:
                 ) from err
 
             except discord.LoginFailure as err:
-                fancy_logger.get().error("Could not log in to Discord: %s", err)
-                fancy_logger.get().error("Please check the token and try again.")
+                fancy_logger.get().warning("Could not log in to Discord: %s", err)
+                fancy_logger.get().warning("Please check the token and try again.")
                 raise OobabotRuntimeError(
                     "Could not log in to Discord: invalid token"
                 ) from err

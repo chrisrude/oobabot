@@ -63,28 +63,22 @@ class AudioResponder:
         self._task = None
         self._abort = False
 
+    # @fancy_logger.log_async_task
     async def _transcript_reply_task(self):
         fancy_logger.get().info("audio_responder: started")
         while not self._abort:
-            fancy_logger.get().info("audio_responder: waiting for wakeword")
             await self._transcript.wakeword_event.wait()
-            fancy_logger.get().info("audio_responder: wakeword detected")
             self._transcript.wakeword_event.clear()
             await self._respond()
 
         fancy_logger.get().info("audio_responder: exiting")
 
     async def _respond(self):
-        fancy_logger.get().info("audio_responder: responding")
-        fancy_logger.get().debug("getting transcript history")
         transcript_history = self._transcript_history_iterator()
-        fancy_logger.get().debug("generating prompt")
         prompt_prefix = await self._prompt_generator.generate(
             message_history=transcript_history,
             image_requested=False,
         )
-
-        fancy_logger.get().debug("asking for response")
 
         response = await self._ooba_client.request_as_string(prompt_prefix)
         fancy_logger.get().debug("received response: '%s'", response)
@@ -94,10 +88,10 @@ class AudioResponder:
 
         # shove response into history
         self._transcript.on_bot_response(response)
-        fancy_logger.get().info("audio_responder: response: %s", response)
 
         self._discrivener.speak(response)
-        await self._channel.send(response)
+        # todo: make this a setting?
+        # await self._channel.send(response)
 
     def _transcript_history_iterator(
         self,

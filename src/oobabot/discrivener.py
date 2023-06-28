@@ -142,6 +142,7 @@ class Discrivener:
             await asyncio.wait_for(self._stdout_reading_task, timeout=self.KILL_TIMEOUT)
             self._stdout_reading_task = None
 
+    # @fancy_logger.log_async_task
     async def _read_stdout(self):
         while True:
             try:
@@ -173,6 +174,7 @@ class Discrivener:
 
         fancy_logger.get().info("Discrivener stdout reader exited")
 
+    # @fancy_logger.log_async_task
     async def _read_stderr(self):
         print("reading stderr")
         # loop until EOF, printing everything to stderr
@@ -203,5 +205,4 @@ class Discrivener:
             fancy_logger.get().error("Discrivener: _process is not running")
             return
 
-        fancy_logger.get().debug("Discrivener: saying '%s'", text)
         self._process.stdin.write(text.encode("utf-8") + b"\n")

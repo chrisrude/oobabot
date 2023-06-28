@@ -48,8 +48,6 @@ class Transcript:
     ) -> None:
         self.message_buffer.append(message)
 
-        fancy_logger.get().debug("transcript: received message: %s", message.text)
-
         # todo: what about wakewords which span segments?
         wakeword_found = False
         for word in re.split(r"[ .,!?\"']", message.text):
@@ -59,7 +57,7 @@ class Transcript:
 
         now = datetime.datetime.now()
         if wakeword_found:
-            fancy_logger.get().info("transcript: wakeword detected!")
+            fancy_logger.get().info("transcript: wakeword detected! %s", message.text)
             self.last_mention = now
             self.wakeword_event.set()
         else:
@@ -75,7 +73,10 @@ class Transcript:
             for msg in self.message_buffer.get():
                 if not msg.is_bot:
                     humans.add(msg.user_id)
-            chance /= 3 * len(humans)
+            if 1 == len(humans):
+                chance = 1.0
+            else:
+                chance /= 3 * len(humans)
             fancy_logger.get().debug(
                 "transcript: chance of replying: %f (+seconds: %d, humans: %d)",
                 chance,

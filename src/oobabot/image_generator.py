@@ -268,6 +268,7 @@ class ImageGenerator:
             ", ".join(self.image_words),
         )
 
+    # @fancy_logger.log_async_task
     async def _generate_image(
         self,
         image_prompt: str,
