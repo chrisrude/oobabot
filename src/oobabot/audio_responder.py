@@ -108,7 +108,7 @@ class AudioResponder:
                     self._channel.guild,
                 )
                 if author is None:
-                    author_name = f"user #{message.author_id}"
+                    author_name = f"user #{message.user_id}"
                     author_is_bot = message.is_bot
                 else:
                     author_name = author.author_name
@@ -122,7 +122,7 @@ class AudioResponder:
                     reference_message_id=0,
                     body_text=message.text,
                     author_is_bot=author_is_bot,
-                    send_timestamp=message.start_time,
+                    send_timestamp=message.start_time.timestamp(),
                 )
 
         return _gen()

@@ -63,7 +63,7 @@ class Transcript:
         else:
             # chance of replying within 5 minutes of last reply
             seconds_since_mention = (now - self.last_mention).seconds
-            if seconds_since_mention > 5 * 60:
+            if seconds_since_mention > 2 * 60:
                 chance = 0.05
             else:
                 chance = 0.95 ** (1 - (seconds_since_mention / 60))
