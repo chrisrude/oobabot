@@ -7,12 +7,14 @@ them to the handler.
 
 import asyncio
 import json
+import pathlib
 import signal
 import typing
 
 from oobabot import discrivener_message
 from oobabot import fancy_logger
 from oobabot import settings
+from oobabot import types
 
 
 class Discrivener:
@@ -29,14 +31,14 @@ class Discrivener:
         self,
         discrivener_location: str,
         discrivener_model_location: str,
-        handler: typing.Callable[["discrivener_message.DiscrivenerMessage"], None],
+        handler: typing.Callable[["types.DiscrivenerMessage"], None],
         log_file: typing.Optional[str] = None,
     ):
-        self._discrivener_location = discrivener_location
-        self._discrivener_model_location = discrivener_model_location
-        self._handler: typing.Callable[
-            ["discrivener_message.DiscrivenerMessage"], None
-        ] = handler
+        self._discrivener_location = pathlib.Path(discrivener_location).expanduser()
+        self._discrivener_model_location = pathlib.Path(
+            discrivener_model_location
+        ).expanduser()
+        self._handler: typing.Callable[["types.DiscrivenerMessage"], None] = handler
         self._process: typing.Optional["asyncio.subprocess.Process"] = None
         self._stderr_reading_task: typing.Optional[asyncio.Task] = None
         self._stdout_reading_task: typing.Optional[asyncio.Task] = None
@@ -72,7 +74,7 @@ class Discrivener:
             str(user_id),
             "--voice-token",
             voice_token,
-            self._discrivener_model_location,
+            str(self._discrivener_model_location),
         )
         await self._launch_process(args)
 

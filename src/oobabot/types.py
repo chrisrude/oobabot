@@ -5,6 +5,7 @@ Discord-specific types from the rest of the code.
 """
 import abc
 import datetime
+import enum
 import typing
 
 
@@ -122,8 +123,34 @@ class FancyAuthor:
         return self._author_avatar_url
 
 
+class DiscrivenerMessageType(str, enum.Enum):
+    """
+    Enumerates the different types of Discrivener messages.
+    """
+
+    CHANNEL_SILENT = "ChannelSilent"
+    CONNECT = "Connect"
+    DISCONNECT = "Disconnect"
+    RECONNECT = "Reconnect"
+    TRANSCRIPTION = "Transcription"
+    USER_JOIN = "UserJoin"
+    USER_LEAVE = "UserLeave"
+
+
+class DiscrivenerMessage(abc.ABC):
+    """
+    Base class for all Discrivener messages.
+    """
+
+    @abc.abstractmethod
+    def __init__(self, message: dict):
+        ...
+
+    type: DiscrivenerMessageType
+
+
 # not an actual GenericMessage, but still a message
-class VoiceMessage(abc.ABC):
+class VoiceMessage(DiscrivenerMessage):
     """
     Represents a message that we have transcribed
     from a voice channel, attributed to a user.

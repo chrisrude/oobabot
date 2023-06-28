@@ -165,7 +165,10 @@ class Oobabot:
         client = voice_client.VoiceClient.current_instance
         if client is None:
             return []
-        return client.current_transcript().message_buffer.get()
+        transcript = client.current_transcript()
+        if transcript is None:
+            return []
+        return transcript.message_buffer.get()
 
     def fancy_author_info(self, user_id: int) -> typing.Optional["types.FancyAuthor"]:
         """
@@ -181,7 +184,7 @@ class Oobabot:
         """
         client = voice_client.VoiceClient.current_instance
         if client is None:
-            return []
+            return None
         return discord_utils.author_from_user_id(user_id, client.guild)
 
 

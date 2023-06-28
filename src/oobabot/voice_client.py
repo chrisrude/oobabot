@@ -19,9 +19,10 @@ from oobabot import audio_responder
 from oobabot import discrivener
 from oobabot import discrivener_message
 from oobabot import fancy_logger
-from oobabot import ooba_client
-from oobabot import prompt_generator
+from oobabot import ooba_client  # pylint: disable=unused-import
+from oobabot import prompt_generator  # pylint: disable=unused-import
 from oobabot import transcript
+from oobabot import types
 
 
 class VoiceClientError(Exception):
@@ -305,18 +306,16 @@ class VoiceClient(discord.VoiceProtocol):
             return False
         return self._discrivener_connected
 
-    def _handle_discrivener_output(
-        self, message: discrivener_message.DiscrivenerMessage
-    ):
+    def _handle_discrivener_output(self, message: "types.DiscrivenerMessage"):
         if message.type in (
-            discrivener_message.DiscrivenerMessageType.CONNECT,
-            discrivener_message.DiscrivenerMessageType.RECONNECT,
+            types.DiscrivenerMessageType.CONNECT,
+            types.DiscrivenerMessageType.RECONNECT,
         ):
             fancy_logger.get().debug("discrivener message: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = True
 
-        elif discrivener_message.DiscrivenerMessageType.DISCONNECT == message.type:
+        elif types.DiscrivenerMessageType.DISCONNECT == message.type:
             fancy_logger.get().debug("discrivener message: %s", message)
             self._voice_state_complete.set()
             self._discrivener_connected = False
@@ -337,13 +336,13 @@ class VoiceClient(discord.VoiceProtocol):
             # todo: how to wait for a result here?
             loop.call_soon_threadsafe(self.disconnect)
 
-        elif discrivener_message.DiscrivenerMessageType.USER_JOIN == message.type:
+        elif types.DiscrivenerMessageType.USER_JOIN == message.type:
             fancy_logger.get().debug("discrivener message: %s", message)
 
-        elif discrivener_message.DiscrivenerMessageType.USER_LEAVE == message.type:
+        elif types.DiscrivenerMessageType.USER_LEAVE == message.type:
             fancy_logger.get().debug("discrivener message: %s", message)
 
-        elif discrivener_message.DiscrivenerMessageType.TRANSCRIPTION == message.type:
+        elif types.DiscrivenerMessageType.TRANSCRIPTION == message.type:
             if isinstance(message, discrivener_message.UserVoiceMessage):
                 self._transcript.on_transcription(message)
             else:
@@ -351,7 +350,7 @@ class VoiceClient(discord.VoiceProtocol):
                     "Unexpected message value %s", type(message).__name__
                 )
 
-        elif discrivener_message.DiscrivenerMessageType.CHANNEL_SILENT == message.type:
+        elif types.DiscrivenerMessageType.CHANNEL_SILENT == message.type:
             if isinstance(message, discrivener_message.ChannelSilentData):
                 self._transcript.on_channel_silent(message)
             else:

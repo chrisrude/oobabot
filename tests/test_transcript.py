@@ -10,11 +10,12 @@ import pytest
 
 from oobabot import discrivener_message
 from oobabot import transcript
+from oobabot import types
 
 TEST_FILE = "tests/test_data/discrivener-json.data"
 
 
-def load_messages() -> typing.List["discrivener_message.DiscrivenerMessage"]:
+def load_messages() -> typing.List["types.DiscrivenerMessage"]:
     messages = []
     with open(TEST_FILE, "r", encoding="utf-8") as file:
         for line in file.readlines():
@@ -25,7 +26,7 @@ def load_messages() -> typing.List["discrivener_message.DiscrivenerMessage"]:
                 )
                 messages.append(message)
             except json.JSONDecodeError:
-                pytest.fail("could not parse %s", line)
+                pytest.fail(f"could not parse {line}")
     assert len(messages) == 71
     return messages
 

@@ -272,7 +272,7 @@ def is_discrivener_installed(
     if not discrivener_location:
         return False
 
-    discrivener_location_path = pathlib.Path(discrivener_location)
+    discrivener_location_path = pathlib.Path(discrivener_location).expanduser()
     if not discrivener_location_path.is_file():
         fancy_logger.get().warning(
             "Discrivener not found at %s.  Audio integration not enabled.",
@@ -282,7 +282,9 @@ def is_discrivener_installed(
 
     fancy_logger.get().info("Discrivener found at %s", discrivener_location_path)
 
-    discrivener_model_location_path = pathlib.Path(discrivener_model_location)
+    discrivener_model_location_path = pathlib.Path(
+        discrivener_model_location
+    ).expanduser()
     if not discrivener_model_location_path.is_file():
         fancy_logger.get().warning(
             "Discrivener model not found at %s.  Audio integration not enabled.",

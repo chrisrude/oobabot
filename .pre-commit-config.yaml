@@ -46,3 +46,11 @@ repos:
         language: system
         types: [python]
         require_serial: true
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright
+        entry: poetry run pyright # used to just be `pyright`
+        language: node
+        pass_filenames: true
+        types: [python]

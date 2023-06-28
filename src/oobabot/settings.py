@@ -43,7 +43,7 @@ class SettingsError(Exception):
     Base class for exceptions in this module.
     """
 
-    def __init__(self, message: str, cause: Exception = None):
+    def __init__(self, message: str, cause: Exception):
         self.message = message
         super().__init__(message, cause)
 
@@ -489,7 +489,7 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
-            oesp.ConfigSetting[int](
+            oesp.ConfigSetting[str](
                 name="discrivener_location",
                 default="",
                 description_lines=[
@@ -504,7 +504,7 @@ class Settings:
         )
 
         self.discord_settings.add_setting(
-            oesp.ConfigSetting[int](
+            oesp.ConfigSetting[str](
                 name="discrivener_model_location",
                 default="",
                 description_lines=[
