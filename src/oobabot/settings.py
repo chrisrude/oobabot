@@ -772,6 +772,7 @@ class Settings:
         self,
         cli_args: typing.List[str],
         config_file: typing.Optional[str] = None,
+        running_from_cli: bool = False,
     ) -> None:
         """
         Load the config from the command line arguments and config file.
@@ -792,13 +793,14 @@ class Settings:
         is_default = False
         if config_file is None:
             config_file, is_default = self._filename_from_args(cli_args)
+        raise_if_file_missing = not is_default and running_from_cli
 
         try:
             self.arg_parser = oesp.load(
                 cli_args=cli_args,
                 setting_groups=self.setting_groups,
                 config_file=config_file,
-                raise_if_file_missing=not is_default,
+                raise_if_file_missing=raise_if_file_missing,
             )
         except oesp.ConfigFileMissingError as err:
             # get full path to config_file

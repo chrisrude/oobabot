@@ -50,7 +50,7 @@ class Oobabot:
     def __init__(
         self,
         cli_args: typing.List[str],
-        log_to_console: bool = False,
+        running_from_cli: bool = False,
     ):
         """
         Initialize the bot, and load settings from the command line,
@@ -66,14 +66,14 @@ class Oobabot:
         self.settings = settings.Settings()
 
         try:
-            self.settings.load(cli_args)
+            self.settings.load(cli_args, running_from_cli=running_from_cli)
         except settings.SettingsError as err:
             print("\n".join([str(arg) for arg in list(err.args)]), file=sys.stderr)
             raise
 
         fancy_logger.init_logging(
             level=self.settings.discord_settings.get_str("log_level"),
-            log_to_console=log_to_console,
+            running_from_cli=running_from_cli,
         )
 
     def start(self):
@@ -203,7 +203,7 @@ def run_cli():
 
     # create the object and load our settings
     try:
-        oobabot = Oobabot(sys.argv[1:], log_to_console=True)
+        oobabot = Oobabot(sys.argv[1:], running_from_cli=True)
     except settings.SettingsError:
         sys.exit(1)
 

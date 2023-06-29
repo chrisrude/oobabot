@@ -143,12 +143,12 @@ def do_escape(msg: typing.Optional[typing.Any]) -> typing.Optional[typing.Any]:
 
 def init_logging(
     level: typing.Union[int, str],
-    log_to_console: bool = True,
+    running_from_cli: bool = True,
 ) -> None:
     logger = get()
     logger.setLevel(level)
 
-    if log_to_console:
+    if running_from_cli:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(level)
         console_handler.setFormatter(
