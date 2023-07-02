@@ -75,7 +75,7 @@ class TemplateStore:
             ],
             "Displayed in Discord after a successful /lobotomize command.  "
             + "Both the discord users and the bot AI will see this message.",
-            False,
+            True,
         ),
         Templates.PROMPT: (
             [
