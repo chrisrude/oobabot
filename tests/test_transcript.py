@@ -3,6 +3,7 @@
 would include tests for Oobabot if we had any good ones
 """
 
+import asyncio
 import json
 import typing
 
@@ -33,6 +34,15 @@ def load_messages() -> typing.List["types.DiscrivenerMessage"]:
 
 def test_can_make_transcript():
     messages = load_messages()
+
+    # on python3.9 and earlier, we need to manually create
+    # an event loop for the transcript to run in
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        print("creating new event loop")
+        asyncio.set_event_loop(asyncio.new_event_loop())
+
     script = transcript.Transcript(1, [])
     for message in messages:
         if isinstance(message, discrivener_message.UserVoiceMessage):
