@@ -17,21 +17,6 @@ class Persona:
     Handles retrieving persona data from a variety of formats
     """
 
-    ai_name: str
-    """
-    The name of the AI.
-    """
-
-    persona: str
-    """
-    The persona of the AI.
-    """
-
-    wakewords: typing.List[str]
-    """
-    If we see one of these words in a message, we'll respond to it.
-    """
-
     # list of keys that, depending on the json/yaml schema, might
     # contain the AI's name.  Take the first one found, in order.
     NAME_KEYS = ["char_name", "name"]
@@ -41,9 +26,9 @@ class Persona:
     PERSONA_KEYS = ["char_persona", "description", "context", "personality"]
 
     def __init__(self, persona_settings: dict) -> None:
-        self.ai_name = persona_settings["ai_name"]
-        self.persona = persona_settings["persona"]
-        self.wakewords = persona_settings["wakewords"].copy()
+        self.ai_name: str = persona_settings["ai_name"]
+        self.persona: str = persona_settings["persona"]
+        self.wakewords: typing.List[str] = persona_settings["wakewords"].copy()
 
         # if a json file is specified, load it and have
         # that overwrite everything else
