@@ -185,6 +185,14 @@ class ConfigSetting(typing.Generic[T]):
         self.set_value(value)  # type: ignore
 
     def set_value(self, value: T) -> None:
+        if isinstance(self.default, bool) and isinstance(value, str):
+            if value.lower() in ["true", "yes", "1"]:
+                value = True  # type: ignore
+            elif value.lower() in ["false", "no", "0"]:
+                value = False  # type: ignore
+            else:
+                value = bool(value)  # type: ignore
+
         self.value = value
         self.fn_on_set(value)
 
