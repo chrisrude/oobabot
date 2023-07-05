@@ -179,8 +179,50 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
         """
         request = self.request_params.copy()
         request["prompt"] = prompt
+        
+        # Parsing additional Stable Diffusion parameters.  These must be the same as the documentation for SD
+        SD_DELIMITER = "="
+        SD_SEED = "seed" # change the seed with "seed=8999", for example, seed value 8999
+        SD_HEIGHT = "height" # change the height with "height=720", for example, indicates 720 pixels
+        SD_WIDTH = "width" # change the width with "width=1080", for example, indicates 1080 pixels
+        SD_STEPS = "steps" # change the height with "steps=40", for example, indicates 40 steps
+        SD_CFG = "cfg_scale" # change the cfg with "cfg_scale=10"
+        SD_ENABLE_HR = "enable_hr" # a boolean, specify w/ "enable_hr=true" or "enable_hr=false", case-insensitive
+        sd_params = [SD_SEED, SD_HEIGHT, SD_WIDTH, SD_STEPS, SD_CFG, SD_ENABLE_HR] 
+
+        for sd_param in sd_params: # parse out each param and put in the request instead
+            for word in prompt.split(" "):  
+                if sd_param + SD_DELIMITER in word:
+                    keyword_pair = word.split(SD_DELIMITER)
+                    if len(keyword_pair) > 1: # safety check so it doesn't crash if someone types "keyword:" with no value
+                        try: 
+                            token_value = keyword_pair[1] 
+                            # handle booleans
+                            if token_value.lower() == "false":
+                                request[sd_param] = False
+                                fancy_logger.get().debug("Stable Diffusion:  setting " + sd_param + " to boolean False")
+                            elif token_value.lower() == "true":
+                                request[sd_param] = True
+                                fancy_logger.get().debug("Stable Diffusion:  setting " + sd_param + " to boolean True")
+                            # handle integers
+                            token_value = int(token_value) 
+                            request[sd_param] = token_value
+                            fancy_logger.get().debug("Stable Diffusion:  setting " + sd_param + " to integer " + str(token_value))
+                            # remove the token pair (aka, the original 'word' from the prompt)
+                            prompt = prompt.replace(word, "")
+                            request["prompt"] = prompt
+                        except ValueError:
+                            fancy_logger.get().debug("Stable Diffusion:  detected " + sd_param + " phrase but no valid integer, doing nothing.")
+
+        # Parsing Negative Prompt parameter, which takes everything after the "np="
+        if "np=" in prompt:
+            prompt_split = prompt.split("np=")
+            request["prompt"] = prompt_split[0]
+            request["negative_prompt"] = prompt_split[1].strip()
         if is_channel_nsfw:
-            request["negative_prompt"] = self.negative_prompt_nsfw
+            request["negative_prompt"] = request["negative_prompt"] + self.negative_prompt_nsfw
+        fancy_logger.get().debug(
+                "Stable Diffusion:  setting negative prompt to '" + request["negative_prompt"] + "'")
 
         # try to extract a model name from the prompt.  If we do,
         # set it via ['override_settings']['sd_model_checkpoint']
