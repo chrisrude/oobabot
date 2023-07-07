@@ -42,7 +42,7 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 | **`oobabot`**  | how that's awesome |
 |---------------|------------------|
 | **user-supplied persona** | you supply the persona on how would like the bot to behave |
-| **multiple converations** | can track multiple conversational threads, and reply to each in a contextually appropriate way |
+| **multiple conversations** | can track multiple conversational threads, and reply to each in a contextually appropriate way |
 | **watchwords** | can monitor all channels in a server for one or more wakewords or @-mentions |
 | **private conversations** | can chat with you 1:1 in a DM |
 | **good Discord hygiene** | splits messages into independent sentences, pings the author in the first one |
@@ -73,7 +73,6 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 You should now be able to run oobabot from wherever pip installed it.
 
 ```none
-  ³ oobabot  ~/oobabot        oobabot --help         383ms  Tue May 23 18:56:42 2023
 usage: oobabot [-h] [-c CONFIG] [--generate-config] [--invite-url] [--ai-name AI_NAME]
                [--persona PERSONA] [--wakewords [WAKEWORDS ...]]
                [--discord-token DISCORD_TOKEN] [--dont-split-responses]
@@ -81,9 +80,9 @@ usage: oobabot [-h] [-c CONFIG] [--generate-config] [--invite-url] [--ai-name AI
                [--stream-responses] [--base-url BASE_URL] [--log-all-the-things]
                [--message-regex MESSAGE_REGEX] [--image-words [IMAGE_WORDS ...]]
                [--stable-diffusion-url STABLE_DIFFUSION_URL]
-               [--extra-prompt-text EXTRA_PROMPT_TEXT] [--use-ai-generated-keywords]
+               [--extra-prompt-text EXTRA_PROMPT_TEXT]
 
-oobabot v0.1.8: Discord bot for oobabooga's text-generation-webui
+oobabot v0.2.0: Discord bot for oobabooga's text-generation-webui
 
 General Settings:
 
@@ -116,7 +115,7 @@ Discord:
   --discord-token DISCORD_TOKEN
                         Token to log into Discord with. For security purposes it's strongly
                         recommended that you set this via the DISCORD_TOKEN environment
-                        variable instead, if possible. (default: )
+                        variable instead, if possible. (default: None)
   --dont-split-responses
                         Post the entire response as a single message, rather than splitting
                         it into separate messages by sentence. (default: False)
@@ -154,19 +153,10 @@ Stable Diffusion:
   --extra-prompt-text EXTRA_PROMPT_TEXT
                         This will be appended to every image generation prompt sent to
                         Stable Diffusion. (default: )
-  --use-ai-generated-keywords
-                        FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate
-                        image keywords from a user's message. It will then pass the
-                        keywords that Oobabooga produces to Stable Diffusion to finally
-                        generate an image. Otherwise, the bot will simply extract keywords
-                        directly from the user's message using a simple regex. (default:
-                        False)
 
 
 Additional settings can be set in config.yml.  Use the --generate-config option to print a
 new copy of this file to STDOUT.
-
-Please set the 'DISCORD_TOKEN' environment variable to your bot's discord token.
 ```
 
 There are **a lot more settings** in the [config.yml file (sample)](./docs/config.sample.yml) here.
@@ -190,7 +180,7 @@ There are **a lot more settings** in the [config.yml file (sample)](./docs/confi
     ```
 
     In certain environments, it may be difficult to set an environment variable.  In that case, you can also pass the token in as a command-line argument using `--discord-token`.  But doing so might leak the token to other
-    users on a shared sysem, as it will be visible to anyone who can run `ps`.
+    users on a shared system, as it will be visible to anyone who can run `ps`.
 
 - **`--base-url`**
 

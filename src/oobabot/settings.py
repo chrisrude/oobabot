@@ -463,6 +463,7 @@ class Settings:
                         """
                     )
                 ],
+                include_in_argparse=False,
             )
         )
         self.discord_settings.add_setting(
@@ -486,6 +487,7 @@ class Settings:
                         """
                     )
                 ],
+                include_in_argparse=False,
             )
         )
         self.discord_settings.add_setting(
@@ -500,6 +502,7 @@ class Settings:
                         """
                     )
                 ],
+                include_in_argparse=False,
             )
         )
 
@@ -515,6 +518,7 @@ class Settings:
                         """
                     )
                 ],
+                include_in_argparse=False,
             )
         )
         ###########################################################
@@ -688,6 +692,7 @@ class Settings:
                         """
                     )
                 ],
+                include_in_argparse=False,
             )
         )
 
