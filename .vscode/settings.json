@@ -1,0 +1,31 @@
+{
+    "cSpell.words": [
+        "aiohttp",
+        "autouse",
+        "chrisrude",
+        "endoftext",
+        "excepthook",
+        "fspath",
+        "jmoney",
+        "Karras",
+        "Keim",
+        "klass",
+        "Messageable",
+        "mirostat",
+        "nanos",
+        "oesp",
+        "ooba",
+        "oobabooga",
+        "oobabot",
+        "pnginfo",
+        "pysbd",
+        "ruamel",
+        "ryaml",
+        "sdapi",
+        "Sébastien",
+        "ssrc",
+        "wakewords",
+        "xsalsa"
+    ],
+    "python.analysis.typeCheckingMode": "basic"
+}
