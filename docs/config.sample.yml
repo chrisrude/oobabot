@@ -1,3 +1,4 @@
+
 # Welcome to Oobabot!
 #
 # This is the configuration file for Oobabot.  It is a YAML file, and
@@ -11,6 +12,7 @@ version: 0.2.0
 # persona
 # .
 persona:
+
   # Name the AI will use to refer to itself
   #   default: oobabot
   ai_name:
@@ -39,9 +41,10 @@ persona:
 # discord
 # .
 discord:
+
   # Token to log into Discord with.  For security purposes it's strongly recommended that
   # you set this via the DISCORD_TOKEN environment variable instead, if possible.
-  discord_token: ""
+  discord_token:
 
   # Post the entire response as a single message, rather than splitting it into separate
   # messages by sentence.
@@ -75,6 +78,15 @@ discord:
   #   default: False
   stream_responses:
 
+  # FEATURE PREVIEW: When streaming responses, cap the rate at which we send updates to
+  # Discord to be no more than once per this many seconds.  This does not guarantee that
+  # updates will be sent this fast.  Only that they will not be sent any faster than this
+  # rate.  This is useful because Discord has a rate limit on how often you can send
+  # messages, and if you exceed it, the updates will suddenly become slow.  Example: 0.2
+  # means we will send updates no faster than 5 times per second.
+  #   default: 0.7
+  stream_responses_speed_limit:
+
   # FEATURE PREVIEW: Adds a limit to the number of channels the bot will post unsolicited
   # messages in at the same time.  This is to prevent the bot from being too noisy in large
   # servers.  When set, only the most recent N channels the bot has been summoned in will
@@ -84,10 +96,21 @@ discord:
   #   default: 3
   unsolicited_channel_cap:
 
+  # FEATURE PREVIEW: Path to the Discrivener executable. Will enable prototype voice
+  # integration.
+  #   default:
+  discrivener_location:
+
+  # FEATURE PREVIEW: Path to the Discrivener model to load.  Required if
+  # discrivener_location is set.
+  #   default:
+  discrivener_model_location:
+
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # oobabooga
 # .
 oobabooga:
+
   # Base URL for the oobabooga instance.  This should be ws://hostname[:port] for plain
   # websocket connections, or wss://hostname[:port] for websocket connections over TLS.
   #   default: ws://localhost:5005
@@ -134,10 +157,16 @@ oobabooga:
     skip_special_tokens: true
     stopping_strings: []
 
+  # When running inside the Oobabooga plugin, automatically connect to Discord when
+  # Oobabooga starts.  This has no effect when running from the command line.
+  #   default: False
+  plugin_auto_start:
+
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # stable_diffusion
 # .
 stable_diffusion:
+
   # When one of these words is used in a message, the bot will generate an image.
   #   default: ['draw me', 'drawing', 'photo', 'pic', 'picture', 'image', 'sketch']
   image_words:
@@ -161,7 +190,7 @@ stable_diffusion:
     steps: 30
     width: 512
     height: 512
-    sampler: ""
+    sampler: ''
 
   # FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate image keywords from a
   # user's message.  It will then pass the keywords that Oobabooga produces to Stable
@@ -174,6 +203,15 @@ stable_diffusion:
 # template
 # .
 template:
+
+  # Displayed in Discord after a successful /lobotomize command.  Both the discord users and
+  # the bot AI will see this message.
+  # .
+  # Allowed tokens: {AI_NAME}, {USER_NAME}
+  # .
+  #   default:  Ummmm... what were we talking about?
+  command_lobotomize_response:
+
   # The main prompt sent to Oobabooga to generate a response from the bot AI.  The AI's
   # reply to this prompt will be sent to discord as the bot's response.
   # .
