@@ -517,13 +517,15 @@ class DiscordBot(discord.Client):
 
             response += token
             (response, abort_response) = self._filter_immersion_breaking_lines(response)
-            if abort_response:
-                break
-            if not response:
-                # we can't send an empty message
-                continue
+
+            # if we are aborting a response, we want to at least post
+            # the valid parts, so don't abort quite yet.
 
             if last_message is None:
+                if not response:
+                    # we don't want to send an empty message
+                    continue
+
                 # when we send the first message, we don't want to send a notification,
                 # as it will only include the first token of the response.  This will
                 # not be very useful to anyone.
@@ -541,6 +543,12 @@ class DiscordBot(discord.Client):
                     suppress=True,
                 )
                 last_message.content = response
+
+            # we want to abort the response only after we've sent any valid
+            # messages, and potentially removed any partial immersion-breaking
+            # lines that we posted when they were in the process of being received.
+            if abort_response:
+                break
 
             this_response_stat.log_response_part()
 
@@ -562,6 +570,10 @@ class DiscordBot(discord.Client):
         These include lines that include a termination symbol, lines
         that attempt to carry on the conversation as a different user,
         and lines that include text which is part of the AI prompt.
+
+        Returns the subset of the input string that should be sent,
+        and a boolean indicating if we should abort the response entirely,
+        ignoring any further lines.
         """
         lines = sentence.split("\n")
         good_lines = []
