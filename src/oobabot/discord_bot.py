@@ -538,6 +538,7 @@ class DiscordBot(discord.Client):
                 await last_message.edit(
                     content=response,
                     allowed_mentions=allowed_mentions,
+                    suppress=True,
                 )
                 last_message.content = response
 
