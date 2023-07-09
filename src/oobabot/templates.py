@@ -29,9 +29,6 @@ class Templates(enum.Enum):
     PROMPT_HISTORY_LINE = "prompt_history_line"
     PROMPT_IMAGE_COMING = "prompt_image_coming"
 
-    # prompts to the AI to generate image keywords
-    PROMPT_IMAGE_KEYWORDS = "prompt_image_keywords"
-
     def __str__(self) -> str:
         return self.value
 
@@ -109,18 +106,6 @@ class TemplateStore:
             + "image.",
             True,
         ),
-        Templates.PROMPT_IMAGE_KEYWORDS: (
-            [
-                TemplateToken.AI_NAME,
-                TemplateToken.USER_MESSAGE,
-            ],
-            """
-            Sent to Oobabooga, along with the user's image request, to generate
-            image keywords.  The AI's response to this prompt will then be sent
-            to Stable Diffusion to generate an image.
-            """,
-            True,
-        ),
         Templates.IMAGE_DETACH: (
             [
                 TemplateToken.IMAGE_PROMPT,
@@ -185,22 +170,6 @@ class TemplateStore:
         Templates.PROMPT_IMAGE_COMING: textwrap.dedent(
             """
             {AI_NAME}: is currently generating an image, as requested.
-            """
-        ),
-        Templates.PROMPT_IMAGE_KEYWORDS: textwrap.dedent(
-            """
-            Below is an instruction that describes a task, paired with an input
-            that provides further context. Write a response that appropriately
-            completes the request.
-
-            ### Instruction:
-            The input text asks for an image to be created.  Please create a list
-            of keywords to describe that image.
-
-            ### Input:
-            {USER_MESSAGE}
-
-            ### Response:
             """
         ),
         Templates.IMAGE_DETACH: textwrap.dedent(
