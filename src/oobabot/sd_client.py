@@ -6,6 +6,7 @@ API.  Takes a prompt and returns image binary data in PNG format.
 
 import asyncio
 import base64
+import re
 import time
 import typing
 
@@ -17,6 +18,16 @@ from oobabot import http_client
 # todo: response stats for SD client
 
 
+def _find_substring_in_dict(
+    desired_val: str, search_list: typing.List
+) -> typing.Optional[str]:
+    desired_val = desired_val.lower()
+    for value in search_list:
+        if value.lower() in desired_val:
+            return value
+    return None
+
+
 class StableDiffusionClient(http_client.SerializedHttpClient):
     """
     Purpose: Client for generating images using the AUTOMATIC1111
@@ -25,6 +36,9 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
 
     SERVICE_NAME = "Stable Diffusion"
     STABLE_DIFFUSION_API_URI_PATH: str = "/sdapi/v1/"
+
+    SAMPLER_KEY = "sampler_name"
+    SAMPLER_KEY_ALIAS = "sampler"
 
     API_COMMAND_URLS = {
         "get_samplers": STABLE_DIFFUSION_API_URI_PATH + "samplers",
@@ -60,12 +74,33 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     def __init__(
         self,
         settings: typing.Dict[str, typing.Any],
+        magic_model_key: str,
     ):
         super().__init__(self.SERVICE_NAME, settings["stable_diffusion_url"])
 
         self.extra_prompt_text = settings["extra_prompt_text"]
         self.request_params = settings["request_params"]
+
+        # lower-case all keys in request_params
+        self.request_params = {k.lower(): v for k, v in self.request_params.items()}
         self.sd_models = []
+        self.sd_samplers = []
+
+        self.user_override_params = {}
+        # ensure that each customizable param is in the request_params
+        for param in settings["user_override_params"]:
+            param = param.lower()
+            if param not in self.request_params:
+                fancy_logger.get().warning(
+                    "Stable Diffusion:  customizable param '%s' not in request_params."
+                    + "  Ignoring setting.",
+                    param,
+                )
+                continue
+            # store the type of the param, so we can validate user input later
+            self.user_override_params[param] = type(self.request_params[param])
+
+        self.magic_model_key = magic_model_key.lower()
 
         # when we're in a "age restricted" channel, we'll swap
         # the "negative_prompt" in the request_params with this
@@ -161,6 +196,140 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
     async def get_models(self) -> typing.List[str]:
         return await self._call_and_extract_field("sd-models", "model_name")
 
+    SD_DELIMITER = "="
+
+    def _find_model(self, desired_model: str) -> typing.Optional[str]:
+        return _find_substring_in_dict(desired_model, self.sd_models)
+
+    def _find_sampler(self, desired_sampler: str) -> typing.Optional[str]:
+        return _find_substring_in_dict(desired_sampler, self.sd_samplers)
+
+    def _to_key_value_pair(
+        self, word: str
+    ) -> typing.Optional[typing.Tuple[str, typing.Any]]:
+        if self.SD_DELIMITER not in word:
+            return None
+
+        keyword_pair = word.split(self.SD_DELIMITER, 1)
+        if len(keyword_pair) < 2:
+            return None
+        key, val = keyword_pair
+
+        # lowercase the key, so we can match it against the
+        # user_override_params dict
+        key = key.lower()
+
+        # magical alias for "negative_prompt"
+        if key == "np":
+            key = "negative_prompt"
+
+        if key == self.SAMPLER_KEY_ALIAS:
+            key = self.SAMPLER_KEY
+
+        if key not in self.user_override_params:
+            return None
+
+        # try to remove any quotes around the value
+        if val.startswith('"') and val.endswith('"'):
+            val = val[1:-1]
+
+        try:
+            val_type = self.user_override_params[key]
+            if val_type == bool:
+                if val.lower in ("true", "yes", "y"):
+                    val = True
+                elif val.lower in ("false", "no", "n"):
+                    val = False
+            elif val_type == int:
+                val = int(val)
+            elif val_type == float:
+                val = float(val)
+        except ValueError:
+            return None
+
+        return (key, val)
+
+    def update_model_and_sampler(self, params: typing.Dict[str, typing.Any]):
+        """
+        Model and Sampler are special since we have a list of known acceptable
+        values.  If the user specifies a value that is not in the list, we
+        ignore it.  If the user specifies a value that is in the list, we
+        override the default.
+
+        Also, "sampler" is an alias for "sampler_name", and "model" is an
+        alias for what should appear in "override_settings.sd_model_checkpoint".
+
+        Finally, we allow the user to specify a substring of the model or
+        sampler name, and we will match the first one we find.  This is
+        useful for when the user doesn't know the exact name of the model
+        or sampler, but knows a substring of it.
+        """
+        desired_model = params.pop(self.magic_model_key, None)
+        if desired_model is not None:
+            model = self._find_model(desired_model)
+            if model is not None:
+                if "override_settings" not in params:
+                    params["override_settings"] = {}
+                params["override_settings"]["sd_model_checkpoint"] = model
+                fancy_logger.get().debug(
+                    "Stable Diffusion: per user request, setting model to '%s'", model
+                )
+            else:
+                fancy_logger.get().debug(
+                    "Stable Diffusion: unavailable model requested.  "
+                    + "If newly added, restart oobabot: '%s'",
+                    desired_model,
+                )
+
+        # the proper key is "sampler_name", but we also allow
+        # "sampler" for convenience.  Move the value, if any, over now.
+        desired_sampler = params.pop(self.SAMPLER_KEY_ALIAS, None)
+        if desired_sampler is not None:
+            params[self.SAMPLER_KEY] = desired_sampler
+
+        desired_sampler = params.pop(self.SAMPLER_KEY, None)
+        if desired_sampler is not None:
+            sampler = self._find_sampler(desired_sampler)
+            if sampler is not None:
+                params[self.SAMPLER_KEY] = sampler
+            else:
+                fancy_logger.get().debug(
+                    "Stable Diffusion: unavailable sampler requested.  "
+                    + "If newly added, restart oobabot: '%s'",
+                    desired_sampler,
+                )
+
+    # this is intended to split the prompt into words, but
+    # also to handle quoted strings.  For instance, if the
+    # prompt is:
+    #   "zombie taylor swift" pinup movie poster
+    # then we want to split it into:
+    #   ["zombie taylor swift", "pinup", "movie", "poster"]
+    #
+    SD_PARAM_SPLIT_REGEX = re.compile(r'(?:".*?"|\S)+')
+
+    def update_params(self, prompt: str, params: typing.Dict[str, typing.Any]) -> str:
+        """
+        Updates the request parameters included in the given prompt,
+        and then returns the remaining prompt.
+        """
+        remaining_prompt = ""
+        for word in self.SD_PARAM_SPLIT_REGEX.findall(prompt):
+            key_val_pair = self._to_key_value_pair(word)
+            if key_val_pair is None:
+                remaining_prompt += word + " "
+                continue
+            key, val = key_val_pair
+
+            fancy_logger.get().debug(
+                "Stable Diffusion: per user request, setting '%s' to '%s'", key, val
+            )
+            params[key] = val
+
+        self.update_model_and_sampler(params)
+
+        return remaining_prompt.strip()
+
     def generate_image(
         self,
         prompt: str,
@@ -178,67 +347,14 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             OobaHttpClientError, if the request fails.
         """
         request = self.request_params.copy()
-        request["prompt"] = prompt
-        
-        # Parsing additional Stable Diffusion parameters.  These must be the same as the documentation for SD
-        SD_DELIMITER = "="
-        SD_SEED = "seed" # change the seed with "seed=8999", for example, seed value 8999
-        SD_HEIGHT = "height" # change the height with "height=720", for example, indicates 720 pixels
-        SD_WIDTH = "width" # change the width with "width=1080", for example, indicates 1080 pixels
-        SD_STEPS = "steps" # change the height with "steps=40", for example, indicates 40 steps
-        SD_CFG = "cfg_scale" # change the cfg with "cfg_scale=10"
-        SD_ENABLE_HR = "enable_hr" # a boolean, specify w/ "enable_hr=true" or "enable_hr=false", case-insensitive
-        sd_params = [SD_SEED, SD_HEIGHT, SD_WIDTH, SD_STEPS, SD_CFG, SD_ENABLE_HR] 
 
-        for sd_param in sd_params: # parse out each param and put in the request instead
-            for word in prompt.split(" "):  
-                if sd_param + SD_DELIMITER in word:
-                    keyword_pair = word.split(SD_DELIMITER)
-                    if len(keyword_pair) > 1: # safety check so it doesn't crash if someone types "keyword:" with no value
-                        try: 
-                            token_value = keyword_pair[1] 
-                            # handle booleans
-                            if token_value.lower() == "false":
-                                request[sd_param] = False
-                                fancy_logger.get().debug("Stable Diffusion:  setting " + sd_param + " to boolean False")
-                            elif token_value.lower() == "true":
-                                request[sd_param] = True
-                                fancy_logger.get().debug("Stable Diffusion:  setting " + sd_param + " to boolean True")
-                            # handle integers
-                            token_value = int(token_value) 
-                            request[sd_param] = token_value
-                            fancy_logger.get().debug("Stable Diffusion:  setting " + sd_param + " to integer " + str(token_value))
-                            # remove the token pair (aka, the original 'word' from the prompt)
-                            prompt = prompt.replace(word, "")
-                            request["prompt"] = prompt
-                        except ValueError:
-                            fancy_logger.get().debug("Stable Diffusion:  detected " + sd_param + " phrase but no valid integer, doing nothing.")
-
-        # Parsing Negative Prompt parameter, which takes everything after the "np="
-        if "np=" in prompt:
-            prompt_split = prompt.split("np=")
-            request["prompt"] = prompt_split[0]
-            request["negative_prompt"] = prompt_split[1].strip()
         if is_channel_nsfw:
-            request["negative_prompt"] = request["negative_prompt"] + self.negative_prompt_nsfw
-        fancy_logger.get().debug(
-                "Stable Diffusion:  setting negative prompt to '" + request["negative_prompt"] + "'")
+            request["negative_prompt"] = self.negative_prompt_nsfw
 
-        # try to extract a model name from the prompt.  If we do,
-        # set it via ['override_settings']['sd_model_checkpoint']
-        lower_prompt = prompt.lower()
-        for model in self.sd_models:
-            if model.lower() in lower_prompt:
-                if "override_settings" not in request:
-                    request["override_settings"] = {}
-                request["override_settings"]["sd_model_checkpoint"] = model
-
-                fancy_logger.get().debug(
-                    "Stable Diffusion:  setting model to '%s'", model
-                )
-                # remove the model name from the prompt itself
-                request["prompt"] = request["prompt"].replace(model, "")
-                break
+        # extract any allowed user overrides from the prompt
+        # and add them to the request dict.  The remaining
+        # prompt is returned.
+        request["prompt"] = self.update_params(prompt, request)
 
         if self.extra_prompt_text:
             request["prompt"] += ", " + self.extra_prompt_text
@@ -247,7 +363,7 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
             fancy_logger.get().debug(
                 "Stable Diffusion: Image request (nsfw: %r): %s",
                 is_channel_nsfw,
-                request["prompt"],
+                request,
             )
             start_time = time.time()
 
@@ -294,48 +410,61 @@ class StableDiffusionClient(http_client.SerializedHttpClient):
 
         return asyncio.create_task(do_post_with_retry())
 
-    async def verify_sampler_available(self):
-        """
-        Checks that the requested sampler is available on the server.
-        If it isn't, logs a warning and sets the sampler to the default.
-        """
-        samplers = await self.get_samplers()
-
-        desired_sampler = self.request_params.get("sampler")
-        if not desired_sampler:
-            fancy_logger.get().debug(
-                "Stable Diffusion: Using default sampler on SD server"
-            )
-            return
-
-        if desired_sampler in samplers:
-            fancy_logger.get().debug(
-                "Stable Diffusion: Using desired sampler '%s'", desired_sampler
-            )
-            return
-
-        fancy_logger.get().warning(
-            "Stable Diffusion: Desired sampler '%s' not available",
-            desired_sampler,
-        )
-        fancy_logger.get().info(
-            "Stable Diffusion: Available samplers: %s", ", ".join(samplers)
-        )
-        self.request_params["sampler"] = ""
-
     async def _setup(self):
-        await self.verify_sampler_available()
         await self.set_options()
         self.sd_models = await self.get_models()
+        self.sd_samplers = await self.get_samplers()
         fancy_logger.get().info(
             "Stable Diffusion: Available models: %s", ", ".join(self.sd_models)
         )
+        # log a warning if the default model is not available
+        desired_model = self.request_params.get(self.magic_model_key, None)
+        if desired_model:
+            model = self._find_model(desired_model)
+            if model is None:
+                fancy_logger.get().warning(
+                    "Stable Diffusion: Desired default model '%s' not available.",
+                    desired_model,
+                )
+            else:
+                fancy_logger.get().debug(
+                    "Stable Diffusion: Using default model '%s'", desired_model
+                )
+
+        fancy_logger.get().info(
+            "Stable Diffusion: Available samplers: %s", ", ".join(self.sd_samplers)
+        )
+        # log a warning if the default sampler is not available
+        desired_sampler = self.request_params.get(
+            self.SAMPLER_KEY_ALIAS, self.request_params.get(self.SAMPLER_KEY, None)
+        )
+        if desired_sampler:
+            sampler = self._find_sampler(desired_sampler)
+            if sampler is None:
+                fancy_logger.get().warning(
+                    "Stable Diffusion: Desired default sampler '%s' not available.",
+                    desired_sampler,
+                )
+            else:
+                fancy_logger.get().debug(
+                    "Stable Diffusion: Using default sampler '%s'", desired_sampler
+                )
+
         fancy_logger.get().debug(
             "Stable Diffusion: Using negative prompt: %s...",
             str(self.request_params.get("negative_prompt", ""))[:20],
         )
         if self.extra_prompt_text:
             fancy_logger.get().debug(
-                "Stable Diffusion: will append to every prompt: '%s'",
+                "Stable Diffusion: Bot will append to every prompt: '%s'",
                 self.extra_prompt_text,
+            )
+        if 0 == len(self.user_override_params):
+            fancy_logger.get().debug(
+                "Stable Diffusion: Users cannot override any SD params"
+            )
+        else:
+            fancy_logger.get().debug(
+                "Stable Diffusion: Users may override: %s",
+                ", ".join(self.user_override_params.keys()),
             )

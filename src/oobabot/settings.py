@@ -74,10 +74,6 @@ class Settings:
     # This section is for constants which are not yet
     # customizable by the user.
 
-    # when trying to stop the bot, wait this long before
-    # giving up and just exiting
-    STOP_LOCK_TIMEOUT: float = 5.0
-
     # This is a table of the probability that the bot will respond
     # in an unsolicited manner (i.e. it isn't specifically pinged)
     # to a message, based on how long ago it was pinged in that
@@ -137,26 +133,41 @@ class Settings:
     # use this prompt for non-age-restricted channels
     DEFAULT_SD_NEGATIVE_PROMPT: str = DEFAULT_SD_NEGATIVE_PROMPT_NSFW + ", nsfw"
 
+    SD_CLIENT_MAGIC_MODEL_KEY = "model"
+
     DEFAULT_SD_REQUEST_PARAMS: typing.Dict[str, typing.Union[bool, int, str]] = {
-        # default values are commented out
-        #
-        # "do_not_save_samples": False,
+        "cfg_scale": 7,
         #    This is a privacy concern for the users of the service.
         #    We don't want to save the generated images anyway, since they
         #    are going to be on Discord.  Also, we don't want to use the
         #    disk space.
         "do_not_save_samples": True,
-        #
-        # "do_not_save_grid": False,
-        #    Sames as above.
         "do_not_save_grid": True,
+        "enable_hr": False,
+        # this is a fake setting, SD calls it "sd_model_checkpoint",
+        # and it needs to appear under "override_params".  But put it here
+        # for convenience, the SD client will do the right thing with it.
+        SD_CLIENT_MAGIC_MODEL_KEY: "",
         "negative_prompt": DEFAULT_SD_NEGATIVE_PROMPT,
         "negative_prompt_nsfw": DEFAULT_SD_NEGATIVE_PROMPT_NSFW,
+        "sampler_name": "",
+        "seed": -1,
         "steps": 30,
         "width": 512,
         "height": 512,
-        "sampler": "",
     }
+
+    DEFAULT_SD_USER_OVERRIDE_PARAMS = [
+        "cfg_scale",
+        "enable_hr",
+        SD_CLIENT_MAGIC_MODEL_KEY,
+        "negative_prompt",
+        "sampler_name",
+        "seed",
+        "height",
+        "width",
+    ]
+
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
     DEFAULT_IMAGE_WORDS: typing.List[str] = [
@@ -667,6 +678,40 @@ class Settings:
                         simple parameters here as Stable Diffusion's API evolves.
                         See Stable Diffusion's documentation for what these parameters
                         mean.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+                show_default_in_yaml=False,
+                place_default_in_yaml=True,
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[list](
+                name="user_override_params",
+                default=self.DEFAULT_SD_USER_OVERRIDE_PARAMS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        These parameters can be overridden by the Discord user
+                        by including them in their image generation request.
+
+                        The format for this is: param_name=value
+
+                        This is a whitelist of parameters that can be overridden.
+                        They must be simple parameters (strings, numbers, booleans),
+                        and they must be in the request_params dictionary.
+
+                        The value the user inputs will be checked against the type
+                        from the request_params dictionary, and if it doesn't match,
+                        the default value will be used instead.
+
+                        Otherwise, this value will be passed through to Stable
+                        Diffusion without any changes, so be mindful of what you allow
+                        here.  It could potentially be used to inject malicious
+                        values into your SD server.
+
+                        For example, steps=1000000 could be bad for your server.
                         """
                     )
                 ],
