@@ -10,7 +10,6 @@ import typing
 
 import discord
 
-from oobabot import discord_utils
 from oobabot import fancy_logger
 from oobabot import http_client
 from oobabot import ooba_client
@@ -240,7 +239,6 @@ class ImageGenerator:
         self.prompt_generator = prompt_generator
         self.stable_diffusion_client = stable_diffusion_client
         self.template_store = template_store
-        self.use_ai_generated_keywords = sd_settings.get("use_ai_generated_keywords")
 
         self.image_patterns = [
             re.compile(
@@ -254,15 +252,6 @@ class ImageGenerator:
         """
         Called when the bot is connected to Discord.
         """
-        if self.use_ai_generated_keywords:
-            fancy_logger.get().debug(
-                "Stable Diffusion: image prompts generated with AI preprocessing"
-            )
-        else:
-            fancy_logger.get().debug(
-                "Stable Diffusion: image prompts extracted with regex"
-            )
-
         fancy_logger.get().debug(
             "Stable Diffusion: image keywords: %s",
             ", ".join(self.image_words),
@@ -345,37 +334,6 @@ class ImageGenerator:
         Kick off a task to generate an image, post it to the channel,
         and return message the image is posted in.
         """
-
-        if self.use_ai_generated_keywords:
-            # ignore the prompt extracted above, and instead pass
-            # the raw message back to Oobabooga and ask it to
-            # generate keywords.  Then pass those keywords to
-            # the image generator.
-            return asyncio.create_task(
-                self._generate_keywords_then_image(
-                    raw_message,
-                    response_channel,
-                )
-            )
-
         return asyncio.create_task(
             self._generate_image(user_image_keywords, raw_message, response_channel)
         )
-
-    async def _generate_keywords_then_image(
-        self,
-        raw_message: discord.Message,
-        response_channel: discord.abc.Messageable,
-    ) -> "discord.Message":
-        message = discord_utils.discord_message_to_generic_message(raw_message)
-        # remove the bot's name from the body text, so it doesn't
-        # pollute the keywords
-        message.body_text = message.body_text.replace(self.ai_name, "")
-        keyword_generation_prompt = self.prompt_generator.keyword_generation_prompt(
-            message
-        )
-        ai_keywords = await self.ooba_client.request_as_string(
-            keyword_generation_prompt
-        )
-        fancy_logger.get().debug("AI-generated keywords: %s", ai_keywords)
-        return await self._generate_image(ai_keywords, raw_message, response_channel)

@@ -13,7 +13,6 @@ import typing
 
 from oobabot import discrivener_message
 from oobabot import fancy_logger
-from oobabot import settings
 from oobabot import types
 
 
@@ -22,9 +21,7 @@ class Discrivener:
     Launches and handles the Discrivener process.
     """
 
-    # we want this shorter than STOP_LOCK_TIMEOUT so that
-    # we can log output from the process before we exit
-    KILL_TIMEOUT = settings.Settings.STOP_LOCK_TIMEOUT - 0.5
+    KILL_TIMEOUT: float = 2.0
 
     # pylint: disable=R1732
     def __init__(

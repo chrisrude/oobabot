@@ -63,6 +63,7 @@ class Runtime:
         if sd_settings["stable_diffusion_url"]:
             self.stable_diffusion_client = sd_client.StableDiffusionClient(
                 settings=sd_settings,
+                magic_model_key=settings.SD_CLIENT_MAGIC_MODEL_KEY,
             )
 
         ########################################################
