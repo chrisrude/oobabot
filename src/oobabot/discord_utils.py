@@ -196,8 +196,11 @@ def get_user_id_from_token(discord_token: str) -> int:
     #
     # where each section, A, B, and C, is independently a base64-encoded string.
     #
-    # Section A encodes the bot's client ID, which is a 16-digit number.
-    # the other sections aren't important here.
+    # Section A encodes the bot's client ID, which is the decimal encoding of
+    # a 64-bit number in the range [21154535154122752, 18446744073709551615]
+    # (17 to 20 digits long).
+    #
+    # The other sections aren't important here.
     token_parts = discord_token.split(".")
     token_part_a = token_parts[0]
 
