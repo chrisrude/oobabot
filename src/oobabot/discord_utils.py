@@ -10,6 +10,7 @@ Discord library.
 
 import base64
 import functools
+import os
 import pathlib
 import re
 import typing
@@ -262,44 +263,48 @@ async def fail_interaction(
     await interaction.response.send_message(reason, ephemeral=True, silent=True)
 
 
-def is_discrivener_installed(
-    discrivener_location: str, discrivener_model_location: str
-):
+def _file_exists_and_is_file(filepath: typing.Optional[str]) -> typing.Optional[str]:
+    if filepath is None:
+        return None
+
+    path = pathlib.Path(filepath).expanduser()
+    if not path.is_file():
+        return None
+
+    if not os.access(path, os.R_OK):
+        return None
+
+    return str(path.resolve())
+
+
+def validate_discrivener_locations(
+    discrivener_location: str,
+    discrivener_model_location: str,
+) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
     """
     Verify that the file discrivener_location exists
     and is a file.
 
     If that passes, also checks that discrivener_model_location
     exists and is a file.
+
+    Returns the expanded paths to each files if it exists,
+    or None if it doesn't.
+
+    Returns the tuple of these checks for the two passed files.
     """
-    if not discrivener_location:
-        return False
+    actual_discrivener_location = _file_exists_and_is_file(discrivener_location)
+    # check that the discrivener binary is executable as well
+    if actual_discrivener_location is not None:
+        if not os.access(actual_discrivener_location, os.X_OK):
+            fancy_logger.get().warning(
+                "discrivener binary is not executable: %s",
+                actual_discrivener_location,
+            )
+            actual_discrivener_location = None
 
-    discrivener_location_path = pathlib.Path(discrivener_location).expanduser()
-    if not discrivener_location_path.is_file():
-        fancy_logger.get().warning(
-            "Discrivener not found at %s.  Audio integration not enabled.",
-            discrivener_location_path,
-        )
-        return False
-
-    fancy_logger.get().info("Discrivener found at %s", discrivener_location_path)
-
-    discrivener_model_location_path = pathlib.Path(
-        discrivener_model_location
-    ).expanduser()
-    if not discrivener_model_location_path.is_file():
-        fancy_logger.get().warning(
-            "Discrivener model not found at %s.  Audio integration not enabled.",
-            discrivener_model_location_path,
-        )
-        return False
-
-    fancy_logger.get().info(
-        "Discrivener model found at %s", discrivener_model_location_path
-    )
-
-    return True
+    actual_model_location = _file_exists_and_is_file(discrivener_model_location)
+    return (actual_discrivener_location, actual_model_location)
 
 
 # the following class was modified from O'Reilly's Python Cookbook,

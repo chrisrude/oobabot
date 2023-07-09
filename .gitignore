@@ -6,6 +6,11 @@ config.yml.*
 
 --Frag*
 
+# ignore discrivener binaries and models
+discrivener-json-*
+espeak-ng-data.tar.gz
+*.bin
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

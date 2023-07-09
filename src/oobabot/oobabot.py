@@ -149,10 +149,11 @@ class Oobabot:
          a. discrivener is configured
          b. discrivener is installed
         """
-        return discord_utils.is_discrivener_installed(
+        exe_location, model_location = discord_utils.validate_discrivener_locations(
             self.settings.discord_settings.get_str("discrivener_location"),
             self.settings.discord_settings.get_str("discrivener_model_location"),
         )
+        return exe_location is not None and model_location is not None
 
     @property
     def current_voice_transcript(

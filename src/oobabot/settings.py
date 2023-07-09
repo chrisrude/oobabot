@@ -473,10 +473,9 @@ class Settings:
                 description_lines=[
                     textwrap.dedent(
                         """
-                        FEATURE PREVIEW: Adds a limit to the number of channels
-                        the bot will post unsolicited messages in at the same
-                        time.  This is to prevent the bot from being too noisy
-                        in large servers.
+                        Adds a limit to the number of channels the bot will post
+                        unsolicited messages in at the same time.  This is to
+                        prevent the bot from being too noisy in large servers.
 
                         When set, only the most recent N channels the bot has
                         been summoned in will have a chance of receiving an
@@ -674,25 +673,6 @@ class Settings:
                 include_in_argparse=False,
                 show_default_in_yaml=False,
                 place_default_in_yaml=True,
-            )
-        )
-        self.stable_diffusion_settings.add_setting(
-            oesp.ConfigSetting[bool](
-                name="use_ai_generated_keywords",
-                default=False,
-                description_lines=[
-                    textwrap.dedent(
-                        """
-                        FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate
-                        image keywords from a user's message.  It will then pass the
-                        keywords that Oobabooga produces to Stable Diffusion to finally
-                        generate an image.
-                        Otherwise, the bot will simply extract keywords directly
-                        from the user's message using a simple regex.
-                        """
-                    )
-                ],
-                include_in_argparse=False,
             )
         )
 

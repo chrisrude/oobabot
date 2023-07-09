@@ -37,15 +37,45 @@ class BotCommands:
         self.persona = persona
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.template_store = template_store
-        self.discrivener_location = discord_settings["discrivener_location"]
-        self.discrivener_model_location = discord_settings["discrivener_model_location"]
-        self.audio_commands = audio_commands.AudioCommands(
-            persona,
-            ooba_client,
-            prompt_generator,
+
+        (
             self.discrivener_location,
             self.discrivener_model_location,
+        ) = discord_utils.validate_discrivener_locations(
+            discord_settings["discrivener_location"],
+            discord_settings["discrivener_model_location"],
         )
+
+        if (
+            discord_settings["discrivener_location"]
+            and self.discrivener_location is None
+        ):
+            fancy_logger.get().warning(
+                "Audio disabled because executable at discrivener_location "
+                + "could not be found: %s",
+                discord_settings["discrivener_location"],
+            )
+
+        if (
+            discord_settings["discrivener_model_location"]
+            and self.discrivener_model_location is None
+        ):
+            fancy_logger.get().warning(
+                "Audio disable because the discrivener_model_location "
+                + "could not be found: %s",
+                discord_settings["discrivener_model_location"],
+            )
+
+        if self.discrivener_location is None or self.discrivener_model_location is None:
+            self.audio_commands = None
+        else:
+            self.audio_commands = audio_commands.AudioCommands(
+                persona,
+                ooba_client,
+                prompt_generator,
+                self.discrivener_location,
+                self.discrivener_model_location,
+            )
 
     async def on_ready(self, client: discord.Client):
         """
@@ -166,10 +196,7 @@ class BotCommands:
         tree.add_command(lobotomize)
         tree.add_command(say)
 
-        if discord_utils.is_discrivener_installed(
-            self.discrivener_location,
-            self.discrivener_model_location,
-        ):
+        if self.audio_commands is not None:
             self.audio_commands.add_commands(tree)
 
         commands = await tree.sync(guild=None)
