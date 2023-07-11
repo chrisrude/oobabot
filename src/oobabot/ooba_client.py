@@ -8,7 +8,7 @@ import json
 import re
 import time
 import typing
-import requests
+
 import aiohttp
 import pysbd
 import pysbd.utils
