@@ -188,6 +188,19 @@ class Oobabot:
             return None
         return discord_utils.author_from_user_id(user_id, client.guild)
 
+    def log_count(self) -> int:
+        """
+        Returns the current number of times the log has been
+        appended to.
+        """
+        return fancy_logger.recent_logs.changes
+
+    def logs(self) -> typing.List[str]:
+        """
+        Returns a list of the most recent log messages.
+        """
+        return fancy_logger.recent_logs.get_all()
+
 
 def run_cli():
     """
