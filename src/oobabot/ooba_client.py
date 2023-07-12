@@ -222,6 +222,17 @@ class OobaClient(http_client.SerializedHttpClient):
             tokens = ""
             last_response = time.perf_counter()
 
+    async def stop():
+        async with aiohttp.ClientSession() as session:
+#REPLACE 127.0.0.1 WITH YOUR OOBABOOGA SERVER'S IP
+            url = "http://127.0.0.1:5000/api/v1/stop-stream"
+            headers = {"Content-Type": "application/json"}
+
+            async with session.post(url, data=json.dumps({}), headers=headers) as response:
+                response_text = await response.text()
+                print(response_text)
+                return response_text
+
     async def request_by_token(self, prompt: str) -> typing.AsyncIterator[str]:
         """
         Yields each token of the response as it arrives.

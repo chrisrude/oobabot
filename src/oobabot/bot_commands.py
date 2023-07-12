@@ -110,6 +110,20 @@ class BotCommands:
                         return channel
             return None
 
+
+        @discord.app_commands.command(
+            name="stop",
+            description=f"Force {self.persona.ai_name} to stop typing the current message.",
+        )
+        async def stop(interaction: discord.Interaction):
+            channel = await get_messageable(interaction)
+            if interaction.channel_id is None:
+                await discord_utils.fail_interaction(interaction)
+                return
+            response = await ooba_client.OobaClient.stop()
+            await interaction.response.send_message(response)
+            return
+
         @discord.app_commands.command(
             name="say",
             description=f"Force {self.persona.ai_name} to say the provided message.",
@@ -195,6 +209,7 @@ class BotCommands:
         tree = discord.app_commands.CommandTree(client)
         tree.add_command(lobotomize)
         tree.add_command(say)
+        tree.add_command(stop)
 
         if self.audio_commands is not None:
             self.audio_commands.add_commands(tree)
