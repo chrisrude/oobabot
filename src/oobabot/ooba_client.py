@@ -240,7 +240,7 @@ class OobaClient(http_client.SerializedHttpClient):
             await websocket.send_json(request)
             if self.log_all_the_things:
                 print(f"Sent request:\n{json.dumps(request, indent=1).encode('utf-8')}")
-                print(f"Prompt:\n{request['prompt'].encode('utf-8')}")
+                print(f"Prompt:\n{str(request['prompt']).encode('utf-8')}")
 
             async for msg in websocket:
                 # we expect a series of text messages in JSON encoding,
@@ -262,7 +262,7 @@ class OobaClient(http_client.SerializedHttpClient):
                         text = incoming_data["text"]
                         if text != SentenceSplitter.END_OF_INPUT:
                             if self.log_all_the_things:
-                                print(text.encode('utf-8'), end="", flush=True)
+                                print(text.encode("utf-8"), end="", flush=True)
 
                             yield text
 
