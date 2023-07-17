@@ -6,7 +6,7 @@
 # "config.yml" from the current directory when it is run.
 #
 
-version: 0.2.0
+version: 0.2.1
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # persona
@@ -44,7 +44,7 @@ discord:
 
   # Token to log into Discord with.  For security purposes it's strongly recommended that
   # you set this via the DISCORD_TOKEN environment variable instead, if possible.
-  discord_token:
+  discord_token: ''
 
   # Post the entire response as a single message, rather than splitting it into separate
   # messages by sentence.
@@ -87,12 +87,11 @@ discord:
   #   default: 0.7
   stream_responses_speed_limit:
 
-  # FEATURE PREVIEW: Adds a limit to the number of channels the bot will post unsolicited
-  # messages in at the same time.  This is to prevent the bot from being too noisy in large
-  # servers.  When set, only the most recent N channels the bot has been summoned in will
-  # have a chance of receiving an unsolicited message.  The bot will still respond to
-  # @-mentions and wake words in any channel it can access.  Set to 0 to disable this
-  # feature.
+  # Adds a limit to the number of channels the bot will post unsolicited messages in at the
+  # same time.  This is to prevent the bot from being too noisy in large servers.  When set,
+  # only the most recent N channels the bot has been summoned in will have a chance of
+  # receiving an unsolicited message.  The bot will still respond to @-mentions and wake
+  # words in any channel it can access.  Set to 0 to disable this feature.
   #   default: 3
   unsolicited_channel_cap:
 
@@ -183,21 +182,37 @@ stable_diffusion:
   # Feel free to add additional simple parameters here as Stable Diffusion's API evolves.
   # See Stable Diffusion's documentation for what these parameters mean.
   request_params:
+    cfg_scale: 7
     do_not_save_samples: true
     do_not_save_grid: true
+    enable_hr: false
+    model: ''
     negative_prompt: animal harm, suicide, loli, nsfw
     negative_prompt_nsfw: animal harm, suicide, loli
+    sampler_name: ''
+    seed: -1
     steps: 30
     width: 512
     height: 512
-    sampler: ''
 
-  # FEATURE PREVIEW: If set, the bot will ask Oobabooga to generate image keywords from a
-  # user's message.  It will then pass the keywords that Oobabooga produces to Stable
-  # Diffusion to finally generate an image. Otherwise, the bot will simply extract keywords
-  # directly from the user's message using a simple regex.
-  #   default: False
-  use_ai_generated_keywords:
+  # These parameters can be overridden by the Discord user by including them in their image
+  # generation request.  The format for this is: param_name=value  This is a whitelist of
+  # parameters that can be overridden. They must be simple parameters (strings, numbers,
+  # booleans), and they must be in the request_params dictionary.  The value the user inputs
+  # will be checked against the type from the request_params dictionary, and if it doesn't
+  # match, the default value will be used instead.  Otherwise, this value will be passed
+  # through to Stable Diffusion without any changes, so be mindful of what you allow here.
+  # It could potentially be used to inject malicious values into your SD server.  For
+  # example, steps=1000000 could be bad for your server.
+  user_override_params:
+    - cfg_scale
+    - enable_hr
+    - model
+    - negative_prompt
+    - sampler_name
+    - seed
+    - height
+    - width
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # template

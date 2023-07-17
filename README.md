@@ -82,7 +82,7 @@ usage: oobabot [-h] [-c CONFIG] [--generate-config] [--invite-url] [--ai-name AI
                [--stable-diffusion-url STABLE_DIFFUSION_URL]
                [--extra-prompt-text EXTRA_PROMPT_TEXT]
 
-oobabot v0.2.0: Discord bot for oobabooga's text-generation-webui
+oobabot v0.2.1: Discord bot for oobabooga's text-generation-webui
 
 General Settings:
 
