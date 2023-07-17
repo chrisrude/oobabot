@@ -262,7 +262,7 @@ class OobaClient(http_client.SerializedHttpClient):
                         text = incoming_data["text"]
                         if text != SentenceSplitter.END_OF_INPUT:
                             if self.log_all_the_things:
-                                print(text, end="", flush=True)
+                                print(text.encode('utf-8'), end="", flush=True)
 
                             yield text
 
