@@ -279,10 +279,20 @@ class RingBufferedHandler(logging.Handler):
 
     def __init__(self, buffer_size: int = 45) -> None:
         super().__init__()
+        self.change_count = 0
         self.buffer = RingBuffer(buffer_size)
 
     def emit(self, record: logging.LogRecord) -> None:
+        self.change_count += 1
         self.buffer.append(self.format(record))
+
+    @property
+    def changes(self) -> int:
+        """
+        Return the number of times the buffer has been
+        updated.
+        """
+        return self.change_count
 
     def get_all(self) -> typing.List[str]:
         return self.buffer.get()
