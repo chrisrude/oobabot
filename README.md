@@ -50,7 +50,7 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 | **stats** | track token generation speed, latency, failures and usage |
 | **easy networking** | connects to discord from your machine using websockets, so no need to expose a server to the internet |
 | ✨**Stable Diffusion** | new in v0.1.4!  Optional image generation with AUTOMATIC1111 |
-| ✨**Slash Commands* | coming in v0.1.6... did your bot get confused?  `/lobotomize` it! |
+| ✨**Slash Commands** | coming in v0.1.6... did your bot get confused?  `/lobotomize` it! |
 
 ## Getting Started with **`oobabot`**
 
