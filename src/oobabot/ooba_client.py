@@ -243,9 +243,11 @@ class OobaClient(http_client.SerializedHttpClient):
                     print(f"Sent request:\n{json.dumps(request, indent=1)}")
                     print(f"Prompt:\n{str(request['prompt'])}")
                 except UnicodeEncodeError:
-                    print(f"Sent request:\n{json.dumps(request, indent=1).encode('utf-8')}")
+                    print(
+                        "Sent request:\n"
+                        + f"{json.dumps(request, indent=1).encode('utf-8')}"
+                    )
                     print(f"Prompt:\n{str(request['prompt']).encode('utf-8')}")
-
 
             async for msg in websocket:
                 # we expect a series of text messages in JSON encoding,
