@@ -49,13 +49,24 @@ def discord_message_to_generic_message(
     """
     Convert a discord message to a GenericMessage or subclass thereof
     """
+    if raw_message.author.bot:
+        # address issue https://github.com/chrisrude/oobabot/issues/76
+        # If the bot is creating a formatted message, keep that formatting
+        # intact.
+        # Ideally, this would be nice to do for user messages as well,
+        # but if we allowed that then it would let a malicious user
+        # impersonate both the bot and other users.  So trust bots only.
+        body_text = raw_message.content
+    else:
+        body_text = sanitize_string(raw_message.content)
+
     generic_args = {
         "author_id": raw_message.author.id,
         "author_name": sanitize_string(raw_message.author.display_name),
         "channel_id": raw_message.channel.id,
         "channel_name": get_channel_name(raw_message.channel),
         "message_id": raw_message.id,
-        "body_text": sanitize_string(raw_message.content),
+        "body_text": body_text,
         "author_is_bot": raw_message.author.bot,
         "send_timestamp": raw_message.created_at.timestamp(),
         "reference_message_id": raw_message.reference.message_id

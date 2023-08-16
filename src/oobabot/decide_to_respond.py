@@ -64,6 +64,9 @@ class DecideToRespond:
         interrobang_bonus: float,
         time_vs_response_chance: typing.List[typing.Tuple[float, float]],
     ):
+        self.disable_unsolicited_replies = discord_settings[
+            "disable_unsolicited_replies"
+        ]
         self.ignore_dms = discord_settings["ignore_dms"]
         self.interrobang_bonus = interrobang_bonus
         self.persona = persona
@@ -139,6 +142,10 @@ class DecideToRespond:
         # if we've posted recently in this channel, there are a few
         # other reasons we may respond.  But if we haven't, just
         # ignore the message.
+
+        # if the admin has disabled unsolicited replies, don't reply
+        if self.disable_unsolicited_replies:
+            return False
 
         # if we haven't posted to this channel recently, don't reply
         response_chance = self.calc_base_chance_of_unsolicited_reply(message)
