@@ -95,6 +95,12 @@ discord:
   #   default: 3
   unsolicited_channel_cap:
 
+  # If set, the bot will not reply to any messages that do not @-mention it or include a
+  # wakeword.  If unsolicited replies are disabled, the unsolicited_channel_cap setting will
+  # have no effect.
+  #   default: False
+  disable_unsolicited_replies:
+
   # FEATURE PREVIEW: Path to the Discrivener executable. Will enable prototype voice
   # integration.
   #   default:

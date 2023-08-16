@@ -135,7 +135,7 @@ class Settings:
 
     SD_CLIENT_MAGIC_MODEL_KEY = "model"
 
-    DEFAULT_SD_REQUEST_PARAMS: typing.Dict[str, typing.Union[bool, int, str]] = {
+    DEFAULT_SD_REQUEST_PARAMS: oesp.SettingDictType = {
         "cfg_scale": 7,
         #    This is a privacy concern for the users of the service.
         #    We don't want to save the generated images anyway, since they
@@ -494,6 +494,24 @@ class Settings:
                         @-mentions and wake words in any channel it can access.
 
                         Set to 0 to disable this feature.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[bool](
+                name="disable_unsolicited_replies",
+                default=False,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        If set, the bot will not reply to any messages that
+                        do not @-mention it or include a wakeword.
+
+                        If unsolicited replies are disabled, the unsolicited_channel_cap
+                        setting will have no effect.
                         """
                     )
                 ],
