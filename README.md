@@ -82,14 +82,15 @@ usage: oobabot [-h] [-c CONFIG] [--generate-config] [--invite-url] [--ai-name AI
                [--stable-diffusion-url STABLE_DIFFUSION_URL]
                [--extra-prompt-text EXTRA_PROMPT_TEXT]
 
-oobabot v0.2.1: Discord bot for oobabooga's text-generation-webui
+oobabot v0.2.2: Discord bot for oobabooga's text-generation-webui
 
 General Settings:
 
   -h, --help
   -c CONFIG, --config CONFIG
-                        Path to a config file to read settings from. Command line settings
-                        will override settings in this file. (default: config.yml)
+                        Path to a config file to read settings from. Command line
+                        settings will override settings in this file. (default:
+                        config.yml)
   --generate-config     If set, oobabot will print its configuration as a .yml file, then
                         exit. Any command-line settings also passed will be reflected in
                         this file. (default: False)
@@ -99,26 +100,27 @@ General Settings:
 Persona:
 
   --ai-name AI_NAME     Name the AI will use to refer to itself (default: oobabot)
-  --persona PERSONA     This prefix will be added in front of every user-supplied request.
-                        This is useful for setting up a 'character' for the bot to play.
-                        Alternatively, this can be set with the OOBABOT_PERSONA environment
-                        variable. (default: )
+  --persona PERSONA     This prefix will be added in front of every user-supplied
+                        request. This is useful for setting up a 'character' for the bot
+                        to play. Alternatively, this can be set with the OOBABOT_PERSONA
+                        environment variable. (default: )
   --wakewords [WAKEWORDS ...]
-                        One or more words that the bot will listen for. The bot will listen
-                        in all discord channels it can access for one of these words to be
-                        mentioned, then reply to any messages it sees with a matching word.
-                        The bot will always reply to @-mentions and direct messages, even
-                        if no wakewords are supplied. (default: ['oobabot'])
+                        One or more words that the bot will listen for. The bot will
+                        listen in all discord channels it can access for one of these
+                        words to be mentioned, then reply to any messages it sees with a
+                        matching word. The bot will always reply to @-mentions and direct
+                        messages, even if no wakewords are supplied. (default:
+                        ['oobabot'])
 
 Discord:
 
   --discord-token DISCORD_TOKEN
-                        Token to log into Discord with. For security purposes it's strongly
-                        recommended that you set this via the DISCORD_TOKEN environment
-                        variable instead, if possible. (default: None)
+                        Token to log into Discord with. For security purposes it's
+                        strongly recommended that you set this via the DISCORD_TOKEN
+                        environment variable instead, if possible. (default: )
   --dont-split-responses
-                        Post the entire response as a single message, rather than splitting
-                        it into separate messages by sentence. (default: False)
+                        Post the entire response as a single message, rather than
+                        splitting it into separate messages by sentence. (default: False)
   --history-lines HISTORY_LINES
                         Number of lines of chat history the AI will see when generating a
                         response. (default: 7)
@@ -126,15 +128,15 @@ Discord:
                         False)
   --reply-in-thread     If set, the bot will generate a thread to respond in if it is not
                         already in one. (default: False)
-  --stream-responses    FEATURE PREVIEW: Stream responses into a single message as they are
-                        generated. Note: may be janky (default: False)
+  --stream-responses    FEATURE PREVIEW: Stream responses into a single message as they
+                        are generated. Note: may be janky (default: False)
 
 Oobabooga:
 
   --base-url BASE_URL   Base URL for the oobabooga instance. This should be
                         ws://hostname[:port] for plain websocket connections, or
-                        wss://hostname[:port] for websocket connections over TLS. (default:
-                        ws://localhost:5005)
+                        wss://hostname[:port] for websocket connections over TLS.
+                        (default: ws://localhost:5005)
   --log-all-the-things  Print all AI input and output to STDOUT. (default: False)
   --message-regex MESSAGE_REGEX
                         A regex that will be used to extract message lines from the AI's
@@ -145,9 +147,9 @@ Oobabooga:
 Stable Diffusion:
 
   --image-words [IMAGE_WORDS ...]
-                        When one of these words is used in a message, the bot will generate
-                        an image. (default: ['draw me', 'drawing', 'photo', 'pic',
-                        'picture', 'image', 'sketch'])
+                        When one of these words is used in a message, the bot will
+                        generate an image. (default: ['draw me', 'drawing', 'photo',
+                        'pic', 'picture', 'image', 'sketch'])
   --stable-diffusion-url STABLE_DIFFUSION_URL
                         URL for an AUTOMATIC1111 Stable Diffusion server. (default: )
   --extra-prompt-text EXTRA_PROMPT_TEXT

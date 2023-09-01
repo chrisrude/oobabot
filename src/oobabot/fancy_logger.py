@@ -323,8 +323,7 @@ recent_logs = RingBufferedHandler()
 #     return wrapper
 
 
-def excepthook(*exc_info):
-    exc_type = exc_info[0]
+def excepthook(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
-        sys.__excepthook__(*exc_info)
-    get().error("Unhandled exception", exc_info=exc_info)
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+    get().error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
