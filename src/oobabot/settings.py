@@ -571,6 +571,21 @@ class Settings:
             )
         )
         self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="base_blocking",
+                default="http://localhost:5000",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Base URL for the oobabooga instance.  This should be
+                        ws://hostname[:port] for plain websocket connections,
+                        or wss://hostname[:port] for websocket connections over TLS.
+                        """
+                    )
+                ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
             oesp.ConfigSetting[bool](
                 name="log_all_the_things",
                 default=False,

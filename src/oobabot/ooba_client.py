@@ -135,6 +135,7 @@ class OobaClient(http_client.SerializedHttpClient):
     SERVICE_NAME = "Oobabooga"
 
     OOBABOOGA_STREAMING_URI_PATH: str = "/api/v1/stream"
+    OOBABOOGA_STOP_STREAM_URI_PATH: str = "/api/v1/stop-stream"
 
     def __init__(
         self,
@@ -145,6 +146,7 @@ class OobaClient(http_client.SerializedHttpClient):
         self.message_regex = settings["message_regex"]
         self.request_params = settings["request_params"]
         self.log_all_the_things = settings["log_all_the_things"]
+        self.base_blocking = settings["base_blocking"]
 
         if self.message_regex:
             self.fn_new_splitter = lambda: RegexSplitter(self.message_regex)
@@ -224,8 +226,7 @@ class OobaClient(http_client.SerializedHttpClient):
 
     async def stop():
         async with aiohttp.ClientSession() as session:
-#REPLACE 127.0.0.1 WITH YOUR OOBABOOGA SERVER'S IP
-            url = "http://127.0.0.1:5000/api/v1/stop-stream"
+            url = f"{OobaClient.base_blocking}{OobaClient.OOBABOOGA_STOP_STREAM_URI_PATH}"
             headers = {"Content-Type": "application/json"}
 
             async with session.post(url, data=json.dumps({}), headers=headers) as response:
