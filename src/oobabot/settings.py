@@ -69,6 +69,10 @@ class Settings:
     User=customizable settings for the bot.  Reads from
     environment variables and command line arguments.
     """
+    # OpenAI settings
+    USE_OPENAI = "use_openai"
+    API_KEY = "api_key"
+    OPENAI_ENDPOINT = "openai_endpoint"
 
     ############################################################
     # This section is for constants which are not yet
@@ -80,9 +84,9 @@ class Settings:
     # same channel.
     TIME_VS_RESPONSE_CHANCE: typing.List[typing.Tuple[float, float]] = [
         # (seconds, base % chance of an unsolicited response)
-        (60.0, 0.90),
-        (120.0, 0.70),
-        (60.0 * 5, 0.50),
+        (120.0, 1.00),
+        (60.0 * 5, 0.80),
+        (60.0 * 10, 0.50),
     ]
 
     # increased chance of responding to a message if it ends with
@@ -94,7 +98,7 @@ class Settings:
     REPETITION_TRACKER_THRESHOLD = 1
 
     OOBABOOGA_DEFAULT_REQUEST_PARAMS: oesp.SettingDictType = {
-        "max_new_tokens": 250,
+        "max_tokens": 250,
         "do_sample": True,
         "temperature": 1.3,
         "top_p": 0.1,
@@ -554,7 +558,33 @@ class Settings:
 
         self.oobabooga_settings = oesp.ConfigSettingGroup("Oobabooga")
         self.setting_groups.append(self.oobabooga_settings)
-
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[bool](
+               name=self.USE_OPENAI,
+               default=True,
+               description_lines=[
+                     "Use the OpenAI API instead of the Oobabooga API.",
+               ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name=self.API_KEY,
+               default="awesome_api_key",
+               description_lines=[
+                     "OpenAI API key. Required if use_openai is True.",
+               ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name=self.OPENAI_ENDPOINT,
+               default="http://localhost:5000/v1/completions",
+               description_lines=[
+                     "OpenAI API completions endpoint. Defaults to the official OpenAI API URL.",
+               ],
+            )
+        )
         self.oobabooga_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="base_url",

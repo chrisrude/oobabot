@@ -352,9 +352,17 @@ class DiscordBot(discord.Client):
             ignore_all_until_message_id=ignore_all_until_message_id,
         )
 
+        if isinstance(response_channel, discord.abc.GuildChannel):
+            guild_name = response_channel.guild.name
+        elif isinstance(response_channel, discord.GroupChannel):
+            guild_name = response_channel
+        else:
+            guild_name = "Direct Message"
         prompt_prefix = await self.prompt_generator.generate(
             message_history=recent_messages,
             image_requested=image_requested,
+            guild_name=guild_name,
+            response_channel=response_channel,  # Pass the guild name here
         )
 
         this_response_stat = self.response_stats.log_request_arrived(prompt_prefix)

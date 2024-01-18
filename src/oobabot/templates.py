@@ -49,6 +49,8 @@ class TemplateToken(str, enum.Enum):
     MESSAGE_HISTORY = "MESSAGE_HISTORY"
     USER_MESSAGE = "USER_MESSAGE"
     USER_NAME = "USER_NAME"
+    GUILDNAME = "GUILDNAME"
+    CHANNELNAME = "CHANNELNAME"
 
     def __str__(self):
         return "{" + self.value + "}"
@@ -80,6 +82,8 @@ class TemplateStore:
                 TemplateToken.IMAGE_COMING,
                 TemplateToken.MESSAGE_HISTORY,
                 TemplateToken.PERSONA,
+                TemplateToken.CHANNELNAME,
+                TemplateToken.GUILDNAME,
             ],
             "The main prompt sent to Oobabooga to generate a response from "
             + "the bot AI.  The AI's reply to this prompt will be sent to "

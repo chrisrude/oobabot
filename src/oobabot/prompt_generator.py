@@ -91,7 +91,7 @@ class PromptGenerator:
         #     - but with the photo request
         #
         est_chars_in_token_space = self.token_space * self.EST_CHARACTERS_PER_TOKEN
-        prompt_without_history = self._generate("", self.image_request_made)
+        prompt_without_history = self._generate("", self.image_request_made, guild_name="", response_channel="")
 
         # how many chars might we have available for history?
         available_chars_for_history = est_chars_in_token_space - len(
@@ -165,6 +165,8 @@ class PromptGenerator:
         self,
         message_history_txt: str,
         image_coming: str,
+        guild_name: str,
+        response_channel: str,
     ) -> str:
         prompt = self.template_store.format(
             templates.Templates.PROMPT,
@@ -173,6 +175,8 @@ class PromptGenerator:
                 templates.TemplateToken.PERSONA: self.persona.persona,
                 templates.TemplateToken.MESSAGE_HISTORY: message_history_txt,
                 templates.TemplateToken.IMAGE_COMING: image_coming,
+                templates.TemplateToken.GUILDNAME: guild_name,
+                templates.TemplateToken.CHANNELNAME: response_channel,
             },
         )
         prompt += self.bot_prompt_line + "\n"
@@ -182,6 +186,8 @@ class PromptGenerator:
         self,
         message_history: typing.Optional[typing.AsyncIterator[types.GenericMessage]],
         image_requested: bool,
+        guild_name: str,
+        response_channel: str,
     ) -> str:
         """
         Generate a prompt for the AI to respond to.
@@ -192,4 +198,4 @@ class PromptGenerator:
                 message_history,
             )
         image_coming = self.image_request_made if image_requested else ""
-        return self._generate(message_history_txt, image_coming)
+        return self._generate(message_history_txt, image_coming, guild_name, response_channel)

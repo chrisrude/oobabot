@@ -132,6 +132,7 @@ class OobaClient(http_client.SerializedHttpClient):
     Client for the Ooba API.  Can provide the response by token or by sentence.
     """
 
+
     SERVICE_NAME = "Oobabooga"
 
     OOBABOOGA_STREAMING_URI_PATH: str = "/api/v1/stream"
@@ -147,7 +148,9 @@ class OobaClient(http_client.SerializedHttpClient):
         self.request_params = settings["request_params"]
         self.log_all_the_things = settings["log_all_the_things"]
         self.base_blocking = settings["base_blocking"]
-
+        self.use_openai = settings["use_openai"]
+        self.api_key = settings["api_key"]
+        self.openai_endpoint = settings["openai_endpoint"]
         if self.message_regex:
             self.fn_new_splitter = lambda: RegexSplitter(self.message_regex)
         else:
@@ -170,8 +173,14 @@ class OobaClient(http_client.SerializedHttpClient):
             )
 
     async def _setup(self):
-        async with self._get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
-            return
+        if not self.use_openai:
+            async with self._get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
+                return
+    async def __aenter__(self):
+        if self.use_openai:
+            # No need to create a session for SSE streaming
+            return self
+
 
     def get_stopping_strings(self) -> typing.List[str]:
         """
@@ -224,21 +233,81 @@ class OobaClient(http_client.SerializedHttpClient):
             tokens = ""
             last_response = time.perf_counter()
 
-    async def stop():
-        async with aiohttp.ClientSession() as session:
-            url = f"{OobaClient.base_blocking}{OobaClient.OOBABOOGA_STOP_STREAM_URI_PATH}"
-            headers = {"Content-Type": "application/json"}
+    async def stop(self):
+        if self.use_openai:
+            # not implemented yet 
+            pass
+        else:
+            # Existing Ooba API stopping logic
+            async with aiohttp.ClientSession() as session:
+                url = f"{self.base_blocking}{self.OOBABOOGA_STOP_STREAM_URI_PATH}"
+                headers = {"Content-Type": "application/json"}
 
-            async with session.post(url, data=json.dumps({}), headers=headers) as response:
-                response_text = await response.text()
-                print(response_text)
-                return response_text
-
+                async with session.post(url, data=json.dumps({}), headers=headers) as response:
+                   response_text = await response.text()
+                   print(response_text)
+                   return response_text
     async def request_by_token(self, prompt: str) -> typing.AsyncIterator[str]:
         """
         Yields each token of the response as it arrives.
         """
+        if self.use_openai:
+            # Directly iterate over the async generator
+            async for token in self._request_by_token_openai(prompt):
+                yield token
+        else:
+            # The Ooba API request is already an async generator
+            async for token in self._request_by_token_ooba(prompt):
+                yield token
 
+    async def _request_by_token_openai(self, prompt: str) -> typing.AsyncIterator[str]:
+         """
+         Yields the response from the custom OpenAI endpoint.
+         """
+         headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+         }
+         
+         # Start with the base request dictionary
+         request = {
+            "prompt": prompt,
+            # Include other parameters with default values if needed
+         }
+         
+         # Update the request dictionary with additional parameters from settings
+         request.update(self.request_params)
+
+         async with aiohttp.ClientSession() as session:
+            async with session.post(self.openai_endpoint, headers=headers, json=request) as response:
+                  if response.status != 200:
+                     raise http_client.OobaHttpClientError(
+                        f"Request to OpenAI failed with status {response.status}"
+                     )
+                  response_json = await response.json()
+                  
+                  # Log the raw response for debugging purposes
+                  if self.log_all_the_things:
+                     try:
+                        print(f"Raw response JSON:\n{json.dumps(response_json, indent=2)}")
+                     except UnicodeEncodeError:
+                        print(f"Raw response JSON:\n{json.dumps(response_json, indent=2).encode('utf-8')}")
+
+                  choices = response_json.get("choices", [])
+                  if not choices:
+                     raise http_client.OobaHttpClientError("No choices received in the response.")
+                  text = choices[0].get("text", "").strip()
+
+
+                  yield text
+                  
+                  # Signal the end of input
+                  yield MessageSplitter.END_OF_INPUT
+
+    async def _request_by_token_ooba(self, prompt: str) -> typing.AsyncIterator[str]:
+        """
+        Yields each token of the response as it arrives from the Ooba API.
+        """           
         request: dict[
             str, typing.Union[bool, float, int, str, typing.List[typing.Any]]
         ] = {
