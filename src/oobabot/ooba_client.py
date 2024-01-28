@@ -261,48 +261,55 @@ class OobaClient(http_client.SerializedHttpClient):
                 yield token
 
     async def _request_by_token_openai(self, prompt: str) -> typing.AsyncIterator[str]:
-         """
-         Yields the response from the custom OpenAI endpoint.
-         """
-         headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-         }
-         
-         # Start with the base request dictionary
-         request = {
-            "prompt": prompt,
-            # Include other parameters with default values if needed
-         }
-         
-         # Update the request dictionary with additional parameters from settings
-         request.update(self.request_params)
+      """
+      Yields the response from the custom OpenAI endpoint by sentences.
+      """
+      headers = {
+         "Authorization": f"Bearer {self.api_key}",
+         "Content-Type": "application/json"
+      }
 
-         async with aiohttp.ClientSession() as session:
-            async with session.post(self.openai_endpoint, headers=headers, json=request) as response:
-                  if response.status != 200:
-                     raise http_client.OobaHttpClientError(
-                        f"Request to OpenAI failed with status {response.status}"
-                     )
-                  response_json = await response.json()
-                  
-                  # Log the raw response for debugging purposes
-                  if self.log_all_the_things:
-                     try:
-                        print(f"Raw response JSON:\n{json.dumps(response_json, indent=2)}")
-                     except UnicodeEncodeError:
-                        print(f"Raw response JSON:\n{json.dumps(response_json, indent=2).encode('utf-8')}")
+      # Start with the base request dictionary
+      request = {
+         "prompt": prompt,
+         "stream": True,
+         # Include other parameters with default values if needed
+      }
 
-                  choices = response_json.get("choices", [])
-                  if not choices:
-                     raise http_client.OobaHttpClientError("No choices received in the response.")
-                  text = choices[0].get("text", "").strip()
+      request.update(self.request_params)
+
+      async with aiohttp.ClientSession() as session:
+         async with session.post(self.openai_endpoint, headers=headers, json=request) as response:
+               # Check for successful response
+               if response.status != 200:
+                  response_text = await response.text()
+                  raise http_client.OobaHttpClientError(
+                     f"Request to OpenAI failed with status {response.status}: {response_text}"
+                  )
+               async for line in response.content:
+                  decoded_line = line.decode('utf-8')
+                  if decoded_line.startswith("data: "):
+                        event_data_str = decoded_line[6:]
+                        try:
+                           event_data = json.loads(event_data_str)
+                           text = event_data.get("choices", [{}])[0].get("text", "")
+                           if text:
+                              yield text
+                           finish_reason = event_data.get("choices", [{}])[0].get("finish_reason")
+                           if finish_reason == "stop":
+                              break
+                        except json.JSONDecodeError:
+                           continue
+               else:
+                  # If unexpected content type is encountered, log or handle accordingly
+                  response_text = await response.text()
+                  print(f"Unexpected Content-Type encountered: {response.headers.get('Content-Type')}. Response: {response_text}")
+                  # Depending on application logic, raise an error or handle differently
+
+               # Make sure to signal the end of input
+               yield MessageSplitter.END_OF_INPUT
 
 
-                  yield text
-                  
-                  # Signal the end of input
-                  yield MessageSplitter.END_OF_INPUT
 
     async def _request_by_token_ooba(self, prompt: str) -> typing.AsyncIterator[str]:
         """
