@@ -235,7 +235,7 @@ class OobaClient(http_client.SerializedHttpClient):
 
     async def stop(self):
         if self.use_openai:
-            # not implemented yet 
+             
             pass
         else:
             # Existing Ooba API stopping logic
@@ -294,6 +294,7 @@ class OobaClient(http_client.SerializedHttpClient):
                            event_data = json.loads(event_data_str)
                            text = event_data.get("choices", [{}])[0].get("text", "")
                            if text:
+                              print(text, end="", flush=True)
                               yield text
                            finish_reason = event_data.get("choices", [{}])[0].get("finish_reason")
                            if finish_reason == "stop":

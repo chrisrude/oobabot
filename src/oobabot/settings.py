@@ -84,9 +84,9 @@ class Settings:
     # same channel.
     TIME_VS_RESPONSE_CHANCE: typing.List[typing.Tuple[float, float]] = [
         # (seconds, base % chance of an unsolicited response)
-        (120.0, 1.00),
-        (60.0 * 5, 0.80),
-        (60.0 * 10, 0.50),
+        (60.0, 0.90),
+        (120.0, 0.70),
+        (60.0 * 5, 0.50),
     ]
 
     # increased chance of responding to a message if it ends with
@@ -101,7 +101,9 @@ class Settings:
         "max_tokens": 250,
         "do_sample": True,
         "temperature": 1.3,
-        "top_p": 0.1,
+        "min_temp": 0.2,
+        "max_temp": 1.8,
+        "min_p": 0.1,
         "typical_p": 1,
         "epsilon_cutoff": 0,  # In units of 1e-4
         "eta_cutoff": 0,  # In units of 1e-4
@@ -123,7 +125,7 @@ class Settings:
         "truncation_length": 2048,
         "ban_eos_token": False,
         "skip_special_tokens": True,
-        "stopping_strings": [],
+        "stop": [],
     }
 
     # set default negative prompts to make it more difficult
@@ -681,7 +683,49 @@ class Settings:
                 include_in_argparse=False,
             )
         )
-
+        ###########################################################
+        # Vision API Settings
+        self.vision_api_settings = oesp.ConfigSettingGroup("Vision API")
+        self.setting_groups.append(self.vision_api_settings)
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="use_vision",
+               default="False",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Use the OpenAI-like Vision API to generate images.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="vision_api_url",
+               default="http://localhost:8000/v1/chat/completions",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           URL for the OpenAI-like Vision API. 
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="vision_api_key",
+               default="notarealkey",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           API key for the OpenAI-like Vision API.
+                           """
+                     )
+               ],
+            )
+        )
         ###########################################################
         # Stable Diffusion Settings
 

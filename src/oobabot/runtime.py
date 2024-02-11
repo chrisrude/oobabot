@@ -139,6 +139,7 @@ class Runtime:
             prompt_generator=self.prompt_generator,
             repetition_tracker=self.repetition_tracker,
             response_stats=self.response_stats,
+            vision_api_settings=settings.vision_api_settings.get_all(),
         )
 
         self.discord_token = settings.discord_settings.get_str("discord_token")

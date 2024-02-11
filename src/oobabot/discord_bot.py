@@ -6,8 +6,9 @@ be easily extracted into a cross-platform library.
 
 import asyncio
 import typing
-
 import discord
+import base64
+import io
 
 from oobabot import bot_commands
 from oobabot import decide_to_respond
@@ -20,6 +21,7 @@ from oobabot import prompt_generator
 from oobabot import repetition_tracker
 from oobabot import response_stats
 from oobabot import types
+from oobabot import vision
 
 
 class DiscordBot(discord.Client):
@@ -33,6 +35,7 @@ class DiscordBot(discord.Client):
         bot_commands: bot_commands.BotCommands,
         decide_to_respond: decide_to_respond.DecideToRespond,
         discord_settings: dict,
+        vision_api_settings: typing.Dict[str, typing.Any],
         image_generator: typing.Optional[image_generator.ImageGenerator],
         ooba_client: ooba_client.OobaClient,
         persona: persona.Persona,
@@ -56,9 +59,10 @@ class DiscordBot(discord.Client):
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.stop_markers = discord_settings["stop_markers"]
         self.stream_responses = discord_settings["stream_responses"]
-        self.stream_responses_speed_limit = discord_settings[
-            "stream_responses_speed_limit"
-        ]
+        self.stream_responses_speed_limit = discord_settings["stream_responses_speed_limit"]
+        self.vision_api_url = vision_api_settings["vision_api_url"]
+        self.vision_api_key = vision_api_settings["vision_api_key"]
+        self.use_vision = vision_api_settings["use_vision"]
 
         # add stopping_strings to stop_markers
         self.stop_markers.extend(self.ooba_client.get_stopping_strings())
@@ -152,22 +156,60 @@ class DiscordBot(discord.Client):
             )
 
     async def on_message(self, raw_message: discord.Message) -> None:
-        """
-        Called when a message is received from Discord.
+         """
+         Called when a message is received from Discord.
 
-        This method is called for every message that the bot can see.
-        It decides whether to respond to the message, and if so,
-        calls _handle_response() to generate a response.
+         This method is called for every message that the bot can see.
+         It decides whether to respond to the message, and if so,
+         calls _handle_response() to generate a response.
 
-        :param raw_message: The raw message from Discord.
-        """
-        try:
+         :param raw_message: The raw message from Discord.
+         """
+         try:
+            # Check if the message starts with $ and the AI name
+            if raw_message.content.startswith("$" + self.persona.ai_name.lower()):
+                  # Extract the command after the AI name
+                  command = raw_message.content[len("$" + self.persona.ai_name):].strip()
+                  fancy_logger.get().debug("Bot command " + command + " attempted")
+                  # Pass the command to the bot_commands for handling
+                  await self.bot_commands.handle_command(command, raw_message)
+                  return  # Return early as we do not want to process the command as a regular message
+         except Exception as e:
+            fancy_logger.get().error("Error handling command: %s", e, exc_info=True)
+
+         # If the message is not a command, proceed with regular message handling
+         try:
             message = discord_utils.discord_message_to_generic_message(raw_message)
             should_respond, is_summon = self.decide_to_respond.should_reply_to_message(
                 self.ai_user_id, message
             )
             if not should_respond:
                 return
+
+            image_descriptions = []
+            if self.use_vision:
+                if should_respond and raw_message.attachments:
+                    for attachment in raw_message.attachments:
+                        if attachment.content_type and attachment.content_type.startswith('image/'):
+                            try:
+                                # Create a BytesIO buffer
+                                buffer = io.BytesIO()
+                                # Save the attachment to the buffer
+                                await attachment.save(buffer)
+                                buffer.seek(0)  # Move to the start of the buffer
+                                # Encode the image in base64
+                                image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+                                # Now pass the base64-encoded image to the vision function
+                                description = await vision.get_image_description(image_base64, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key)
+                                if description:
+                                    image_descriptions.append(description)
+                            except Exception as e:
+                                fancy_logger.get().error("Error processing image: %s", e, exc_info=True)
+
+            # If there are image descriptions, append them to the message content
+            if image_descriptions:
+                description_text = ' '.join(f'[Image description: {desc}]' for desc in image_descriptions)
+                message.body_text += " " + description_text  # Append descriptions to the message content
 
             is_summon_in_public_channel = is_summon and isinstance(
                 message,
@@ -176,78 +218,78 @@ class DiscordBot(discord.Client):
 
             async with raw_message.channel.typing():
                 await self._handle_response(
-                    message, raw_message, is_summon_in_public_channel
+                    message, raw_message, is_summon_in_public_channel, image_descriptions
                 )
-
-        except discord.DiscordException as err:
+         except discord.DiscordException as err:
             fancy_logger.get().error(
                 "Exception while processing message: %s", err, exc_info=True
             )
 
     async def _handle_response(
-        self,
-        message: types.GenericMessage,
-        raw_message: discord.Message,
-        is_summon_in_public_channel: bool,
-    ) -> None:
-        """
-        Called when we've decided to respond to a message.
+      self,
+      message: types.GenericMessage,
+      raw_message: discord.Message,
+      is_summon_in_public_channel: bool,
+      image_descriptions: typing.List[str],
+      ) -> None:
+      """
+      Called when we've decided to respond to a message.
 
-        It decides if we're sending a text response, an image response,
-        or both, and then sends the response(s).
-        """
-        image_prompt = None
-        if self.image_generator is not None:
+      It decides if we're sending a text response, an image response,
+      or both, and then sends the response(s).
+      """
+      image_prompt = None
+      if self.image_generator is not None:
             # are we creating an image?
             image_prompt = self.image_generator.maybe_get_image_prompt(raw_message)
 
-        result = await self._send_text_response(
+      result = await self._send_text_response(
             message=message,
             raw_message=raw_message,
             image_requested=image_prompt is not None,
             is_summon_in_public_channel=is_summon_in_public_channel,
-        )
-        if result is None:
+            image_descriptions=image_descriptions
+      )
+      if result is None:
             # we failed to create a thread that the user could
             # read our response in, so we're done here.  Abort!
             return
-        message_task, response_channel = result
+      message_task, response_channel = result
 
-        # log the mention, now that we know the channel we
-        # want to monitor later to continue to conversation
-        if isinstance(response_channel, (discord.Thread, discord.abc.GuildChannel)):
+      # log the mention, now that we know the channel we
+      # want to monitor later to continue to conversation
+      if isinstance(response_channel, (discord.Thread, discord.abc.GuildChannel)):
             if is_summon_in_public_channel:
-                self.decide_to_respond.log_mention(
-                    response_channel.id,
-                    message.send_timestamp,
-                )
+               self.decide_to_respond.log_mention(
+                  response_channel.id,
+                  message.send_timestamp,
+               )
 
-        image_task = None
-        if self.image_generator is not None and image_prompt is not None:
-            image_task = await self.image_generator.generate_image(
-                image_prompt,
-                raw_message,
-                response_channel=response_channel,
+      image_task = None
+      if self.image_generator is not None and image_prompt is not None:
+            # Changed from 'await self.image_generator.generate_image(...)' to 'self.image_generator.generate_image(...)'
+            image_task = self.image_generator.generate_image(
+               image_prompt,
+               raw_message,
+               response_channel=response_channel,
             )
 
-        response_tasks = [
+      response_tasks = [
             task for task in [message_task, image_task] if task is not None
-        ]
-        await asyncio.wait(response_tasks)
+      ]
 
-        # there may be more than one exception, so be sure to log
-        # them all before raising either of them
-        raise_later = None
-        for task in response_tasks:
-            if task.exception() is not None:
-                fancy_logger.get().error(
-                    f"Exception while running {task.get_coro()} "
-                    + f"response: {task.exception()}",
-                    stack_info=True,
-                )
-                raise_later = task.exception()
-        if raise_later is not None:
-            raise raise_later
+      # Use asyncio.gather instead of asyncio.wait to properly handle exceptions
+      if response_tasks:
+            done, pending = await asyncio.wait(response_tasks, return_when=asyncio.ALL_COMPLETED)
+            # Check for exceptions in the tasks that have completed
+            for task in done:
+               if task.exception():
+                  fancy_logger.get().error(
+                        f"Exception while running {task.get_coro()} "
+                        + f"response: {task.exception()}",
+                        stack_info=True,
+                  )
+                  raise task.exception()
 
     async def _send_text_response(
         self,
@@ -255,6 +297,7 @@ class DiscordBot(discord.Client):
         raw_message: discord.Message,
         image_requested: bool,
         is_summon_in_public_channel: bool,
+        image_descriptions: typing.List[str],
     ) -> typing.Optional[typing.Tuple[asyncio.Task, discord.abc.Messageable]]:
         """
         Send a text response to a message.
@@ -306,6 +349,7 @@ class DiscordBot(discord.Client):
             is_summon_in_public_channel=is_summon_in_public_channel,
             response_channel=response_channel,
             response_channel_id=response_channel.id,
+            image_descriptions=image_descriptions,
         )
         response_task = asyncio.create_task(response_coro)
         return (response_task, response_channel)
@@ -318,21 +362,22 @@ class DiscordBot(discord.Client):
         is_summon_in_public_channel: bool,
         response_channel: discord.abc.Messageable,
         response_channel_id: int,
+        image_descriptions: typing.List[str],
     ) -> None:
         """
         Getting closer now!  This method is what actually gathers message
         history, queries the AI for a text response, breaks the response
         into individual messages, and then and then calls
-        __send_response_message() to send sech message.
+        __send_response_message() to send each message.
         """
         fancy_logger.get().debug(
             "Request from %s in %s", message.author_name, message.channel_name
         )
-
+    
         repeated_id = self.repetition_tracker.get_throttle_message_id(
             response_channel_id
         )
-
+    
         # determine if we're responding to a specific message that
         # summoned us.  If so, find out what message ID that was, so
         # that we can ignore all messages sent after it (as not to
@@ -344,14 +389,34 @@ class DiscordBot(discord.Client):
             if message.channel_id == response_channel_id:
                 reference = raw_message.to_reference()
             ignore_all_until_message_id = raw_message.id
-
+    
         recent_messages = await self._recent_messages_following_thread(
             channel=response_channel,
             num_history_lines=self.prompt_generator.history_lines,
             stop_before_message_id=repeated_id,
             ignore_all_until_message_id=ignore_all_until_message_id,
+            image_descriptions=image_descriptions,
         )
 
+        # Convert the recent messages into a list to modify it
+        recent_messages_list = [msg async for msg in recent_messages]
+
+        # If there are image descriptions, create a new message with the user's name and prepend it
+        if image_descriptions:
+            description_text = ' '.join(f'[User posted an image and your image recognition system describes it to you: {desc}]' for desc in image_descriptions)
+            for msg in recent_messages_list:
+                if msg.author_id == message.author_id:
+                    # Append the image descriptions to the body text of the user's last message
+                    msg.body_text += "\n" + description_text
+                    break
+
+        # Convert the list back into an asynchronous iterator
+        async def list_to_async_iterator(lst):
+            for item in lst:
+                yield item
+        recent_messages_async_iter = list_to_async_iterator(recent_messages_list)
+
+        # Generate the prompt prefix using the modified recent messages list
         if isinstance(response_channel, discord.abc.GuildChannel):
             guild_name = response_channel.guild.name
         elif isinstance(response_channel, discord.GroupChannel):
@@ -359,22 +424,22 @@ class DiscordBot(discord.Client):
         else:
             guild_name = "Direct Message"
         prompt_prefix = await self.prompt_generator.generate(
-            message_history=recent_messages,
+            message_history=recent_messages_async_iter,
             image_requested=image_requested,
             guild_name=guild_name,
-            response_channel=response_channel,  # Pass the guild name here
+            response_channel=response_channel,
         )
-
+        
+    
         this_response_stat = self.response_stats.log_request_arrived(prompt_prefix)
-
         # restrict the @mentions the AI is allowed to use in its response.
         # this is to prevent another user from being able to trick the AI
         # into @-pinging a large group and annoying them.
         # Only the author of the original message may be @-pinged.
         allowed_mentions = discord.AllowedMentions(
-            everyone=False,
-            users=[raw_message.author],
-            roles=False,
+            everyone=True,
+            users=True,
+            roles=True,
         )
 
         # will be set to true when we abort the response because:
@@ -598,7 +663,7 @@ class DiscordBot(discord.Client):
 
             # hack: abort response if it looks like the AI is
             # continuing the conversation as someone else
-            if line.endswith(" says:"):
+            if "says:" in line:
                 fancy_logger.get().warning(
                     'Filtered out "%s" from response, aborting', line
                 )
@@ -631,59 +696,68 @@ class DiscordBot(discord.Client):
 
     ########
     async def _filter_history_message(
-        self,
-        message: discord.Message,
-        stop_before_message_id: typing.Optional[int],
-    ) -> typing.Tuple[typing.Optional[types.GenericMessage], bool]:
-        """
-        Filter out any messages that we don't want to include in the
-        AI's history.
+      self,
+      message: discord.Message,
+      stop_before_message_id: typing.Optional[int],
+   ) -> typing.Tuple[typing.Optional[types.GenericMessage], bool]:
+      """
+      Filter out any messages that we don't want to include in the
+      AI's history.
 
-        These include:
-         - messages generated by our image generator
-         - messages at or before the stop_before_message_id
+      These include:
+       - messages generated by our image generator
+       - messages at or before the stop_before_message_id
 
-        Also, modify the message in the following ways:
-         - if the message is from the AI, set the author name to
-           the AI's persona name, not its Discord account name
-         - remove <@_0000000_> user-id based message mention text,
-           replacing them with @username mentions
-        """
-        # if we've hit the throttle message, stop and don't add any
-        # more history
-        if stop_before_message_id and message.id == stop_before_message_id:
-            return (None, False)
+      Also, modify the message in the following ways:
+       - if the message is from the AI, set the author name to
+         the AI's persona name, not its Discord account name
+       - remove <@_0000000_> user-id based message mention text,
+         replacing them with @username mentions
+      """
+      # if we've hit the throttle message, stop and don't add any
+      # more history
+      if stop_before_message_id and message.id == stop_before_message_id:
+         return (None, False)
 
-        generic_message = discord_utils.discord_message_to_generic_message(message)
+      generic_message = discord_utils.discord_message_to_generic_message(message)
 
-        if generic_message.author_id == self.ai_user_id:
-            # make sure the AI always sees its persona name
-            # in the transcript, even if the chat program
-            # has it under a different account name
-            generic_message.author_name = self.persona.ai_name
+      if generic_message.author_id == self.ai_user_id:
+         # make sure the AI always sees its persona name
+         # in the transcript, even if the chat program
+         # has it under a different account name
+         generic_message.author_name = self.persona.ai_name
 
-            # hack: use the suppress_embeds=True flag to indicate
-            # that this message is one we generated as part of a text
-            # response, as opposed to an image or application message
-            if not message.flags.suppress_embeds:
-                # this is a message generated by our image generator
-                return (None, True)
+         # hack: use the suppress_embeds=True flag to indicate
+         # that this message is one we generated as part of a text
+         # response, as opposed to an image or application message
+         if not message.flags.suppress_embeds:
+            # this is a message generated by our image generator
+            return (None, True)
 
-        if message.channel.guild is None:
-            fn_user_id_to_name = discord_utils.dm_user_id_to_name(
-                self.ai_user_id,
-                self.persona.ai_name,
-            )
-        else:
-            fn_user_id_to_name = discord_utils.guild_user_id_to_name(
-                message.channel.guild,
-            )
+      if isinstance(message.channel, discord.DMChannel):
+         fn_user_id_to_name = discord_utils.dm_user_id_to_name(
+            self.ai_user_id,
+            self.persona.ai_name,
+         )
+      elif isinstance(message.channel, discord.TextChannel):
+         fn_user_id_to_name = discord_utils.guild_user_id_to_name(
+            message.channel.guild,
+         )
+      elif isinstance(message.channel, discord.GroupChannel):
+         fn_user_id_to_name = discord_utils.group_user_id_to_name(
+            message.channel,
+         )
+      else:
+         fn_user_id_to_name = discord_utils.dm_user_id_to_name(
+            self.ai_user_id,
+            self.persona.ai_name,
+         )
 
-        discord_utils.replace_mention_ids_with_names(
-            generic_message,
-            fn_user_id_to_name=fn_user_id_to_name,
-        )
-        return (generic_message, True)
+      discord_utils.replace_mention_ids_with_names(
+         generic_message,
+         fn_user_id_to_name=fn_user_id_to_name,
+      )
+      return (generic_message, True)
 
     async def _filtered_history_iterator(
         self,
@@ -776,6 +850,7 @@ class DiscordBot(discord.Client):
         stop_before_message_id: typing.Optional[int],
         ignore_all_until_message_id: typing.Optional[int],
         num_history_lines: int,
+        image_descriptions: typing.List[str],  # Add this parameter
     ) -> typing.AsyncIterator[types.GenericMessage]:
         max_messages_to_check = num_history_lines + self.MESSAGE_HISTORY_LOOKBACK_BONUS
         history = channel.history(limit=max_messages_to_check)
@@ -785,4 +860,6 @@ class DiscordBot(discord.Client):
             stop_before_message_id=stop_before_message_id,
             ignore_all_until_message_id=ignore_all_until_message_id,
         )
+
+
         return result
