@@ -165,17 +165,7 @@ class DiscordBot(discord.Client):
 
          :param raw_message: The raw message from Discord.
          """
-         try:
-            # Check if the message starts with $ and the AI name
-            if raw_message.content.startswith("$" + self.persona.ai_name.lower()):
-                  # Extract the command after the AI name
-                  command = raw_message.content[len("$" + self.persona.ai_name):].strip()
-                  fancy_logger.get().debug("Bot command " + command + " attempted")
-                  # Pass the command to the bot_commands for handling
-                  await self.bot_commands.handle_command(command, raw_message)
-                  return  # Return early as we do not want to process the command as a regular message
-         except Exception as e:
-            fancy_logger.get().error("Error handling command: %s", e, exc_info=True)
+
 
          # If the message is not a command, proceed with regular message handling
          try:
