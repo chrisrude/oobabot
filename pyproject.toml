@@ -15,6 +15,7 @@ pysbd = "^0.3.4"
 ruamel-yaml = "^0.17.26"
 pynacl = "^1.5.0"
 typing-extensions = "^4.9.0"
+emoji = "^2.10.1"
 
 [tool.poetry.scripts]
 oobabot = 'oobabot.oobabot:main'

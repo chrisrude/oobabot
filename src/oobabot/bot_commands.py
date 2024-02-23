@@ -45,6 +45,8 @@ class BotCommands:
             discord_settings["discrivener_location"],
             discord_settings["discrivener_model_location"],
         )
+        self.speak_voice_replies = discord_settings["speak_voice_replies"]
+        self.post_voice_replies = discord_settings["post_voice_replies"]
 
         if (
             discord_settings["discrivener_location"]
@@ -75,6 +77,8 @@ class BotCommands:
                 prompt_generator,
                 self.discrivener_location,
                 self.discrivener_model_location,
+                self.speak_voice_replies,
+                self.post_voice_replies,
             )
 
     async def on_ready(self, client: discord.Client):
@@ -116,7 +120,6 @@ class BotCommands:
             description=f"Force {self.persona.ai_name} to stop typing the current message.",
         )
         async def stop(interaction: discord.Interaction):
-            channel = await get_messageable(interaction)
             if interaction.channel_id is None:
                 await discord_utils.fail_interaction(interaction)
                 return

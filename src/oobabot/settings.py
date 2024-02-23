@@ -555,6 +555,37 @@ class Settings:
                 include_in_argparse=False,
             )
         )
+
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="speak_voice_replies",
+                default="true",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Whether to speak replies in voice calls with discrivener
+                           default: true
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="post_voice_replies",
+                default="false",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Whether to reply in the voice-text channel of voice calls
+                           default: false
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
         ###########################################################
         # Oobabooga Settings
 
