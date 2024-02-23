@@ -786,6 +786,19 @@ class Settings:
                ],
             )
         )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="vision_api_model",
+               default="gpt-4-vision-preview",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Model to use for the vision API.
+                           """
+                     )
+               ],
+            )
+        )
         ###########################################################
         # Stable Diffusion Settings
 

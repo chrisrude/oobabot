@@ -1,13 +1,18 @@
 import aiohttp
 
-async def get_image_description(image_base64, vision_api_url, vision_api_key):
+async def get_image_description(image, vision_api_url, vision_api_key, vision_api_model):
+    if image.startswith('http'):
+        image_data = image
+    else:
+        image_data = f"data:image/jpeg;base64,{image}"
+
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {vision_api_key}"
     }
 
     payload = {
-        "model": "gpt-4-vision-preview",
+        "model": vision_api_model,
         "messages": [
             {
                 "role": "user",
@@ -19,7 +24,7 @@ async def get_image_description(image_base64, vision_api_url, vision_api_key):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_base64}",
+                            "url": image_data,
                         }
                     }
                 ]
