@@ -53,6 +53,7 @@ class DiscordBot(discord.Client):
         self.response_stats = response_stats
 
         self.ai_user_id = -1
+        self.prompt_finder = re.compile(r"^[^\s]+:")
 
         self.dont_split_responses = discord_settings["dont_split_responses"]
         self.ignore_dms = discord_settings["ignore_dms"]
@@ -415,8 +416,8 @@ class DiscordBot(discord.Client):
         prompt_prefix = await self.prompt_generator.generate(
             message_history=recent_messages_async_iter,
             image_requested=image_requested,
-            guild_name=guild_name,
-            response_channel=response_channel,
+            guild_name=str(guild_name),
+            response_channel=str(response_channel),
         )
         
     
