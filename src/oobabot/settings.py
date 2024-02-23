@@ -525,6 +525,35 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
+            oesp.ConfigSetting[list[str]](
+                name="response_chance_vs_time",
+                default=[str(x) for x in self.TIME_VS_RESPONSE_CHANCE],
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Response chance vs. time - calibration table
+                        List of tuples with time in seconds and response chance as float between 0-1
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[float](
+                name="interrobang_bonus",
+                default=self.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        How much to increase response chance by if the message ends with ? or !
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="discrivener_location",
                 default="",
@@ -778,6 +807,20 @@ class Settings:
             )
         )
         self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[typing.List[str]](
+                name="avatar_words",
+                default=self.DEFAULT_IMAGE_WORDS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        When one of these words is used in a message, the bot will
+                        generate a self-portrait.
+                        """
+                    )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="stable_diffusion_url",
                 default="",
@@ -801,6 +844,17 @@ class Settings:
                         sent to Stable Diffusion.
                         """
                     )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="avatar_prompt",
+                default="",
+                description_lines=[
+                    """
+                    Prompt to send to Stable Diffusion to generate self-portrait if asked.
+                    """
                 ],
             )
         )
