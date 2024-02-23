@@ -2,12 +2,12 @@
 
 **`oobabot`** is a Discord bot which talks to a Large Language Model AIs (like LLaMA, llama.cpp, etc...), running on [oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui).
 
-[![python lint and test with poetry](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml/badge.svg)](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml)
+**updated to support OpenAI API! use `--generate-config` to update your configs!**
 
 ## Installation
 
 ```bash
-  pip install oobabot
+  pip install git+https://github.com/jmoney7823956789378/oobabot
 ```
 
 requires python 3.8+
@@ -51,6 +51,8 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 | **easy networking** | connects to discord from your machine using websockets, so no need to expose a server to the internet |
 | ✨**Stable Diffusion** | new in v0.1.4!  Optional image generation with AUTOMATIC1111 |
 | ✨**Slash Commands** | coming in v0.1.6... did your bot get confused?  `/lobotomize` it! |
+| **OpenAI API Support** | roughly supports OpenAI API endpoints |
+| **Vision API Support** | roughly supports Vision model API (tested with llama-cpp-python API) |
 
 ## Getting Started with **`oobabot`**
 
