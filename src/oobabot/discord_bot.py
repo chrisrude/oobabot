@@ -9,7 +9,7 @@ import typing
 import discord
 import base64
 import io
-
+import re
 from oobabot import bot_commands
 from oobabot import decide_to_respond
 from oobabot import discord_utils
@@ -257,7 +257,6 @@ class DiscordBot(discord.Client):
 
       image_task = None
       if self.image_generator is not None and image_prompt is not None:
-            # Changed from 'await self.image_generator.generate_image(...)' to 'self.image_generator.generate_image(...)'
             image_task = self.image_generator.generate_image(
                image_prompt,
                raw_message,
@@ -624,7 +623,7 @@ class DiscordBot(discord.Client):
         return last_message
 
     def _filter_immersion_breaking_lines(
-        self, sentence: str
+    self, text: str
     ) -> typing.Tuple[str, bool]:
         """
         Given a string that represents an individual response message,
@@ -638,50 +637,66 @@ class DiscordBot(discord.Client):
         and a boolean indicating if we should abort the response entirely,
         ignoring any further lines.
         """
-        lines = sentence.split("\n")
+        # This pattern uses a positive lookahead to keep the punctuation at the end of the sentence
+        split_pattern = r'(?<=[.!?])\s+(?=[A-Z])'
+        # First, split the text by 'real' newlines to preserve them
+        lines = text.split('\n')
         good_lines = []
-        previous_line = ""
         abort_response = False
+
         for line in lines:
-            # if the AI gives itself a second line, just ignore
-            # the line instruction and continue
-            if self.prompt_generator.bot_prompt_line == line:
-                fancy_logger.get().warning(
-                    "Filtered out %s from response, continuing", line
-                )
-                continue
+            # Split the line by the pattern to get individual sentences
+            sentences = re.split(split_pattern, line)
+            good_sentences = []
 
-            # hack: abort response if it looks like the AI is
-            # continuing the conversation as someone else
-            if "says:" in line:
-                fancy_logger.get().warning(
-                    'Filtered out "%s" from response, aborting', line
-                )
-                abort_response = True
-                break
-
-            # look for partial stop markers within a line
-            for marker in self.stop_markers:
-                if marker in line:
-                    (keep_part, removed) = line.split(marker, 1)
+            for sentence in sentences:
+                # if the AI gives itself a second line, just ignore
+                # the line instruction and continue
+                if self.prompt_generator.bot_prompt_line == sentence:
                     fancy_logger.get().warning(
-                        'Filtered out "%s" from response, aborting',
-                        removed,
+                        "Filtered out %s from response, continuing", sentence
                     )
-                    if keep_part:
-                        good_lines.append(keep_part)
+                    continue
+
+                # hack: abort response if it looks like the AI is
+                # continuing the conversation as someone else
+                if "]:" in sentence:
+                    fancy_logger.get().warning(
+                        'Filtered out "%s" from response, aborting', sentence
+                    )
                     abort_response = True
                     break
 
-            if not line and not previous_line:
-                # filter out multiple blank lines in a row
-                continue
+                # look for partial stop markers within a sentence
+                for marker in self.stop_markers:
+                    if marker in sentence:
+                        (keep_part, removed) = sentence.split(marker, 1)
+                        fancy_logger.get().warning(
+                            'Filtered out "%s" from response, aborting',
+                            removed,
+                        )
+                        if keep_part:
+                            good_sentences.append(keep_part)
+                        abort_response = True
+                        break
 
-            if not line.strip():
-                # filter out lines that are entirely made of whitespace
-                continue
+                if abort_response:
+                    break
 
-            good_lines.append(line)
+                # filter out sentences that are entirely made of whitespace
+                if not sentence.strip():
+                    continue
+
+                good_sentences.append(sentence)
+
+            if abort_response:
+                break
+
+            # Join the good sentences with a space and append to good_lines
+            good_line = " ".join(good_sentences)
+            if good_line:
+                good_lines.append(good_line)
+
         return ("\n".join(good_lines), abort_response)
 
     ########

@@ -59,7 +59,7 @@ class PromptGenerator:
         self.bot_prompt_line = self.template_store.format(
             templates.Templates.PROMPT_HISTORY_LINE,
             {
-                templates.TemplateToken.USER_NAME: self.persona.ai_name,
+                templates.TemplateToken.USER_NAME: "[" + self.persona.ai_name + "]",
                 templates.TemplateToken.USER_MESSAGE: "",
             },
         ).strip()
@@ -142,7 +142,7 @@ class PromptGenerator:
             line = self.template_store.format(
                 templates.Templates.PROMPT_HISTORY_LINE,
                 {
-                    templates.TemplateToken.USER_NAME: message.author_name,
+                    templates.TemplateToken.USER_NAME: "[" + message.author_name + "]",
                     templates.TemplateToken.USER_MESSAGE: message.body_text,
                 },
             )
@@ -179,7 +179,8 @@ class PromptGenerator:
                 templates.TemplateToken.CHANNELNAME: response_channel,
             },
         )
-        prompt += self.bot_prompt_line + "\n"
+        prompt += self.bot_prompt_line
+        print(prompt)
         return prompt
 
     async def generate(

@@ -84,9 +84,9 @@ class Settings:
     # same channel.
     TIME_VS_RESPONSE_CHANCE: typing.List[typing.Tuple[float, float]] = [
         # (seconds, base % chance of an unsolicited response)
-        (60.0, 0.90),
-        (120.0, 0.70),
-        (60.0 * 5, 0.50),
+        (180.0, 0.99),
+        (300.0, 0.70),
+        (60.0 * 10, 0.50),
     ]
 
     # increased chance of responding to a message if it ends with

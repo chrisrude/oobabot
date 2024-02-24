@@ -149,7 +149,7 @@ class TemplateStore:
     DEFAULT_TEMPLATES: typing.Dict[Templates, str] = {
         Templates.PROMPT: textwrap.dedent(
             """
-            You are in a chat room with multiple participants.
+            You are in a chat room called {CHANNELNAME}/{GUILDNAME} with multiple participants.
             Below is a transcript of recent messages in the conversation.
             Write the next one to three messages that you would send in this
             conversation, from the point of view of the participant named
@@ -166,9 +166,7 @@ class TemplateStore:
         ),
         Templates.PROMPT_HISTORY_LINE: textwrap.dedent(
             """
-            {USER_NAME} says:
-            {USER_MESSAGE}
-
+            {USER_NAME}: {USER_MESSAGE}
             """
         ),
         Templates.PROMPT_IMAGE_COMING: textwrap.dedent(
