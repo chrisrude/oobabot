@@ -424,6 +424,24 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="prompt_prefix",
+                default="",
+                description_lines=[
+                    "The prefix prepended to AI name in the prompt to the language model.",
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="prompt_suffix",
+                default="",
+                description_lines=[
+                    "The suffix appended to AI name in the prompt to the language model.",
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
                 name="stop_markers",
                 default=[

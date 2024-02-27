@@ -56,7 +56,6 @@ class DiscordBot(discord.Client):
         self.response_stats = response_stats
 
         self.ai_user_id = -1
-        self.prompt_finder = re.compile(r"^[^\s]+:")
         self.url_extractor = re.compile(r"(https?://\S+)")
 
         self.dont_split_responses = discord_settings["dont_split_responses"]
@@ -69,6 +68,10 @@ class DiscordBot(discord.Client):
         self.vision_api_key = vision_api_settings["vision_api_key"]
         self.vision_api_model = vision_api_settings["vision_api_model"]
         self.use_vision = vision_api_settings["use_vision"]
+
+        self.prompt_prefix = discord_settings["prompt_prefix"]
+        self.prompt_suffix = discord_settings["prompt_suffix"]
+        self.prompt_finder = re.compile(r"^" + re.escape(self.prompt_prefix) + r"\S+" + re.escape(self.prompt_suffix) + r":")
 
         # add stopping_strings to stop_markers
         self.stop_markers.extend(self.ooba_client.get_stopping_strings())
@@ -686,7 +689,7 @@ class DiscordBot(discord.Client):
 
                 # hack: abort response if it looks like the AI is
                 # continuing the conversation as someone else
-                if "]:" in sentence:
+                if self.prompt_finder.match(sentence):
                     fancy_logger.get().warning(
                         'Filtered out "%s" from response, aborting', sentence
                     )

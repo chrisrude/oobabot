@@ -54,12 +54,15 @@ class PromptGenerator:
         self.persona = persona
         self.template_store = template_store
 
+        self.prompt_prefix = discord_settings["prompt_prefix"]
+        self.prompt_suffix = discord_settings["prompt_suffix"]
+
         # this will be also used when sending message
         # to suppress sending the prompt text to the user
         self.bot_prompt_line = self.template_store.format(
             templates.Templates.PROMPT_HISTORY_LINE,
             {
-                templates.TemplateToken.USER_NAME: "[" + self.persona.ai_name + "]",
+                templates.TemplateToken.USER_NAME: self.prompt_prefix + self.persona.ai_name + self.prompt_suffix,
                 templates.TemplateToken.USER_MESSAGE: "",
             },
         ).strip()
@@ -142,7 +145,7 @@ class PromptGenerator:
             line = self.template_store.format(
                 templates.Templates.PROMPT_HISTORY_LINE,
                 {
-                    templates.TemplateToken.USER_NAME: "[" + message.author_name + "]",
+                    templates.TemplateToken.USER_NAME: self.prompt_prefix + message.author_name + self.prompt_suffix,
                     templates.TemplateToken.USER_MESSAGE: message.body_text,
                 },
             )
