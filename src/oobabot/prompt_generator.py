@@ -183,7 +183,6 @@ class PromptGenerator:
             },
         )
         prompt += self.bot_prompt_line
-        print(prompt)
         return prompt
 
     async def generate(
