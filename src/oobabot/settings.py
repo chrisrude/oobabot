@@ -176,14 +176,30 @@ class Settings:
 
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
-    DEFAULT_IMAGE_WORDS: typing.List[str] = [
-        "draw me",
-        "drawing",
+    DEFAULT_IMAGE_VERBS: typing.List[str] = [
+        "draw",
+        "sketch",
+        "paint",
+        "make",
+        "generate",
+        "post",
+        "upload",
+    ]
+    DEFAULT_IMAGE_NOUNS: typing.List[str] = [
         "photo",
         "pic",
         "picture",
         "image",
         "sketch",
+    ]
+    DEFAULT_AVATAR_WORDS: typing.List[str] = [
+        "self-portrait",
+        "self portrait",
+        "your avatar",
+        "your pfp",
+        "your profile pic",
+        "yourself",
+        "you",
     ]
 
     # ENVIRONMENT VARIABLES ####
@@ -832,7 +848,7 @@ class Settings:
             )
         )
         self.vision_api_settings.add_setting(
-            oesp.ConfigSetting[str](
+            oesp.ConfigSetting[int](
                name="max_tokens",
                default=300,
                description_lines=[
@@ -845,7 +861,7 @@ class Settings:
             )
         )
         self.vision_api_settings.add_setting(
-            oesp.ConfigSetting[str](
+            oesp.ConfigSetting[int](
                name="max_image_size",
                default=1344,
                description_lines=[
@@ -867,7 +883,7 @@ class Settings:
         self.stable_diffusion_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
                 name="image_verbs",
-                default=self.DEFAULT_IMAGE_WORDS,
+                default=self.DEFAULT_IMAGE_VERBS,
                 description_lines=[
                     textwrap.dedent(
                         """
@@ -881,7 +897,7 @@ class Settings:
         self.stable_diffusion_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
                 name="image_nouns",
-                default=self.DEFAULT_IMAGE_WORDS,
+                default=self.DEFAULT_IMAGE_NOUNS,
                 description_lines=[
                     textwrap.dedent(
                         """
@@ -895,7 +911,7 @@ class Settings:
         self.stable_diffusion_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
                 name="avatar_words",
-                default=self.DEFAULT_IMAGE_WORDS,
+                default=self.DEFAULT_AVATAR_WORDS,
                 description_lines=[
                     textwrap.dedent(
                         """
