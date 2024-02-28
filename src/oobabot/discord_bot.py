@@ -10,6 +10,9 @@ import discord
 import base64
 import io
 import re
+import requests
+from PIL import Image
+
 from oobabot import bot_commands
 from oobabot import decide_to_respond
 from oobabot import discord_utils
@@ -53,6 +56,7 @@ class DiscordBot(discord.Client):
         self.response_stats = response_stats
 
         self.ai_user_id = -1
+        self.url_extractor = re.compile(r"(https?://\S+)")
 
         self.dont_split_responses = discord_settings["dont_split_responses"]
         self.ignore_dms = discord_settings["ignore_dms"]
@@ -62,7 +66,15 @@ class DiscordBot(discord.Client):
         self.stream_responses_speed_limit = discord_settings["stream_responses_speed_limit"]
         self.vision_api_url = vision_api_settings["vision_api_url"]
         self.vision_api_key = vision_api_settings["vision_api_key"]
+        self.vision_model = vision_api_settings["model"]
+        self.vision_max_tokens = vision_api_settings["max_tokens"]
+        self.vision_max_image_size = vision_api_settings["max_image_size"]
+        self.vision_fetch_urls = vision_api_settings["fetch_urls"]
         self.use_vision = vision_api_settings["use_vision"]
+
+        self.prompt_prefix = discord_settings["prompt_prefix"]
+        self.prompt_suffix = discord_settings["prompt_suffix"]
+        self.prompt_finder = re.compile(r"^" + re.escape(self.prompt_prefix) + r"\S+" + re.escape(self.prompt_suffix) + r":")
 
         # add stopping_strings to stop_markers
         self.stop_markers.extend(self.ooba_client.get_stopping_strings())
@@ -178,28 +190,51 @@ class DiscordBot(discord.Client):
 
             image_descriptions = []
             if self.use_vision:
-                if should_respond and raw_message.attachments:
-                    for attachment in raw_message.attachments:
-                        if attachment.content_type and attachment.content_type.startswith('image/'):
-                            try:
-                                # Create a BytesIO buffer
-                                buffer = io.BytesIO()
-                                # Save the attachment to the buffer
-                                await attachment.save(buffer)
-                                buffer.seek(0)  # Move to the start of the buffer
-                                # Encode the image in base64
-                                image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-                                # Now pass the base64-encoded image to the vision function
-                                description = await vision.get_image_description(image_base64, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key)
-                                if description:
-                                    image_descriptions.append(description)
-                            except Exception as e:
-                                fancy_logger.get().error("Error processing image: %s", e, exc_info=True)
-
-            # If there are image descriptions, append them to the message content
-            if image_descriptions:
-                description_text = ' '.join(f'[Image description: {desc}]' for desc in image_descriptions)
-                message.body_text += " " + description_text  # Append descriptions to the message content
+                if should_respond:
+                    if self.vision_fetch_urls:
+                        urls = self.url_extractor.findall(raw_message.content)
+                        if urls:
+                            for url in urls:
+                                r = requests.head(url)
+                                if r.headers["content-type"].startswith("image/"):
+                                    try:
+                                        description = await vision.get_image_description(url, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, model=self.vision_model, max_tokens=self.vision_max_tokens)
+                                        if description:
+                                            image_descriptions.append(description)
+                                    except Exception as e:
+                                        fancy_logger.get().error("Error processing image: %s", e, exc_info=True)
+                    if raw_message.attachments:
+                        for attachment in raw_message.attachments:
+                            if attachment.content_type and attachment.content_type.startswith("image/"):
+                                try:
+                                    # Create a BytesIO buffer
+                                    buffer = io.BytesIO()
+                                    # Save the attachment to the buffer
+                                    await attachment.save(buffer)
+                                    buffer.seek(0)  # Move to the start of the buffer
+                                    # Resample the image to something our image recognition model can handle, if necessary
+                                    image = Image.open(buffer)
+                                    buffer.flush()
+                                    if image.width > self.vision_max_image_size or image.height > self.vision_max_image_size:
+                                        # Resize image using its largest side as the baseline, preserving aspect ratio
+                                        if image.width > image.height:
+                                            height = int(image.height * (self.vision_max_image_size / image.width))
+                                            image = image.resize((self.vision_max_image_size, height), Image.LANCZOS)
+                                        else:
+                                            width = int(image.width * (self.vision_max_image_size / image.height))
+                                            image = image.resize((width, self.vision_max_image_size), Image.LANCZOS)
+                                    image.save(buffer, "PNG", optimize=True) # dump image data in PNG format
+                                    buffer.seek(0)
+                                    # Encode the image in base64
+                                    #image_base64 = "data:image/png;base64," # this doesn't work with LocalAI for some reason, someone save me
+                                    image_base64 = "data:image/jpeg;base64," # we lie to the API since it only accepts JPEG, but can decode PNG data anyway
+                                    image_base64 += base64.b64encode(buffer.read()).decode("utf-8")
+                                    # Now pass the base64-encoded image to the vision function
+                                    description = await vision.get_image_description(image_base64, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, model=self.vision_model, max_tokens=self.vision_max_tokens)
+                                    if description:
+                                        image_descriptions.append(description)
+                                except Exception as e:
+                                    fancy_logger.get().error("Error processing image: %s", e, exc_info=True)
 
             is_summon_in_public_channel = is_summon and isinstance(
                 message,
@@ -392,7 +427,7 @@ class DiscordBot(discord.Client):
 
         # If there are image descriptions, create a new message with the user's name and prepend it
         if image_descriptions:
-            description_text = ' '.join(f'[User posted an image and your image recognition system describes it to you: {desc}]' for desc in image_descriptions)
+            description_text = ' '.join(f'[{message.author_name} posted an image and your image recognition system describes it to you: {desc}]' for desc in image_descriptions)
             for msg in recent_messages_list:
                 if msg.author_id == message.author_id:
                     # Append the image descriptions to the body text of the user's last message
@@ -415,8 +450,8 @@ class DiscordBot(discord.Client):
         prompt_prefix = await self.prompt_generator.generate(
             message_history=recent_messages_async_iter,
             image_requested=image_requested,
-            guild_name=guild_name,
-            response_channel=response_channel,
+            guild_name=str(guild_name),
+            response_channel=str(response_channel),
         )
         
     
@@ -660,7 +695,7 @@ class DiscordBot(discord.Client):
 
                 # hack: abort response if it looks like the AI is
                 # continuing the conversation as someone else
-                if "]:" in sentence:
+                if self.prompt_finder.match(sentence):
                     fancy_logger.get().warning(
                         'Filtered out "%s" from response, aborting', sentence
                     )

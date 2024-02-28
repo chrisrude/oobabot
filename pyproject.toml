@@ -13,6 +13,11 @@ python = "^3.8.1"
 "discord.py" = "^2.2.2"
 pysbd = "^0.3.4"
 ruamel-yaml = "^0.17.26"
+pynacl = "^1.5.0"
+typing-extensions = "^4.9.0"
+emoji = "^2.10.1"
+pillow = "^10.2.0"
+requests = "^2.31.0"
 
 [tool.poetry.scripts]
 oobabot = 'oobabot.oobabot:main'

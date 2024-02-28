@@ -26,6 +26,8 @@ class AudioCommands:
         prompt_generator: prompt_generator.PromptGenerator,
         discrivener_location: str,
         discrivener_model_location: str,
+        speak_voice_replies: bool,
+        post_voice_replies: bool,
     ):
         voice_client.VoiceClient.wakewords = persona.wakewords
 
@@ -35,6 +37,9 @@ class AudioCommands:
 
         voice_client.VoiceClient.discrivener_location = discrivener_location
         voice_client.VoiceClient.discrivener_model_location = discrivener_model_location
+        voice_client.VoiceClient.speak_voice_replies = speak_voice_replies
+        voice_client.VoiceClient.post_voice_replies = post_voice_replies
+        voice_client.VoiceClient.persona = persona
         voice_client.VoiceClient.ooba_client = ooba_client
         voice_client.VoiceClient.prompt_generator = prompt_generator
 
@@ -105,6 +110,8 @@ class AudioCommands:
                 self.voice_client = await voice_channel.connect(
                     cls=voice_client.VoiceClient,
                 )
+                voice_client.VoiceClient.inviter = interaction.user.display_name
+
                 message = f"Joined voice channel #{voice_channel.name}"
             except discord.DiscordException as err:
                 fancy_logger.get().error(
@@ -120,7 +127,7 @@ class AudioCommands:
         @discord.app_commands.command(
             name="leave_voice",
             description=f"Have {self.persona.ai_name} leave the "
-            + "voice channel it is in.",
+            + "current voice channel.",
         )
         async def leave_voice(interaction: discord.Interaction):
             if interaction.user is None:

@@ -176,14 +176,30 @@ class Settings:
 
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
-    DEFAULT_IMAGE_WORDS: typing.List[str] = [
-        "draw me",
-        "drawing",
+    DEFAULT_IMAGE_VERBS: typing.List[str] = [
+        "draw",
+        "sketch",
+        "paint",
+        "make",
+        "generate",
+        "post",
+        "upload",
+    ]
+    DEFAULT_IMAGE_NOUNS: typing.List[str] = [
         "photo",
         "pic",
         "picture",
         "image",
         "sketch",
+    ]
+    DEFAULT_AVATAR_WORDS: typing.List[str] = [
+        "self-portrait",
+        "self portrait",
+        "your avatar",
+        "your pfp",
+        "your profile pic",
+        "yourself",
+        "you",
     ]
 
     # ENVIRONMENT VARIABLES ####
@@ -424,6 +440,24 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="prompt_prefix",
+                default="",
+                description_lines=[
+                    "The prefix prepended to AI name in the prompt to the language model.",
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="prompt_suffix",
+                default="",
+                description_lines=[
+                    "The suffix appended to AI name in the prompt to the language model.",
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
                 name="stop_markers",
                 default=[
@@ -525,6 +559,35 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
+            oesp.ConfigSetting[list[str]](
+                name="response_chance_vs_time",
+                default=[str(x) for x in self.TIME_VS_RESPONSE_CHANCE],
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Response chance vs. time - calibration table
+                        List of tuples with time in seconds and response chance as float between 0-1
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[float](
+                name="interrobang_bonus",
+                default=self.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        How much to increase response chance by if the message ends with ? or !
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="discrivener_location",
                 default="",
@@ -549,6 +612,37 @@ class Settings:
                         """
                         FEATURE PREVIEW: Path to the Discrivener model to
                         load.  Required if discrivener_location is set.
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="speak_voice_replies",
+                default="true",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Whether to speak replies in voice calls with discrivener
+                           default: true
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="post_voice_replies",
+                default="false",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Whether to reply in the voice-text channel of voice calls
+                           default: false
                         """
                     )
                 ],
@@ -688,13 +782,27 @@ class Settings:
         self.vision_api_settings = oesp.ConfigSettingGroup("Vision API")
         self.setting_groups.append(self.vision_api_settings)
         self.vision_api_settings.add_setting(
-            oesp.ConfigSetting[str](
+            oesp.ConfigSetting[bool](
                name="use_vision",
-               default="False",
+               default=False,
                description_lines=[
                      textwrap.dedent(
                            """
                            Use the OpenAI-like Vision API to generate images.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[bool](
+               name="fetch_urls",
+               default=False,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Fetch images from URLs. Warning: this may lead to your
+                           host IP address being leaked to any sites that are accessed!
                            """
                      )
                ],
@@ -726,6 +834,46 @@ class Settings:
                ],
             )
         )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="model",
+               default="gpt-4-vision-preview",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Model to use for the vision API.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[int](
+               name="max_tokens",
+               default=300,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Maximum number of tokens for the vision model to predict.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[int](
+               name="max_image_size",
+               default=1344,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Maximum size for the longest side of the image. It will be
+                           downsampled to this size if necessary.
+                           """
+                     )
+               ],
+            )
+        )
         ###########################################################
         # Stable Diffusion Settings
 
@@ -734,13 +882,42 @@ class Settings:
 
         self.stable_diffusion_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
-                name="image_words",
-                default=self.DEFAULT_IMAGE_WORDS,
+                name="image_verbs",
+                default=self.DEFAULT_IMAGE_VERBS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        When one of these verbs is used in a message, the bot will
+                        generate an image if followed by an image noun or avatar word.
+                        """
+                    )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[typing.List[str]](
+                name="image_nouns",
+                default=self.DEFAULT_IMAGE_NOUNS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        When one of these nouns is used in a message, the bot will
+                        generate an image using the remaining message as the prompt.
+                        """
+                    )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[typing.List[str]](
+                name="avatar_words",
+                default=self.DEFAULT_AVATAR_WORDS,
                 description_lines=[
                     textwrap.dedent(
                         """
                         When one of these words is used in a message, the bot will
-                        generate an image.
+                        generate a self-portrait, substituting the avatar word for
+                        the configured avatar prompt.
                         """
                     )
                 ],
@@ -770,6 +947,17 @@ class Settings:
                         sent to Stable Diffusion.
                         """
                     )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="avatar_prompt",
+                default="",
+                description_lines=[
+                    """
+                    Prompt to send to Stable Diffusion to generate self-portrait if asked.
+                    """
                 ],
             )
         )

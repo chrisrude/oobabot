@@ -235,17 +235,34 @@ class ImageGenerator:
     ):
         self.ai_name = persona_settings.get("ai_name", "")
         self.ooba_client = ooba_client
-        self.image_words = sd_settings.get("image_words", [])
+        self.image_verbs = sd_settings.get("image_verbs", [])
+        self.image_nouns = sd_settings.get("image_nouns", [])
+        self.avatar_words = [x.lower() for x in sd_settings.get("avatar_words", [])]
+        self.avatar_prompt = sd_settings.get("avatar_prompt", "")
         self.prompt_generator = prompt_generator
         self.stable_diffusion_client = stable_diffusion_client
         self.template_store = template_store
 
-        self.image_patterns = [
+        self.image_verb_patterns = [
             re.compile(
-                r"^.*\b" + image_word + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$",
+                r"^.*\b" + image_verb + r"\s*(an?|the)?\s*([\w ,\-\(\)\[\]=:]+)[^\w]*$",
                 re.IGNORECASE,
             )
-            for image_word in self.image_words
+            for image_verb in self.image_verbs
+        ]
+        self.image_noun_patterns = [
+            re.compile(
+                r"\b" + image_noun + r"\s*(as?|of|in|the|with)*\s*:?(.*)$",
+                re.IGNORECASE,
+            )
+            for image_noun in self.image_nouns
+        ]
+        self.avatar_patterns = [
+            re.compile(
+                r"\b" + avatar_word + r"[^\w]*\b",
+                re.IGNORECASE
+            )
+            for avatar_word in self.avatar_words
         ]
 
     def on_ready(self):
@@ -253,8 +270,16 @@ class ImageGenerator:
         Called when the bot is connected to Discord.
         """
         fancy_logger.get().debug(
-            "Stable Diffusion: image keywords: %s",
-            ", ".join(self.image_words),
+            "Stable Diffusion: image verbs: %s",
+            ", ".join(self.image_verbs),
+        )
+        fancy_logger.get().debug(
+            "Stable Diffusion: image nouns: %s",
+            ", ".join(self.image_nouns),
+        )
+        fancy_logger.get().debug(
+            "Stable Diffusion: avatar words: %s",
+            ", ".join(self.avatar_words),
         )
 
     # @fancy_logger.log_async_task
@@ -314,14 +339,36 @@ class ImageGenerator:
     def maybe_get_image_prompt(
         self, raw_message: discord.Message
     ) -> typing.Optional[str]:
-        for image_pattern in self.image_patterns:
-            match = image_pattern.search(raw_message.content)
+        image_prompt = None
+        # Iterate through image verbs
+        for image_verb_pattern in self.image_verb_patterns:
+            match = image_verb_pattern.search(raw_message.content)
             if match:
-                image_prompt = match.group(2)
-                if len(image_prompt) < self.MIN_IMAGE_PROMPT_LENGTH:
-                    continue
-                fancy_logger.get().debug("Found image prompt: %s", image_prompt)
-                return image_prompt
+                # If we found a match, iterate through the image nouns for the remaining prompt
+                maybe_image_prompt = match.group(2)
+                for image_noun_pattern in self.image_noun_patterns:
+                    match = image_noun_pattern.search(maybe_image_prompt)
+                    if match:
+                        # If we found a match here, set the image prompt and break out of the loop
+                        image_prompt = match.group(2)
+                        continue
+                if not match:
+                    # If we didn't find anything, search avatar words too
+                    for avatar_pattern in self.avatar_patterns:
+                        if avatar_pattern.search(maybe_image_prompt):
+                            image_prompt = maybe_image_prompt
+                            continue
+                if image_prompt and len(image_prompt) >= self.MIN_IMAGE_PROMPT_LENGTH:
+                    # If we made it this far, go on to image generation
+                    fancy_logger.get().debug("Found image prompt: %s", image_prompt)
+                    # see if we're asked for our avatar and substitute in our avatar prompt
+                    for avatar_pattern in self.avatar_patterns:
+                        match = avatar_pattern.search(image_prompt)
+                        if match:
+                            fancy_logger.get().debug("Found request for self-portrait in image prompt, substituting avatar prompt.")
+                            image_prompt = avatar_pattern.sub(self.avatar_prompt + ", ", image_prompt).strip(", ")
+                            fancy_logger.get().debug("Final image prompt: %s", image_prompt)
+                    return image_prompt
         return None
 
     async def generate_image(
