@@ -1,4 +1,5 @@
-FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
+ARG IMAGE=${IMAGE:-nvidia/cuda:12.2.2-runtime-ubuntu22.04}
+FROM $IMAGE
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
