@@ -766,13 +766,27 @@ class Settings:
         self.vision_api_settings = oesp.ConfigSettingGroup("Vision API")
         self.setting_groups.append(self.vision_api_settings)
         self.vision_api_settings.add_setting(
-            oesp.ConfigSetting[str](
+            oesp.ConfigSetting[bool](
                name="use_vision",
-               default="False",
+               default=False,
                description_lines=[
                      textwrap.dedent(
                            """
                            Use the OpenAI-like Vision API to generate images.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[bool](
+               name="fetch_urls",
+               default=False,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Fetch images from URLs. Warning: this may lead to your
+                           host IP address being leaked to any sites that are accessed!
                            """
                      )
                ],

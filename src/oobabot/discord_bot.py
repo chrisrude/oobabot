@@ -69,6 +69,7 @@ class DiscordBot(discord.Client):
         self.vision_model = vision_api_settings["model"]
         self.vision_max_tokens = vision_api_settings["max_tokens"]
         self.vision_max_image_size = vision_api_settings["max_image_size"]
+        self.vision_fetch_urls = vision_api_settings["fetch_urls"]
         self.use_vision = vision_api_settings["use_vision"]
 
         self.prompt_prefix = discord_settings["prompt_prefix"]
@@ -190,17 +191,18 @@ class DiscordBot(discord.Client):
             image_descriptions = []
             if self.use_vision:
                 if should_respond:
-                    urls = self.url_extractor.findall(raw_message.content)
-                    if urls:
-                        for url in urls:
-                            r = requests.head(url)
-                            if r.headers["content-type"].startswith("image/"):
-                                try:
-                                    description = await vision.get_image_description(url, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, model=self.vision_model, max_tokens=self.vision_max_tokens)
-                                    if description:
-                                        image_descriptions.append(description)
-                                except Exception as e:
-                                    fancy_logger.get().error("Error processing image: %s", e, exc_info=True)
+                    if self.vision_fetch_urls:
+                        urls = self.url_extractor.findall(raw_message.content)
+                        if urls:
+                            for url in urls:
+                                r = requests.head(url)
+                                if r.headers["content-type"].startswith("image/"):
+                                    try:
+                                        description = await vision.get_image_description(url, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, model=self.vision_model, max_tokens=self.vision_max_tokens)
+                                        if description:
+                                            image_descriptions.append(description)
+                                    except Exception as e:
+                                        fancy_logger.get().error("Error processing image: %s", e, exc_info=True)
                     if raw_message.attachments:
                         for attachment in raw_message.attachments:
                             if attachment.content_type and attachment.content_type.startswith("image/"):
