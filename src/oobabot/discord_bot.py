@@ -66,7 +66,9 @@ class DiscordBot(discord.Client):
         self.stream_responses_speed_limit = discord_settings["stream_responses_speed_limit"]
         self.vision_api_url = vision_api_settings["vision_api_url"]
         self.vision_api_key = vision_api_settings["vision_api_key"]
-        self.vision_api_model = vision_api_settings["vision_api_model"]
+        self.vision_model = vision_api_settings["model"]
+        self.vision_max_tokens = vision_api_settings["max_tokens"]
+        self.vision_max_image_size = vision_api_settings["max_image_size"]
         self.use_vision = vision_api_settings["use_vision"]
 
         self.prompt_prefix = discord_settings["prompt_prefix"]
@@ -194,7 +196,7 @@ class DiscordBot(discord.Client):
                             r = requests.head(url)
                             if r.headers["content-type"].startswith("image/"):
                                 try:
-                                    description = await vision.get_image_description(url, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, vision_api_model=self.vision_api_model)
+                                    description = await vision.get_image_description(url, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, model=self.vision_model, max_tokens=self.vision_max_tokens)
                                     if description:
                                         image_descriptions.append(description)
                                 except Exception as e:
@@ -208,27 +210,29 @@ class DiscordBot(discord.Client):
                                     # Save the attachment to the buffer
                                     await attachment.save(buffer)
                                     buffer.seek(0)  # Move to the start of the buffer
-                                    # Resample the image to something our image recognition model can handle
-                                    # otherwise the base64 ends up too long
+                                    # Resample the image to something our image recognition model can handle, if necessary
                                     image = Image.open(buffer)
                                     buffer.flush()
-                                    new_size = 2000, 1000
-                                    image.thumbnail(new_size, Image.Resampling.LANCZOS)
-                                    image.save(buffer, "PNG")
+                                    if image.width > self.vision_max_image_size or image.height > self.vision_max_image_size:
+                                        # Resize image using its largest side as the baseline, preserving aspect ratio
+                                        if image.width > image.height:
+                                            height = int(image.height * (self.vision_max_image_size / image.width))
+                                            image = image.resize((self.vision_max_image_size, height), Image.LANCZOS)
+                                        else:
+                                            width = int(image.width * (self.vision_max_image_size / image.height))
+                                            image = image.resize((width, self.vision_max_image_size), Image.LANCZOS)
+                                    image.save(buffer, "PNG", optimize=True) # dump image data in PNG format
                                     buffer.seek(0)
                                     # Encode the image in base64
-                                    image_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+                                    #image_base64 = "data:image/png;base64," # this doesn't work with LocalAI for some reason, someone save me
+                                    image_base64 = "data:image/jpeg;base64," # we lie to the API since it only accepts JPEG, but can decode PNG data anyway
+                                    image_base64 += base64.b64encode(buffer.read()).decode("utf-8")
                                     # Now pass the base64-encoded image to the vision function
-                                    description = await vision.get_image_description(image_base64, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, vision_api_model=self.vision_api_model)
+                                    description = await vision.get_image_description(image_base64, vision_api_url=self.vision_api_url, vision_api_key=self.vision_api_key, model=self.vision_model, max_tokens=self.vision_max_tokens)
                                     if description:
                                         image_descriptions.append(description)
                                 except Exception as e:
                                     fancy_logger.get().error("Error processing image: %s", e, exc_info=True)
-
-            # If there are image descriptions, append them to the message content
-            if image_descriptions:
-                description_text = ' '.join(f"[Image description: {desc}]" for desc in image_descriptions)
-                message.body_text += " " + description_text  # Append descriptions to the message content
 
             is_summon_in_public_channel = is_summon and isinstance(
                 message,

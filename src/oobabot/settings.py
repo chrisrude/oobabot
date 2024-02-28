@@ -806,12 +806,39 @@ class Settings:
         )
         self.vision_api_settings.add_setting(
             oesp.ConfigSetting[str](
-               name="vision_api_model",
+               name="model",
                default="gpt-4-vision-preview",
                description_lines=[
                      textwrap.dedent(
                            """
                            Model to use for the vision API.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="max_tokens",
+               default=300,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Maximum number of tokens for the vision model to predict.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="max_image_size",
+               default=1344,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Maximum size for the longest side of the image. It will be
+                           downsampled to this size if necessary.
                            """
                      )
                ],
