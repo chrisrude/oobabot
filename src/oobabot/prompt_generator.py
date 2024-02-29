@@ -57,6 +57,13 @@ class PromptGenerator:
         self.prompt_prefix = discord_settings["prompt_prefix"]
         self.prompt_suffix = discord_settings["prompt_suffix"]
 
+        self.example_dialogue = self.template_store.format(
+            templates.Templates.EXAMPLE_DIALOGUE,
+            {
+                templates.TemplateToken.AI_NAME: self.persona.ai_name,
+            },
+        ).strip()
+
         # this will be also used when sending message
         # to suppress sending the prompt text to the user
         self.bot_prompt_line = self.template_store.format(
@@ -138,6 +145,14 @@ class PromptGenerator:
         # reverse order
         history_lines = []
 
+        section_separator = self.template_store.format(
+            templates.Templates.SECTION_SEPARATOR,
+            {
+                templates.TemplateToken.AI_NAME: self.persona.ai_name,
+            },
+        )
+
+        # first we process and append the chat transcript
         async for message in message_history:
             if not message.body_text:
                 continue
@@ -156,12 +171,38 @@ class PromptGenerator:
                     "ran out of prompt space, discarding {%d} lines of chat history",
                     num_discarded_lines,
                 )
+                prompt_len_remaining = 0
                 break
 
             prompt_len_remaining -= len(line)
             history_lines.append(line)
 
+        # then we append the example dialogue, if it exists, and there's room in the message history
+        if len(self.example_dialogue) > 0 and prompt_len_remaining > len(section_separator):
+            remaining_lines = self.history_lines - len(history_lines)
+
+            if remaining_lines > 0:
+                history_lines.append(section_separator + "\n") # append the section separator (and newline) to the top which becomes the bottom
+                prompt_len_remaining -= len(section_separator) # and subtract the character budget that consumed
+                # split example dialogue into lines
+                example_dialogue_lines = [line + "\n" for line in self.example_dialogue.split("\n")] # keep the newlines by rebuilding the list in a comprehension
+
+                # fill remaining quota of history lines with example dialogue lines
+                # this has the effect of gradually pushing them out as the chat exceeds the history limit
+                for i in range(remaining_lines):
+                    # start from the end of the list since the order is reversed
+                    if len(example_dialogue_lines[-1]) + len(section_separator) > prompt_len_remaining: # account for the number of characters in the section separator we will append last
+                        break
+
+                    prompt_len_remaining -= len(example_dialogue_lines[-1])
+                    history_lines.append(example_dialogue_lines.pop()) # pop the last item of the list into the transcript
+                    # and then break out of the loop once we run out of example dialogue
+                    if not example_dialogue_lines:
+                        break
+
+        # then reverse the order of the list so it's in order again
         history_lines.reverse()
+        history_lines[-1] = history_lines[-1].strip("\n") # strip the last newline
         return "".join(history_lines)
 
     def _generate(
@@ -177,6 +218,12 @@ class PromptGenerator:
                 templates.TemplateToken.AI_NAME: self.persona.ai_name,
                 templates.TemplateToken.PERSONA: self.persona.persona,
                 templates.TemplateToken.MESSAGE_HISTORY: message_history_txt,
+                templates.TemplateToken.SECTION_SEPARATOR: self.template_store.format(
+                    templates.Templates.SECTION_SEPARATOR,
+                    {
+                        templates.TemplateToken.AI_NAME: self.persona.ai_name
+                    },
+                ),
                 templates.TemplateToken.IMAGE_COMING: image_coming,
                 templates.TemplateToken.GUILDNAME: guild_name,
                 templates.TemplateToken.CHANNELNAME: response_channel,
