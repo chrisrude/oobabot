@@ -245,14 +245,14 @@ class ImageGenerator:
 
         self.image_verb_patterns = [
             re.compile(
-                r"^.*\b" + image_verb + r"\s*(an?|the)?\s*([\w ,\-\(\)\[\]=:]+)[^\w]*$",
+                r"^.*\b" + image_verb + r"\b\s*(an?|the)?\s*([\w ,\-\(\)\[\]=:]+)[^\w]*",
                 re.IGNORECASE,
             )
             for image_verb in self.image_verbs
         ]
         self.image_noun_patterns = [
             re.compile(
-                r"\b" + image_noun + r"\s*(as?|of|in|the|with)*\s*:?(.*)$",
+                r"\b" + image_noun + r"\s*(as?|of|in|the|with)*\s*:?\s*\b(.*)$",
                 re.IGNORECASE,
             )
             for image_noun in self.image_nouns
