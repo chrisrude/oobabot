@@ -10,6 +10,7 @@ import typing
 import ruamel.yaml as ryaml
 
 from oobabot import fancy_logger
+from oobabot import templates
 
 
 class Persona:
@@ -27,7 +28,7 @@ class Persona:
 
     def __init__(self, persona_settings: dict) -> None:
         self.ai_name: str = persona_settings["ai_name"]
-        self.persona: str = persona_settings["persona"]
+        self.persona: str = persona_settings["persona"].replace(str(templates.TemplateToken.AI_NAME), self.ai_name)
         self.wakewords: typing.List[str] = persona_settings["wakewords"].copy()
 
         # if a json file is specified, load it and have

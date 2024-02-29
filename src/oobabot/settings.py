@@ -300,7 +300,8 @@ class Settings:
                         bot to play.  Alternatively, this can be set with the
                         {self.OOBABOT_PERSONA_ENV_VAR} environment variable.
                         """
-                    )
+                    ),
+                    _make_template_comment(([templates.TemplateToken.AI_NAME], "", True))[2],
                 ],
                 show_default_in_yaml=False,
             )
