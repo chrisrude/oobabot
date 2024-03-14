@@ -115,8 +115,8 @@ class SentenceSplitter(MessageSplitter):
             # we do want to include any other whitespace, though.
 
             to_print = sentence_w_char_spans.sent  # type: ignore
-            if to_print.endswith("\n"):
-                to_print = to_print[:-1]
+            # if to_print.endswith("\n"):
+            #     to_print = to_print[:-1]
 
             yield to_print
 
