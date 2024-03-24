@@ -136,7 +136,7 @@ class OobaClient(http_client.SerializedHttpClient):
     SERVICE_NAME = "Oobabooga"
 
     OOBABOOGA_STREAMING_URI_PATH: str = "/api/v1/stream"
-    OOBABOOGA_STOP_STREAM_URI_PATH: str = "/api/v1/stop-stream"
+    OOBABOOGA_STOP_STREAM_URI_PATH: str = "/v1/internal/stop-generation"
 
     def __init__(
         self,
@@ -234,19 +234,15 @@ class OobaClient(http_client.SerializedHttpClient):
             last_response = time.perf_counter()
 
     async def stop(self):
-        if self.use_openai:
-             
-            pass
-        else:
-            # Existing Ooba API stopping logic
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.base_blocking}{self.OOBABOOGA_STOP_STREAM_URI_PATH}"
-                headers = {"Content-Type": "application/json"}
+        # New Ooba OpenAPI stopping logic
+        async with aiohttp.ClientSession() as session:
+            url = f"{self.base_blocking}{self.OOBABOOGA_STOP_STREAM_URI_PATH}"
+            headers = {"accept": "application/json"}
 
-                async with session.post(url, data=json.dumps({}), headers=headers) as response:
-                   response_text = await response.text()
-                   print(response_text)
-                   return response_text
+            async with session.post(url, data=json.dumps({}), headers=headers) as response:
+               response_text = await response.text()
+               print(response_text)
+               return response_text
     async def request_by_token(self, prompt: str) -> typing.AsyncIterator[str]:
         """
         Yields each token of the response as it arrives.
