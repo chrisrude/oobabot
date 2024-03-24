@@ -23,6 +23,7 @@ from oobabot import ooba_client  # pylint: disable=unused-import
 from oobabot import prompt_generator  # pylint: disable=unused-import
 from oobabot import transcript
 from oobabot import types
+from oobabot import persona
 
 
 class VoiceClientError(Exception):
@@ -49,6 +50,7 @@ class VoiceClient(discord.VoiceProtocol):
     current_instance: typing.Optional["VoiceClient"] = None
     ooba_client: ooba_client.OobaClient
     prompt_generator: prompt_generator.PromptGenerator
+    persona: persona.Persona
     wakewords: typing.List[str] = []
 
     supported_modes: typing.Tuple[voice.SupportedModes, ...] = (

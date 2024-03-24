@@ -37,6 +37,7 @@ class BotCommands:
         self.persona = persona
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.template_store = template_store
+        self.ooba_client = ooba_client
 
         (
             self.discrivener_location,
@@ -123,8 +124,9 @@ class BotCommands:
             if interaction.channel_id is None:
                 await discord_utils.fail_interaction(interaction)
                 return
-            response = await ooba_client.OobaClient.stop()
-            await interaction.response.send_message(response)
+            response = await self.ooba_client.stop()
+            str_response = response if response is not None else "No response from server."
+            await interaction.response.send_message(str_response)
             return
 
         @discord.app_commands.command(
