@@ -55,6 +55,7 @@ class TemplateToken(str, enum.Enum):
     USER_NAME = "USER_NAME"
     GUILDNAME = "GUILDNAME"
     CHANNELNAME = "CHANNELNAME"
+    CURRENTDATETIME = "CURRENTDATETIME"
 
     def __str__(self):
         return "{" + self.value + "}"
@@ -89,6 +90,7 @@ class TemplateStore:
                 TemplateToken.PERSONA,
                 TemplateToken.CHANNELNAME,
                 TemplateToken.GUILDNAME,
+                TemplateToken.CURRENTDATETIME,
             ],
             "The main prompt sent to Oobabooga to generate a response from "
             + "the bot AI.  The AI's reply to this prompt will be sent to "

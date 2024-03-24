@@ -4,7 +4,7 @@ Generate a prompt for the AI to respond to, given the
 message history and persona.
 """
 import typing
-
+import datetime
 from oobabot import fancy_logger
 from oobabot import persona
 from oobabot import templates
@@ -227,6 +227,7 @@ class PromptGenerator:
                 templates.TemplateToken.IMAGE_COMING: image_coming,
                 templates.TemplateToken.GUILDNAME: guild_name,
                 templates.TemplateToken.CHANNELNAME: response_channel,
+                templates.TemplateToken.CURRENTDATETIME: (datetime.datetime.now().strftime("%B %d, %Y - %H:%M:%S")),
             },
         )
         prompt += self.bot_prompt_line
