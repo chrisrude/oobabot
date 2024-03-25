@@ -72,6 +72,7 @@ class Settings:
     # OpenAI settings
     USE_OPENAI = "use_openai"
     API_KEY = "api_key"
+    OPENAI_MODEL = "openai_model"
     OPENAI_ENDPOINT = "openai_endpoint"
 
     ############################################################
@@ -678,7 +679,16 @@ class Settings:
                name=self.OPENAI_ENDPOINT,
                default="http://localhost:5000/v1/completions",
                description_lines=[
-                     "OpenAI API completions endpoint. Defaults to the official OpenAI API URL.",
+                     "OpenAI API completions endpoint. Defaults to localhost. (seems to work with /v1/chat/completions endpoints, pls verify?)",
+               ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name=self.OPENAI_MODEL,
+               default="",
+               description_lines=[
+                     "Model to use (supported by some endpoints), otherwise leave blank. Example for openrouter: mistralai/mistral-7b-instruct:free",
                ],
             )
         )

@@ -149,6 +149,7 @@ class OobaClient(http_client.SerializedHttpClient):
         self.log_all_the_things = settings["log_all_the_things"]
         self.base_blocking = settings["base_blocking"]
         self.use_openai = settings["use_openai"]
+        self.openai_model = settings["openai_model"]
         self.api_key = settings["api_key"]
         self.openai_endpoint = settings["openai_endpoint"]
         if self.message_regex:
@@ -267,6 +268,7 @@ class OobaClient(http_client.SerializedHttpClient):
 
       # Start with the base request dictionary
       request = {
+         "model": self.openai_model,
          "prompt": prompt,
          "stream": True,
          # Include other parameters with default values if needed
