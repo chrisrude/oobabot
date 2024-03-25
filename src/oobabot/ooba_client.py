@@ -258,55 +258,68 @@ class OobaClient(http_client.SerializedHttpClient):
                 yield token
 
     async def _request_by_token_openai(self, prompt: str) -> typing.AsyncIterator[str]:
-      """
-      Yields the response from the custom OpenAI endpoint by sentences.
-      """
-      headers = {
-         "Authorization": f"Bearer {self.api_key}",
-         "Content-Type": "application/json"
-      }
+        """
+        Yields the response from the Cohere API by sentences.
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "accept": "application/json",
+        }
 
-      # Start with the base request dictionary
-      request = {
-         "model": self.openai_model,
-         "prompt": prompt,
-         "stream": True,
-         # Include other parameters with default values if needed
-      }
+        request = {
+            "model": self.openai_model,
+            "prompt": prompt,
+            "message": prompt, #Sending both of these because apparently cohere's api only takes message. neat. >:(
+            "stream": True,
 
-      request.update(self.request_params)
+        }
 
-      async with aiohttp.ClientSession() as session:
-         async with session.post(self.openai_endpoint, headers=headers, json=request) as response:
-               # Check for successful response
-               if response.status != 200:
-                  response_text = await response.text()
-                  raise http_client.OobaHttpClientError(
-                     f"Request to OpenAI failed with status {response.status}: {response_text}"
-                  )
-               async for line in response.content:
-                  decoded_line = line.decode('utf-8')
-                  if decoded_line.startswith("data: "):
-                        event_data_str = decoded_line[6:]
+        request.update(self.request_params)
+        print(request)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(self.openai_endpoint, headers=headers, json=request) as response:
+                print(response)
+                if response.status != 200:
+                    response_text = await response.text()
+                    raise http_client.OobaHttpClientError(
+                        f"Request failed with status {response.status}: {response_text}"
+                    )
+
+                async for line in response.content:
+                    print(line)
+                    decoded_line = line.decode('utf-8').strip()
+                    if decoded_line.startswith("data: "):
+                        decoded_line = decoded_line[6:]  # Strip "data: "
+                    if decoded_line:
                         try:
-                           event_data = json.loads(event_data_str)
-                           text = event_data.get("choices", [{}])[0].get("text", "")
-                           if text:
-                              print(text, end="", flush=True)
-                              yield text
-                           finish_reason = event_data.get("choices", [{}])[0].get("finish_reason")
-                           if finish_reason == "stop":
-                              break
+                            event_data = json.loads(decoded_line)
+                            if "choices" in event_data:  # Handling the format with "choices"
+                                for choice in event_data.get("choices", []):
+                                    text = choice.get("text", "")
+                                    if text:
+                                        print(text, end="", flush=True)
+                                        yield text
+                                    if choice.get("finish_reason") is not None:
+                                        break
+                            else:  # Handling other formats
+                                text = event_data.get("text", "")
+                                is_finished = event_data.get("is_finished", False)
+                                if text:
+                                    print(text, end="", flush=True)
+                                    yield text
+                                if is_finished:
+                                    break
                         except json.JSONDecodeError:
-                           continue
-               else:
-                  # If unexpected content type is encountered, log or handle accordingly
-                  response_text = await response.text()
-                  print(f"Unexpected Content-Type encountered: {response.headers.get('Content-Type')}. Response: {response_text}")
-                  # Depending on application logic, raise an error or handle differently
+                            continue
+                else:
+                    response_text = await response.text()
+                    print(f"Unexpected Content-Type encountered: {response.headers.get('Content-Type')}. Response: {response_text}")
 
-               # Make sure to signal the end of input
-               yield MessageSplitter.END_OF_INPUT
+
+                # Make sure to signal the end of input
+                yield MessageSplitter.END_OF_INPUT
 
 
 

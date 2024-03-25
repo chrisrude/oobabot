@@ -177,7 +177,7 @@ class Settings:
 
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
-    DEFAULT_IMAGE_VERBS: typing.List[str] = [
+    DEFAULT_IMAGE_WORDS: typing.List[str] = [
         "draw",
         "sketch",
         "paint",
@@ -186,13 +186,7 @@ class Settings:
         "post",
         "upload",
     ]
-    DEFAULT_IMAGE_NOUNS: typing.List[str] = [
-        "photo",
-        "pic",
-        "picture",
-        "image",
-        "sketch",
-    ]
+
     DEFAULT_AVATAR_WORDS: typing.List[str] = [
         "self-portrait",
         "self portrait",
@@ -893,27 +887,13 @@ class Settings:
 
         self.stable_diffusion_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
-                name="image_verbs",
-                default=self.DEFAULT_IMAGE_VERBS,
+                name="image_words",
+                default=self.DEFAULT_IMAGE_WORDS,
                 description_lines=[
                     textwrap.dedent(
                         """
-                        When one of these verbs is used in a message, the bot will
-                        generate an image if followed by an image noun or avatar word.
-                        """
-                    )
-                ],
-            )
-        )
-        self.stable_diffusion_settings.add_setting(
-            oesp.ConfigSetting[typing.List[str]](
-                name="image_nouns",
-                default=self.DEFAULT_IMAGE_NOUNS,
-                description_lines=[
-                    textwrap.dedent(
-                        """
-                        When one of these nouns is used in a message, the bot will
-                        generate an image using the remaining message as the prompt.
+                        When one of these words is used in a message, the bot will
+                        generate an image.
                         """
                     )
                 ],
