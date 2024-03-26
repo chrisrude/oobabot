@@ -56,6 +56,7 @@ class PromptGenerator:
 
         self.prompt_prefix = discord_settings["prompt_prefix"]
         self.prompt_suffix = discord_settings["prompt_suffix"]
+        self.reply_in_thread = discord_settings["reply_in_thread"]
 
         self.example_dialogue = self.template_store.format(
             templates.Templates.EXAMPLE_DIALOGUE,
@@ -202,7 +203,8 @@ class PromptGenerator:
 
         # then reverse the order of the list so it's in order again
         history_lines.reverse()
-        history_lines[-1] = history_lines[-1].strip("\n") # strip the last newline
+        if not self.reply_in_thread:
+            history_lines[-1] = history_lines[-1].strip("\n") # strip the last newline (moved to if statement due to causing errors when 'reply in thread' is True?)
         return "".join(history_lines)
 
     def _generate(
