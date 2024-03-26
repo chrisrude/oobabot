@@ -308,7 +308,11 @@ class OobaClient(http_client.SerializedHttpClient):
                                 for choice in event_data.get("choices", []):
                                     text = choice.get("text", "")
                                     if text:
-                                        print(text, end="", flush=True)
+                                        if self.log_all_the_things:
+                                            try:
+                                                print(text, end="", flush=True)
+                                            except UnicodeEncodeError:
+                                                print(text.encode("utf-8"), end="", flush=True)
                                         yield text
                                     if choice.get("finish_reason") is not None:
                                         break
@@ -316,7 +320,11 @@ class OobaClient(http_client.SerializedHttpClient):
                                 text = event_data.get("text", "")
                                 is_finished = event_data.get("is_finished", False)
                                 if text:
-                                    print(text, end="", flush=True)
+                                    if self.log_all_the_things:
+                                        try:
+                                            print(text, end="", flush=True)
+                                        except UnicodeEncodeError:
+                                            print(text.encode("utf-8"), end="", flush=True)
                                     yield text
                                 if is_finished:
                                     break
