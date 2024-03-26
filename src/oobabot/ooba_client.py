@@ -286,7 +286,16 @@ class OobaClient(http_client.SerializedHttpClient):
                     raise http_client.OobaHttpClientError(
                         f"Request failed with status {response.status}: {response_text}"
                     )
-
+                if self.log_all_the_things:
+                    try:
+                        print(f"Sent request:\n{json.dumps(request, indent=1)}")
+                        print(f"Prompt:\n{str(request['prompt'])}")
+                    except UnicodeEncodeError:
+                        print(
+                            "Sent request:\n"
+                            + f"{json.dumps(request, indent=1).encode('utf-8')}"
+                        )
+                        print(f"Prompt:\n{str(request['prompt']).encode('utf-8')}")
                 async for line in response.content:
                     #print(line)
                     decoded_line = line.decode('utf-8').strip()
