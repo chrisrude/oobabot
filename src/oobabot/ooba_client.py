@@ -276,11 +276,11 @@ class OobaClient(http_client.SerializedHttpClient):
         }
 
         request.update(self.request_params)
-        print(request)
+        #print(request)
 
         async with aiohttp.ClientSession() as session:
             async with session.post(self.openai_endpoint, headers=headers, json=request) as response:
-                print(response)
+                #print(response)
                 if response.status != 200:
                     response_text = await response.text()
                     raise http_client.OobaHttpClientError(
@@ -288,7 +288,7 @@ class OobaClient(http_client.SerializedHttpClient):
                     )
 
                 async for line in response.content:
-                    print(line)
+                    #print(line)
                     decoded_line = line.decode('utf-8').strip()
                     if decoded_line.startswith("data: "):
                         decoded_line = decoded_line[6:]  # Strip "data: "
