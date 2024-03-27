@@ -1,8 +1,18 @@
 # `oobabot`
 
-**`oobabot`** is a Discord bot which talks to a Large Language Model AIs (like LLaMA, llama.cpp, etc...), running on [oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui).
+**`oobabot`** is a Discord bot which talks to a Large Language Model AIs (like LLaMA, llama.cpp, etc...), running on just about any api-enabled backend:
 
-**updated to support OpenAI API! use `--generate-config` to update your configs!**
+[oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui)
+
+[TabbyAPI](https://github.com/theroyallab/tabbyAPI)
+
+[aphrodite-engine](https://github.com/PygmalionAI/aphrodite-engine)
+
+Even supports non-local solutions such as Openrouter, Cohere, OpenAI API, etc.
+
+
+**updated! use `--generate-config` and update your configs!**
+
 
 ## Installation and Quick Start!
 requires python 3.8+
@@ -85,9 +95,19 @@ Here is some background information about Rosie:
 - The people in this chat room are your friends
 ```
 
-Persona may be set from the command line with the **`--persona`** argument.
+Persona may be set from the command line with the **`--persona`** argument, or within the config.yml.
 
-Alternatively, it can be set through the environment variable **`OOBABOT_PERSONA`**.
+Alternatively, oobabot supports loading tavern-style json character cards!.
+
+```
+  # Path to a file containing a persona.  This can be just a single string, a json file in
+  # the common "tavern" formats, or a yaml file in the Oobabooga format.  With a single
+  # string, the persona will be set to that string.  Otherwise, the ai_name and persona will
+  # be overwritten with the values in the file.  Also, the wakewords will be extended to
+  # include the character's own name.
+  #   default:
+  persona_file: 
+```
 
 ## Then, run it
 
