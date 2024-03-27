@@ -279,7 +279,7 @@ class OobaClient(http_client.SerializedHttpClient):
         #print(request)
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(self.openai_endpoint, headers=headers, json=request) as response:
+            async with session.post(self.openai_endpoint, headers=headers, json=request, verify_ssl=False) as response:
                 #print(response)
                 if response.status != 200:
                     response_text = await response.text()
