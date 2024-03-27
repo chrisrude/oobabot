@@ -695,7 +695,7 @@ class DiscordBot(discord.Client):
 
                 # hack: abort response if it looks like the AI is
                 # continuing the conversation as someone else
-                username_pattern = re.compile(r'\[(.*?)\]:\s*(.*)')
+                username_pattern = re.compile(r'\[(.*?)\]:')
                 match = username_pattern.match(sentence)
                 if match:
                     username, remaining_text = match.groups()
