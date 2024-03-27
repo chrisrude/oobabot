@@ -33,7 +33,7 @@ requires python 3.8+
 
 (This is the part where you open config.yml with you favorite text editor and fill in all the cool parts)
 
-~: oobabot --generate-invite
+~: oobabot --generate-invite -c config.yml
 
 (oobabot spits out a neat invite link for YOUR BOT!)
 
