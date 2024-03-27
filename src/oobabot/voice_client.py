@@ -23,6 +23,7 @@ from oobabot import ooba_client  # pylint: disable=unused-import
 from oobabot import prompt_generator  # pylint: disable=unused-import
 from oobabot import transcript
 from oobabot import types
+from oobabot import persona
 
 
 class VoiceClientError(Exception):
@@ -43,9 +44,13 @@ class VoiceClient(discord.VoiceProtocol):
 
     discrivener_location: str
     discrivener_model_location: str
+    inviter: str
+    speak_voice_replies: bool
+    post_voice_replies: bool
     current_instance: typing.Optional["VoiceClient"] = None
     ooba_client: ooba_client.OobaClient
     prompt_generator: prompt_generator.PromptGenerator
+    persona: persona.Persona
     wakewords: typing.List[str] = []
 
     supported_modes: typing.Tuple[voice.SupportedModes, ...] = (
@@ -94,6 +99,8 @@ class VoiceClient(discord.VoiceProtocol):
             self.ooba_client,
             self.prompt_generator,
             self._transcript,
+            self.speak_voice_replies,
+            self.post_voice_replies,
         )
 
     @property
@@ -206,6 +213,7 @@ class VoiceClient(discord.VoiceProtocol):
         await self._guild_channel.guild.change_voice_state(
             channel=self._guild_channel, self_deaf=self_deaf, self_mute=self_mute
         )
+        self._transcript.on_bot_response(f"*{self.persona.ai_name} joins the voice call.*")
 
     async def voice_disconnect(self) -> None:
         fancy_logger.get().info(

@@ -115,8 +115,8 @@ class SentenceSplitter(MessageSplitter):
             # we do want to include any other whitespace, though.
 
             to_print = sentence_w_char_spans.sent  # type: ignore
-            if to_print.endswith("\n"):
-                to_print = to_print[:-1]
+            # if to_print.endswith("\n"):
+            #     to_print = to_print[:-1]
 
             yield to_print
 
@@ -132,9 +132,11 @@ class OobaClient(http_client.SerializedHttpClient):
     Client for the Ooba API.  Can provide the response by token or by sentence.
     """
 
+
     SERVICE_NAME = "Oobabooga"
 
     OOBABOOGA_STREAMING_URI_PATH: str = "/api/v1/stream"
+    OOBABOOGA_STOP_STREAM_URI_PATH: str = "/v1/internal/stop-generation"
 
     def __init__(
         self,
@@ -145,7 +147,11 @@ class OobaClient(http_client.SerializedHttpClient):
         self.message_regex = settings["message_regex"]
         self.request_params = settings["request_params"]
         self.log_all_the_things = settings["log_all_the_things"]
-
+        self.base_blocking = settings["base_blocking"]
+        self.use_openai = settings["use_openai"]
+        self.openai_model = settings["openai_model"]
+        self.api_key = settings["api_key"]
+        self.openai_endpoint = settings["openai_endpoint"]
         if self.message_regex:
             self.fn_new_splitter = lambda: RegexSplitter(self.message_regex)
         else:
@@ -168,8 +174,14 @@ class OobaClient(http_client.SerializedHttpClient):
             )
 
     async def _setup(self):
-        async with self._get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
-            return
+        if not self.use_openai:
+            async with self._get_session().ws_connect(self.OOBABOOGA_STREAMING_URI_PATH):
+                return
+    async def __aenter__(self):
+        if self.use_openai:
+            # No need to create a session for SSE streaming
+            return self
+
 
     def get_stopping_strings(self) -> typing.List[str]:
         """
@@ -222,11 +234,116 @@ class OobaClient(http_client.SerializedHttpClient):
             tokens = ""
             last_response = time.perf_counter()
 
+    async def stop(self):
+        # New Ooba OpenAPI stopping logic
+        async with aiohttp.ClientSession() as session:
+            url = f"{self.base_blocking}{self.OOBABOOGA_STOP_STREAM_URI_PATH}"
+            headers = {"accept": "application/json"}
+
+            async with session.post(url, data=json.dumps({}), headers=headers) as response:
+               response_text = await response.text()
+               print(response_text)
+               return response_text
     async def request_by_token(self, prompt: str) -> typing.AsyncIterator[str]:
         """
         Yields each token of the response as it arrives.
         """
+        if self.use_openai:
+            # Directly iterate over the async generator
+            async for token in self._request_by_token_openai(prompt):
+                yield token
+        else:
+            # The Ooba API request is already an async generator
+            async for token in self._request_by_token_ooba(prompt):
+                yield token
 
+    async def _request_by_token_openai(self, prompt: str) -> typing.AsyncIterator[str]:
+        """
+        Yields the response from the Cohere API by sentences.
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "accept": "application/json",
+        }
+
+        request = {
+            "model": self.openai_model,
+            "prompt": prompt,
+            "message": prompt, #Sending both of these because apparently cohere's api only takes message. neat. >:(
+            "stream": True,
+
+        }
+
+        request.update(self.request_params)
+        #print(request)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(self.openai_endpoint, headers=headers, json=request, verify_ssl=False) as response:
+                #print(response)
+                if response.status != 200:
+                    response_text = await response.text()
+                    raise http_client.OobaHttpClientError(
+                        f"Request failed with status {response.status}: {response_text}"
+                    )
+                if self.log_all_the_things:
+                    try:
+                        print(f"Sent request:\n{json.dumps(request, indent=1)}")
+                        print(f"Prompt:\n{str(request['prompt'])}")
+                    except UnicodeEncodeError:
+                        print(
+                            "Sent request:\n"
+                            + f"{json.dumps(request, indent=1).encode('utf-8')}"
+                        )
+                        print(f"Prompt:\n{str(request['prompt']).encode('utf-8')}")
+                async for line in response.content:
+                    #print(line)
+                    decoded_line = line.decode('utf-8').strip()
+                    if decoded_line.startswith("data: "):
+                        decoded_line = decoded_line[6:]  # Strip "data: "
+                    if decoded_line:
+                        try:
+                            event_data = json.loads(decoded_line)
+                            if "choices" in event_data:  # Handling the format with "choices"
+                                for choice in event_data.get("choices", []):
+                                    text = choice.get("text", "")
+                                    if text:
+                                        if self.log_all_the_things:
+                                            try:
+                                                print(text, end="", flush=True)
+                                            except UnicodeEncodeError:
+                                                print(text.encode("utf-8"), end="", flush=True)
+                                        yield text
+                                    if choice.get("finish_reason") is not None:
+                                        break
+                            else:  # Handling other formats
+                                text = event_data.get("text", "")
+                                is_finished = event_data.get("is_finished", False)
+                                if text:
+                                    if self.log_all_the_things:
+                                        try:
+                                            print(text, end="", flush=True)
+                                        except UnicodeEncodeError:
+                                            print(text.encode("utf-8"), end="", flush=True)
+                                    yield text
+                                if is_finished:
+                                    break
+                        except json.JSONDecodeError:
+                            continue
+                else:
+                    response_text = await response.text()
+                    print(f"Unexpected Content-Type encountered: {response.headers.get('Content-Type')}. Response: {response_text}")
+
+
+                # Make sure to signal the end of input
+                yield MessageSplitter.END_OF_INPUT
+
+
+
+    async def _request_by_token_ooba(self, prompt: str) -> typing.AsyncIterator[str]:
+        """
+        Yields each token of the response as it arrives from the Ooba API.
+        """           
         request: dict[
             str, typing.Union[bool, float, int, str, typing.List[typing.Any]]
         ] = {

@@ -40,7 +40,8 @@ def sanitize_string(raw_string: str) -> str:
     """
     Filter out any characters that would confuse the AI
     """
-    return FORBIDDEN_CHARACTERS_PATTERN.sub(" ", raw_string)
+    # Ignore sanitizing of messages because it's really a non issue.
+    return raw_string
 
 
 def discord_message_to_generic_message(
@@ -49,16 +50,7 @@ def discord_message_to_generic_message(
     """
     Convert a discord message to a GenericMessage or subclass thereof
     """
-    if raw_message.author.bot:
-        # address issue https://github.com/chrisrude/oobabot/issues/76
-        # If the bot is creating a formatted message, keep that formatting
-        # intact.
-        # Ideally, this would be nice to do for user messages as well,
-        # but if we allowed that then it would let a malicious user
-        # impersonate both the bot and other users.  So trust bots only.
-        body_text = raw_message.content
-    else:
-        body_text = sanitize_string(raw_message.content)
+    body_text = raw_message.content
 
     generic_args = {
         "author_id": raw_message.author.id,

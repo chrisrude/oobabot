@@ -26,6 +26,8 @@ class Templates(enum.Enum):
 
     # prompts to the AI to generate text responses
     PROMPT = "prompt"
+    EXAMPLE_DIALOGUE = "example_dialogue"
+    SECTION_SEPARATOR = "section_separator"
     PROMPT_HISTORY_LINE = "prompt_history_line"
     PROMPT_IMAGE_COMING = "prompt_image_coming"
 
@@ -46,9 +48,14 @@ class TemplateToken(str, enum.Enum):
     PERSONA = "PERSONA"
     IMAGE_COMING = "IMAGE_COMING"
     IMAGE_PROMPT = "IMAGE_PROMPT"
+    EXAMPLE_DIALOGUE = "EXAMPLE_DIALOGUE"
     MESSAGE_HISTORY = "MESSAGE_HISTORY"
+    SECTION_SEPARATOR = "SECTION_SEPARATOR"
     USER_MESSAGE = "USER_MESSAGE"
     USER_NAME = "USER_NAME"
+    GUILDNAME = "GUILDNAME"
+    CHANNELNAME = "CHANNELNAME"
+    CURRENTDATETIME = "CURRENTDATETIME"
 
     def __str__(self):
         return "{" + self.value + "}"
@@ -79,11 +86,32 @@ class TemplateStore:
                 TemplateToken.AI_NAME,
                 TemplateToken.IMAGE_COMING,
                 TemplateToken.MESSAGE_HISTORY,
+                TemplateToken.SECTION_SEPARATOR,
                 TemplateToken.PERSONA,
+                TemplateToken.CHANNELNAME,
+                TemplateToken.GUILDNAME,
+                TemplateToken.CURRENTDATETIME,
             ],
             "The main prompt sent to Oobabooga to generate a response from "
             + "the bot AI.  The AI's reply to this prompt will be sent to "
             + "discord as the bot's response.",
+            True,
+        ),
+        Templates.EXAMPLE_DIALOGUE: (
+            [
+                TemplateToken.AI_NAME,
+            ],
+            "The example dialogue inserted directly before the message history. "
+            + "This is gradually pushed out as the chat grows beyond the context "
+            + "length in the same as as the message history itself.",
+            True,
+        ),
+        Templates.SECTION_SEPARATOR: (
+            [
+                TemplateToken.AI_NAME,
+            ],
+            "Separator between different sections, if necessary. For example, to "
+            "separate example dialogue from the main chat transcript.",
             True,
         ),
         Templates.PROMPT_HISTORY_LINE: (
@@ -145,7 +173,7 @@ class TemplateStore:
     DEFAULT_TEMPLATES: typing.Dict[Templates, str] = {
         Templates.PROMPT: textwrap.dedent(
             """
-            You are in a chat room with multiple participants.
+            You are in a chat room called {CHANNELNAME}/{GUILDNAME} with multiple participants.
             Below is a transcript of recent messages in the conversation.
             Write the next one to three messages that you would send in this
             conversation, from the point of view of the participant named
@@ -160,11 +188,15 @@ class TemplateStore:
             {IMAGE_COMING}
             """
         ),
+        Templates.EXAMPLE_DIALOGUE: textwrap.dedent(
+            ""
+        ),
+        Templates.SECTION_SEPARATOR: textwrap.dedent(
+            "***"
+        ),
         Templates.PROMPT_HISTORY_LINE: textwrap.dedent(
             """
-            {USER_NAME} says:
-            {USER_MESSAGE}
-
+            {USER_NAME}: {USER_MESSAGE}
             """
         ),
         Templates.PROMPT_IMAGE_COMING: textwrap.dedent(

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  oobabot:
+    build:
+      context: .
+      args:
+        IMAGE: nvidia/cuda:12.2.2-runtime-ubuntu22.04
+        #IMAGE: rocm/dev-ubuntu-22.04 # comment above and uncomment this for AMD GPUs
+    container_name: oobabot
+    restart: unless-stopped
+    volumes:
+      - ./config.yml:/app/config.yml
+    # deploy: # uncomment for NVIDIA GPUs
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    # For AMD GPUs, comment out the `deploy:` block above and uncomment the below:
+    #devices:
+    #  - /dev/kfd
+    #  - /dev/dri

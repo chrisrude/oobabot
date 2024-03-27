@@ -236,16 +236,25 @@ class ImageGenerator:
         self.ai_name = persona_settings.get("ai_name", "")
         self.ooba_client = ooba_client
         self.image_words = sd_settings.get("image_words", [])
+        self.avatar_words = [x.lower() for x in sd_settings.get("avatar_words", [])]
+        self.avatar_prompt = sd_settings.get("avatar_prompt", "")
         self.prompt_generator = prompt_generator
         self.stable_diffusion_client = stable_diffusion_client
         self.template_store = template_store
 
         self.image_patterns = [
             re.compile(
-                r"^.*\b" + image_word + r"\b[\s]*(of|with)?[\s]*[:]?(.*)$",
+                r"^.*\b" + image_word + r"\b\s*(a|the|of|with)?\s*:?([\w ,\-\(\)\[\]:]+)[^\w]*$",
                 re.IGNORECASE,
             )
             for image_word in self.image_words
+        ]
+        self.avatar_patterns = [
+            re.compile(
+                r"\b" + avatar_word + r"[^\w]*\b",
+                re.IGNORECASE
+            )
+            for avatar_word in self.avatar_words
         ]
 
     def on_ready(self):
@@ -321,6 +330,13 @@ class ImageGenerator:
                 if len(image_prompt) < self.MIN_IMAGE_PROMPT_LENGTH:
                     continue
                 fancy_logger.get().debug("Found image prompt: %s", image_prompt)
+                # see if we're asked for our avatar and substitute in our avatar prompt
+                for avatar_pattern in self.avatar_patterns:
+                    match = avatar_pattern.search(raw_message.content)
+                    if match:
+                        fancy_logger.get().debug("Found request for self-portrait in image prompt, substituting avatar prompt.")
+                        image_prompt = avatar_pattern.sub(f"{self.avatar_prompt}, ", image_prompt)
+                        fancy_logger.get().debug("Final image prompt: %s", image_prompt)
                 return image_prompt
         return None
 

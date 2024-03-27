@@ -1,41 +1,47 @@
 # `oobabot`
 
-**`oobabot`** is a Discord bot which talks to a Large Language Model AIs (like LLaMA, llama.cpp, etc...), running on [oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui).
+**`oobabot`** is a Discord bot which talks to a Large Language Model AIs (like LLaMA, llama.cpp, etc...), running on just about any api-enabled backend:
 
-[![python lint and test with poetry](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml/badge.svg)](https://github.com/chrisrude/oobabot/actions/workflows/python-package.yml)
+[oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui)
 
-## Installation
+[TabbyAPI](https://github.com/theroyallab/tabbyAPI)
 
-```bash
-  pip install oobabot
-```
+[aphrodite-engine](https://github.com/PygmalionAI/aphrodite-engine)
 
+Even supports non-local solutions such as Openrouter, Cohere, OpenAI API, etc.
+
+
+**updated! use `--generate-config` and update your configs!**
+
+
+## Installation and Quick Start!
 requires python 3.8+
 
-## Usage
-
 ```bash
-$ oobabot --wakewords rosie cat --ai-name Rosie --persona "you are a cat named Rosie"
-
-2023-05-04 00:24:10,968 DEBUG Oobabooga base URL: ws://localhost:5005
-2023-05-04 00:24:11,133 INFO Connected to Oobabooga!
-2023-05-04 00:24:11,133 DEBUG Connecting to Discord...
-2023-05-04 00:24:13,807 INFO Connected to discord as RosieAI#0000 (ID: 1100100011101010101)
-2023-05-04 00:24:13,807 DEBUG monitoring DMs, plus 24 channels across 1 server(s)
-2023-05-04 00:24:13,807 DEBUG AI name: Rosie
-2023-05-04 00:24:13,807 DEBUG AI persona: you are a cat named Rosie
-2023-05-04 00:24:13,807 DEBUG wakewords: rosie, cat
+  pip install git+https://github.com/jmoney7823956789378/oobabot
 ```
 
-See below for more details on the command line options.
+1. Install LLM loader with an OpenAI-compatible API.
+     (optionally, skip this step and run via a cloud provider!
+1. Create [a Discord bot account](https://discordpy.readthedocs.io/en/stable/discord.html), invite it to your server, and note its authentication token.
+1. [Install **`oobabot`** (see INSTALL.md)](./docs/INSTALL.md)
 
-## Motivation
+```bash
+~: pip install git+https://github.com/jmoney7823956789378/oobabot
 
-![oobabot in action!](./docs/oobabot.png "discord action shot")
+~: oobabot --generate-config > config.yml
 
-Text-generative UIs are cool to run at home, and Discord is fun to mess with your friends.  Why not combine the two and have something awesome!
+(This is the part where you open config.yml with you favorite text editor and fill in all the cool parts)
 
-Real motivation: I wanted a chatbot in my discord that would act like my cat.  A "catbot" if you will.
+~: oobabot --generate-invite -c config.yml
+
+(oobabot spits out a neat invite link for YOUR BOT!)
+
+~: oobabot -c config.yml
+
+2024-03-26 17:20:21,700  INFO Starting oobabot, core version 0.2.3
+
+```
 
 ## Features
 
@@ -49,169 +55,30 @@ Real motivation: I wanted a chatbot in my discord that would act like my cat.  A
 | **low-latency** | streams the reply live, sentence by sentence.  Provides lower latency, especially on longer responses. |
 | **stats** | track token generation speed, latency, failures and usage |
 | **easy networking** | connects to discord from your machine using websockets, so no need to expose a server to the internet |
-| ✨**Stable Diffusion** | new in v0.1.4!  Optional image generation with AUTOMATIC1111 |
-| ✨**Slash Commands** | coming in v0.1.6... did your bot get confused?  `/lobotomize` it! |
+| **Stable Diffusion** | new in v0.1.4!  Optional image generation with AUTOMATIC1111 |
+| **Slash Commands** | coming in v0.1.6... did your bot get confused?  `/lobotomize` it! |
+| **OpenAI API Support** | roughly supports MANY OpenAI API endpoints |
+| **Vision API Support** | roughly supports Vision model API (tested with llama-cpp-python API) |
 
-## Getting Started with **`oobabot`**
-
-### See the [Installation Guide](./docs/INSTALL.md) for step-by-step instructions
-
-## Installation tl;dr
-
-1. Install [oobabooga's text-generation-webui](https://github.com/oobabooga/text-generation-webui) and enable its API module
-1. Create [a Discord bot account](https://discordpy.readthedocs.io/en/stable/discord.html), invite it to your server, and note its authentication token.
-1. [Install **`oobabot`** (see INSTALL.md)](./docs/INSTALL.md)
-
-```bash
-~: pip install oobabot
-
-~: export DISCORD_TOKEN = __your_bots_discord_token__
-
-~: oobabot --base-url ws://oobabooga-hostname:5005/ --ai-name YourBotsName --persona "You are a cat named YourBotsName"
-```
 
 You should now be able to run oobabot from wherever pip installed it.
+If you're on windows, you should use `python3 -m oobabot (args here)`
 
-```none
-usage: oobabot [-h] [-c CONFIG] [--generate-config] [--invite-url] [--ai-name AI_NAME]
-               [--persona PERSONA] [--wakewords [WAKEWORDS ...]]
-               [--discord-token DISCORD_TOKEN] [--dont-split-responses]
-               [--history-lines HISTORY_LINES] [--ignore-dms] [--reply-in-thread]
-               [--stream-responses] [--base-url BASE_URL] [--log-all-the-things]
-               [--message-regex MESSAGE_REGEX] [--image-words [IMAGE_WORDS ...]]
-               [--stable-diffusion-url STABLE_DIFFUSION_URL]
-               [--extra-prompt-text EXTRA_PROMPT_TEXT]
+There are a **LOT** of settings in the config.yaml, and it can be tough to figure out what works best.
+I've included my very own (partially redacted) config here:
+[config.yml file (sample)](./docs/example-config.yml) here.
 
-oobabot v0.2.2: Discord bot for oobabooga's text-generation-webui
-
-General Settings:
-
-  -h, --help
-  -c CONFIG, --config CONFIG
-                        Path to a config file to read settings from. Command line
-                        settings will override settings in this file. (default:
-                        config.yml)
-  --generate-config     If set, oobabot will print its configuration as a .yml file, then
-                        exit. Any command-line settings also passed will be reflected in
-                        this file. (default: False)
-  --invite-url          Print a URL which can be used to invite the bot to a Discord
-                        server. Requires that the Discord token is set. (default: False)
-
-Persona:
-
-  --ai-name AI_NAME     Name the AI will use to refer to itself (default: oobabot)
-  --persona PERSONA     This prefix will be added in front of every user-supplied
-                        request. This is useful for setting up a 'character' for the bot
-                        to play. Alternatively, this can be set with the OOBABOT_PERSONA
-                        environment variable. (default: )
-  --wakewords [WAKEWORDS ...]
-                        One or more words that the bot will listen for. The bot will
-                        listen in all discord channels it can access for one of these
-                        words to be mentioned, then reply to any messages it sees with a
-                        matching word. The bot will always reply to @-mentions and direct
-                        messages, even if no wakewords are supplied. (default:
-                        ['oobabot'])
-
-Discord:
-
-  --discord-token DISCORD_TOKEN
-                        Token to log into Discord with. For security purposes it's
-                        strongly recommended that you set this via the DISCORD_TOKEN
-                        environment variable instead, if possible. (default: )
-  --dont-split-responses
-                        Post the entire response as a single message, rather than
-                        splitting it into separate messages by sentence. (default: False)
-  --history-lines HISTORY_LINES
-                        Number of lines of chat history the AI will see when generating a
-                        response. (default: 7)
-  --ignore-dms          If set, the bot will not respond to direct messages. (default:
-                        False)
-  --reply-in-thread     If set, the bot will generate a thread to respond in if it is not
-                        already in one. (default: False)
-  --stream-responses    FEATURE PREVIEW: Stream responses into a single message as they
-                        are generated. Note: may be janky (default: False)
-
-Oobabooga:
-
-  --base-url BASE_URL   Base URL for the oobabooga instance. This should be
-                        ws://hostname[:port] for plain websocket connections, or
-                        wss://hostname[:port] for websocket connections over TLS.
-                        (default: ws://localhost:5005)
-  --log-all-the-things  Print all AI input and output to STDOUT. (default: False)
-  --message-regex MESSAGE_REGEX
-                        A regex that will be used to extract message lines from the AI's
-                        output. The first capture group will be used as the message. If
-                        this is not set, the entire output will be used as the message.
-                        (default: )
-
-Stable Diffusion:
-
-  --image-words [IMAGE_WORDS ...]
-                        When one of these words is used in a message, the bot will
-                        generate an image. (default: ['draw me', 'drawing', 'photo',
-                        'pic', 'picture', 'image', 'sketch'])
-  --stable-diffusion-url STABLE_DIFFUSION_URL
-                        URL for an AUTOMATIC1111 Stable Diffusion server. (default: )
-  --extra-prompt-text EXTRA_PROMPT_TEXT
-                        This will be appended to every image generation prompt sent to
-                        Stable Diffusion. (default: )
-
-
-Additional settings can be set in config.yml.  Use the --generate-config option to print a
-new copy of this file to STDOUT.
-```
-
-There are **a lot more settings** in the [config.yml file (sample)](./docs/config.sample.yml) here.
-
-## Required settings
-
-- **`DISCORD_TOKEN`** environment variable
-
-   Set your shell environment's **`DISCORD_TOKEN`** to token Discord provided when you set up the bot account.  It should be something like a 72-character-long random-looking string.
-
-    **bash example**
-
-    ``` bash
-    export DISCORD_TOKEN=___YOUR_TOKEN___
-    ```
-
-    **fish example**
-
-    ``` fish
-    set -Ux DISCORD_TOKEN ___YOUR_TOKEN___
-    ```
-
-    In certain environments, it may be difficult to set an environment variable.  In that case, you can also pass the token in as a command-line argument using `--discord-token`.  But doing so might leak the token to other
-    users on a shared system, as it will be visible to anyone who can run `ps`.
-
-- **`--base-url`**
-
-    The base URL of oobabooga's streaming web API.  This is
-    required if the oobabooga machine is different than where you're running **`oobabot`**.
-
-    By default, this will be port 5005 (even though the HTML UI runs on a different port).  The protocol should typically be ws://.
-
-    All together, this should look something like:
-
-    ```bash
-    --base-url ws://localhost:5005
-    ```
-
-   This is also the default value, but any other setting should follow the same form.
 
 ## Optional settings
 
-- **`--ai-name`**
 
-   the name the AI will be instructed to call itself.  Note that this technically doesn't need to be the same as the bot in your discord, but it would likely make sense to your users if they are at least similar.
-
-- **`--wakewords`**
+- **`wakewords`**
 
    one or more words that the bot will look for.  It will reply to any message which contains one of these words, in any channel.
 
 ## Persona: the fun setting
 
-- **`--persona`**
+- **`persona`**
 
     is a short few sentences describing the role your bot should act as.  For instance, this is the setting I'm using for my cat-bot, whose name is "Rosie".
 
@@ -228,9 +95,19 @@ Here is some background information about Rosie:
 - The people in this chat room are your friends
 ```
 
-Persona may be set from the command line with the **`--persona`** argument.
+Persona may be set from the command line with the **`--persona`** argument, or within the config.yml.
 
-Alternatively, it can be set through the environment variable **`OOBABOT_PERSONA`**.
+Alternatively, oobabot supports loading tavern-style json character cards!.
+
+```
+  # Path to a file containing a persona.  This can be just a single string, a json file in
+  # the common "tavern" formats, or a yaml file in the Oobabooga format.  With a single
+  # string, the persona will be set to that string.  Otherwise, the ai_name and persona will
+  # be overwritten with the values in the file.  Also, the wakewords will be extended to
+  # include the character's own name.
+  #   default:
+  persona_file: 
+```
 
 ## Then, run it
 
@@ -242,7 +119,7 @@ You should see something like this if everything worked:
 
 ## Stable Diffusion via AUTOMATIC1111
 
-- **`--stable-diffusion-url`**
+- **`stable-diffusion-url`**
 
   is the URL to a server running [AUTOMATIC1111/stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
 
@@ -287,9 +164,17 @@ By default, **`oobabot`** will listen for three types of messages in the servers
  1. any message containing a provided wakeword (see Optional Settings)
 
 Also, the bot has a random chance of sending follow-up messages within the
-same channel if others reply within 120 seconds of its last post.  The exact
-parameters for this are in flux, but is meant to simulate a natural conversation
-flow, without forcing others to always post a wakeword.
+same channel if others reply within 120 seconds of its last post. This "random chance" is configurable via the config.yaml:
+```
+Response chance vs. time - calibration table List of tuples with time in seconds and
+response chance as float between 0-1
+default: ['(180.0, 0.99)', '(300.0, 0.7)', '(600.0, 0.5)']
+```
+Here, you can see that NEW messages within 3 minutes of the bot's last reply will have a 99% chance of response.
+Between 3-5 minutes, the default chance drops to 70%.
+Between 5-10 minutes, the default chance drops to 50%.
+Feel free to configure this to suit your needs! 
+  
 
 ### Slash Commands
 
@@ -304,21 +189,6 @@ Oobabot doesn't add any restrictions on who can run these commands, but luckily 
 
 If you're running on a large server, you may want to restrict who can run these commands.  I suggest creating a new role, and only allowing that role to run the commands.
 
-## Using a config file
-
-Instead of the command line, you can also use a config file.  This is useful if you want to run multiple instances of the bot, or if you want to run it as a service.
-
-There are also many more settings available in the config file, which are not available on the command line.  See [docs/CONFIG.md](./docs/CONFIG.md) for information on how to use it.
-
-You can also look at a [config.yml file (sample)](./docs/config.sample.yml) here.
-
-## Known Issues
-
-- detection of requests for photos is very crude, and will likely be improved in the future.
-- public threads in 'age restricted' channels are treated as if they
-  were not age-restricted
-- sometimes the bot wants to continue conversations on behalf of other members of the chatroom.  I have some hacks in place to notice and truncate this behavior, but it can lead to terse responses on occasion.
-- found one not listed here?  Have an idea?  [Create an issue](https://github.com/chrisrude/oobabot/issues) on github!
 
 ## Contributing
 

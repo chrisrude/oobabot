@@ -63,25 +63,25 @@ class Transcript:
         else:
             # chance of replying within 5 minutes of last reply
             seconds_since_mention = (now - self.last_mention).seconds
-            if seconds_since_mention > 2 * 60:
+            if seconds_since_mention > 5 * 60:
                 chance = 0.05
             else:
                 chance = 0.95 ** (1 - (seconds_since_mention / 60))
-            # also, divide chance by number of human speakers
+            # also, divide chance by number of users
             # in the message history
-            humans = set()
+            users = set()
             for msg in self.message_buffer.get():
                 if not msg.is_bot:
-                    humans.add(msg.user_id)
-            if 1 == len(humans):
+                    users.add(msg.user_id)
+            if len(users) == 1:
                 chance = 1.0
             else:
-                chance /= 3 * len(humans)
+                chance /= 3 * len(users)
             fancy_logger.get().debug(
-                "transcript: chance of replying: %f (+seconds: %d, humans: %d)",
+                "transcript: chance of replying: %f (+seconds: %d, users: %d)",
                 chance,
                 seconds_since_mention,
-                len(humans),
+                len(users),
             )
             if chance > 0.0 and chance > random.random():
                 self.wakeword_event.set()

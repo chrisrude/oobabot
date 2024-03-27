@@ -7,6 +7,8 @@ then queues a response.
 
 import asyncio
 import typing
+import re
+import emoji
 
 import discord
 
@@ -35,6 +37,8 @@ class AudioResponder:
         ooba_client: ooba_client.OobaClient,
         prompt_generator: prompt_generator.PromptGenerator,
         transcript: transcript.Transcript,
+        speak_voice_replies: bool,
+        post_voice_replies: bool,
     ):
         self._abort = False
         self._channel = channel
@@ -43,6 +47,12 @@ class AudioResponder:
         self._prompt_generator = prompt_generator
         self._transcript = transcript
         self._task: typing.Optional[asyncio.Task] = None
+
+        self.speak_voice_replies = speak_voice_replies
+        self.post_voice_replies = post_voice_replies
+        self.dialogue_extractor = re.compile(r"\s?\*(.*?)\*")
+        self.dialogue_cleaner = re.compile(r"\b[a-zA-Zé\d\s\'`\.,;!\?\-]+\b")
+        self.emoticon_matcher = re.compile(r"\s+(:[\w]|[\^><\-;Tce]\w[\^><\-;Tce]|<3)\b")
 
     async def start(self):
         await self.stop()
@@ -78,6 +88,8 @@ class AudioResponder:
         prompt_prefix = await self._prompt_generator.generate(
             message_history=transcript_history,
             image_requested=False,
+            guild_name=self._channel.guild.name,
+            response_channel=self._channel.name
         )
 
         response = await self._ooba_client.request_as_string(prompt_prefix)
@@ -89,9 +101,16 @@ class AudioResponder:
         # shove response into history
         self._transcript.on_bot_response(response)
 
-        self._discrivener.speak(response)
-        # todo: make this a setting?
-        # await self._channel.send(response)
+        if self.speak_voice_replies:
+            dialogue = self.dialogue_extractor.sub(".", response)
+            dialogue = self.emoticon_matcher.sub(".", dialogue)
+            dialogue = emoji.replace_emoji(dialogue, ".")
+            dialogue = re.sub(r"\s\.\b", ".", dialogue)
+            dialogue = self.dialogue_cleaner.findall(dialogue)
+            response = " ".join(dialogue)
+            self._discrivener.speak(response)
+        if self.post_voice_replies:
+            await self._channel.send(response)
 
     def _transcript_history_iterator(
         self,

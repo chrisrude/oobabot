@@ -69,6 +69,11 @@ class Settings:
     User=customizable settings for the bot.  Reads from
     environment variables and command line arguments.
     """
+    # OpenAI settings
+    USE_OPENAI = "use_openai"
+    API_KEY = "api_key"
+    OPENAI_MODEL = "openai_model"
+    OPENAI_ENDPOINT = "openai_endpoint"
 
     ############################################################
     # This section is for constants which are not yet
@@ -80,9 +85,9 @@ class Settings:
     # same channel.
     TIME_VS_RESPONSE_CHANCE: typing.List[typing.Tuple[float, float]] = [
         # (seconds, base % chance of an unsolicited response)
-        (60.0, 0.90),
-        (120.0, 0.70),
-        (60.0 * 5, 0.50),
+        (180.0, 0.99),
+        (300.0, 0.70),
+        (60.0 * 10, 0.50),
     ]
 
     # increased chance of responding to a message if it ends with
@@ -94,10 +99,12 @@ class Settings:
     REPETITION_TRACKER_THRESHOLD = 1
 
     OOBABOOGA_DEFAULT_REQUEST_PARAMS: oesp.SettingDictType = {
-        "max_new_tokens": 250,
+        "max_tokens": 250,
         "do_sample": True,
         "temperature": 1.3,
-        "top_p": 0.1,
+        "min_temp": 0.2,
+        "max_temp": 1.8,
+        "min_p": 0.1,
         "typical_p": 1,
         "epsilon_cutoff": 0,  # In units of 1e-4
         "eta_cutoff": 0,  # In units of 1e-4
@@ -119,7 +126,7 @@ class Settings:
         "truncation_length": 2048,
         "ban_eos_token": False,
         "skip_special_tokens": True,
-        "stopping_strings": [],
+        "stop": [],
     }
 
     # set default negative prompts to make it more difficult
@@ -171,13 +178,23 @@ class Settings:
     # words to look for in the prompt to indicate that the user
     # wants to generate an image
     DEFAULT_IMAGE_WORDS: typing.List[str] = [
-        "draw me",
-        "drawing",
-        "photo",
-        "pic",
-        "picture",
-        "image",
+        "draw",
         "sketch",
+        "paint",
+        "make",
+        "generate",
+        "post",
+        "upload",
+    ]
+
+    DEFAULT_AVATAR_WORDS: typing.List[str] = [
+        "self-portrait",
+        "self portrait",
+        "your avatar",
+        "your pfp",
+        "your profile pic",
+        "yourself",
+        "you",
     ]
 
     # ENVIRONMENT VARIABLES ####
@@ -278,7 +295,8 @@ class Settings:
                         bot to play.  Alternatively, this can be set with the
                         {self.OOBABOT_PERSONA_ENV_VAR} environment variable.
                         """
-                    )
+                    ),
+                    _make_template_comment(([templates.TemplateToken.AI_NAME], "", True))[2],
                 ],
                 show_default_in_yaml=False,
             )
@@ -418,6 +436,24 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="prompt_prefix",
+                default="",
+                description_lines=[
+                    "The prefix prepended to AI name in the prompt to the language model.",
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="prompt_suffix",
+                default="",
+                description_lines=[
+                    "The suffix appended to AI name in the prompt to the language model.",
+                ],
+            )
+        )
+        self.discord_settings.add_setting(
             oesp.ConfigSetting[typing.List[str]](
                 name="stop_markers",
                 default=[
@@ -519,6 +555,35 @@ class Settings:
             )
         )
         self.discord_settings.add_setting(
+            oesp.ConfigSetting[list[str]](
+                name="response_chance_vs_time",
+                default=[str(x) for x in self.TIME_VS_RESPONSE_CHANCE],
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Response chance vs. time - calibration table
+                        List of tuples with time in seconds and response chance as float between 0-1
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[float](
+                name="interrobang_bonus",
+                default=self.DECIDE_TO_RESPOND_INTERROBANG_BONUS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        How much to increase response chance by if the message ends with ? or !
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="discrivener_location",
                 default="",
@@ -549,16 +614,97 @@ class Settings:
                 include_in_argparse=False,
             )
         )
+
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="speak_voice_replies",
+                default="true",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Whether to speak replies in voice calls with discrivener
+                           default: true
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
+        self.discord_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="post_voice_replies",
+                default="false",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        FEATURE PREVIEW: Whether to reply in the voice-text channel of voice calls
+                           default: false
+                        """
+                    )
+                ],
+                include_in_argparse=False,
+            )
+        )
         ###########################################################
         # Oobabooga Settings
 
         self.oobabooga_settings = oesp.ConfigSettingGroup("Oobabooga")
         self.setting_groups.append(self.oobabooga_settings)
-
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[bool](
+               name=self.USE_OPENAI,
+               default=True,
+               description_lines=[
+                     "Use the OpenAI API instead of the Oobabooga API.",
+               ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name=self.API_KEY,
+               default="awesome_api_key",
+               description_lines=[
+                     "OpenAI API key. Required if use_openai is True.",
+               ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name=self.OPENAI_ENDPOINT,
+               default="http://localhost:5000/v1/completions",
+               description_lines=[
+                     "OpenAI API completions endpoint. Defaults to localhost. (seems to work with /v1/chat/completions endpoints, pls verify?)",
+               ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name=self.OPENAI_MODEL,
+               default="",
+               description_lines=[
+                     "Model to use (supported by some endpoints), otherwise leave blank. Example for openrouter: mistralai/mistral-7b-instruct:free",
+               ],
+            )
+        )
         self.oobabooga_settings.add_setting(
             oesp.ConfigSetting[str](
                 name="base_url",
                 default="ws://localhost:5005",
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        Base URL for the oobabooga instance.  This should be
+                        ws://hostname[:port] for plain websocket connections,
+                        or wss://hostname[:port] for websocket connections over TLS.
+                        """
+                    )
+                ],
+            )
+        )
+        self.oobabooga_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="base_blocking",
+                default="http://localhost:5000",
                 description_lines=[
                     textwrap.dedent(
                         """
@@ -636,7 +782,103 @@ class Settings:
                 include_in_argparse=False,
             )
         )
-
+        ###########################################################
+        # Vision API Settings
+        self.vision_api_settings = oesp.ConfigSettingGroup("Vision API")
+        self.setting_groups.append(self.vision_api_settings)
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[bool](
+               name="use_vision",
+               default=False,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Use the OpenAI-like Vision API to generate images.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[bool](
+               name="fetch_urls",
+               default=False,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Fetch images from URLs. Warning: this may lead to your
+                           host IP address being leaked to any sites that are accessed!
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="vision_api_url",
+               default="http://localhost:8000/v1/chat/completions",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           URL for the OpenAI-like Vision API. 
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="vision_api_key",
+               default="notarealkey",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           API key for the OpenAI-like Vision API.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[str](
+               name="model",
+               default="gpt-4-vision-preview",
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Model to use for the vision API.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[int](
+               name="max_tokens",
+               default=300,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Maximum number of tokens for the vision model to predict.
+                           """
+                     )
+               ],
+            )
+        )
+        self.vision_api_settings.add_setting(
+            oesp.ConfigSetting[int](
+               name="max_image_size",
+               default=1344,
+               description_lines=[
+                     textwrap.dedent(
+                           """
+                           Maximum size for the longest side of the image. It will be
+                           downsampled to this size if necessary.
+                           """
+                     )
+               ],
+            )
+        )
         ###########################################################
         # Stable Diffusion Settings
 
@@ -652,6 +894,21 @@ class Settings:
                         """
                         When one of these words is used in a message, the bot will
                         generate an image.
+                        """
+                    )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[typing.List[str]](
+                name="avatar_words",
+                default=self.DEFAULT_AVATAR_WORDS,
+                description_lines=[
+                    textwrap.dedent(
+                        """
+                        When one of these words is used in a message, the bot will
+                        generate a self-portrait, substituting the avatar word for
+                        the configured avatar prompt.
                         """
                     )
                 ],
@@ -681,6 +938,17 @@ class Settings:
                         sent to Stable Diffusion.
                         """
                     )
+                ],
+            )
+        )
+        self.stable_diffusion_settings.add_setting(
+            oesp.ConfigSetting[str](
+                name="avatar_prompt",
+                default="",
+                description_lines=[
+                    """
+                    Prompt to send to Stable Diffusion to generate self-portrait if asked.
+                    """
                 ],
             )
         )

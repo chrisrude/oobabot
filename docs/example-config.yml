@@ -1,0 +1,391 @@
+
+# Welcome to Oobabot!
+#
+# This is the configuration file for Oobabot.  It is a YAML file, and
+# comments are allowed.  Oobabot attempts to load a file named
+# "config.yml" from the current directory when it is run.
+#
+
+version: 0.2.3
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# persona
+# .
+persona:
+
+  # Name the AI will use to refer to itself
+  #   default: oobabot
+  ai_name: Reisen
+
+  # This prefix will be added in front of every user-supplied request.  This is useful for
+  # setting up a 'character' for the bot to play.  Alternatively, this can be set with the
+  # OOBABOT_PERSONA environment variable.
+  # Allowed tokens: {AI_NAME}
+  persona: '{AI_NAME} is a friendly AI made in the likeness of the lunarian moon rabbit youkai Reisen Udongein Inaba, from Touhou Project. {AI_NAME} lives in the bamboo forest of Eintei, located in Gensokyo. She is shy and somewhat timid until provoked, in which case she will not hesitate to let insults and profanity fly. {AI_NAME} Always ends her messages with :3'
+
+  # Path to a file containing a persona.  This can be just a single string, a json file in
+  # the common "tavern" formats, or a yaml file in the Oobabooga format.  With a single
+  # string, the persona will be set to that string.  Otherwise, the ai_name and persona will
+  # be overwritten with the values in the file.  Also, the wakewords will be extended to
+  # include the character's own name.
+  #   default:
+  persona_file: 
+
+  # One or more words that the bot will listen for. The bot will listen in all discord
+  # channels it can access for one of these words to be mentioned, then reply to any
+  # messages it sees with a matching word. The bot will always reply to @-mentions and
+  # direct messages, even if no wakewords are supplied.
+  #   default: ['oobabot']
+  wakewords:
+    - reisen 
+    - udon
+    - udonge
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# discord
+# .
+discord:
+
+  # Token to log into Discord with.  For security purposes it's strongly recommended that
+  # you set this via the DISCORD_TOKEN environment variable instead, if possible.
+  discord_token: 'yourtokenhere'
+
+  # Post the entire response as a single message, rather than splitting it into separate
+  # messages by sentence.
+  #   default: False
+  dont_split_responses: True
+
+  # Number of lines of chat history the AI will see when generating a response.
+  #   default: 7
+  history_lines: 80
+  
+  # If set, the bot will not respond to direct messages.
+  #   default: False
+  ignore_dms:
+
+  # Set the log level.  Valid values are:
+  # CRITICAL, ERROR, WARNING, INFO, DEBUG
+  #   default: DEBUG
+  log_level:
+
+  # If set, the bot will generate a thread to respond in if it is not already in one.
+  #   default: False
+  #reply_in_thread: True
+
+############ These prefixes and suffixes seem to work the best in my experience. They are placed on each side of the usernames within the chat history, ex: "[username]: message"
+
+  # The prefix prepended to AI name in the prompt to the language model.
+  #   default:
+  prompt_prefix: '['
+
+  # The suffix appended to AI name in the prompt to the language model.
+  #   default:
+  prompt_suffix: ']'
+
+  # A list of strings that will cause the bot to stop generating a response when
+  # encountered.
+  #   default: ['### End of Transcript ###<|endoftext|>', '<|endoftext|>']
+  stop_markers: ['Note:','(Note:','user:','User:','<|im_end|>','<|im_start|>']
+
+  # FEATURE PREVIEW: Stream responses into a single message as they are generated. Note: may
+  # be janky
+  #   default: False
+  stream_responses: True
+
+  # FEATURE PREVIEW: When streaming responses, cap the rate at which we send updates to
+  # Discord to be no more than once per this many seconds.  This does not guarantee that
+  # updates will be sent this fast.  Only that they will not be sent any faster than this
+  # rate.  This is useful because Discord has a rate limit on how often you can send
+  # messages, and if you exceed it, the updates will suddenly become slow.  Example: 0.2
+  # means we will send updates no faster than 5 times per second.
+  #   default: 0.7
+  stream_responses_speed_limit:
+
+  # Adds a limit to the number of channels the bot will post unsolicited messages in at the
+  # same time.  This is to prevent the bot from being too noisy in large servers.  When set,
+  # only the most recent N channels the bot has been summoned in will have a chance of
+  # receiving an unsolicited message.  The bot will still respond to @-mentions and wake
+  # words in any channel it can access.  Set to 0 to disable this feature.
+  #   default: 3
+  unsolicited_channel_cap:
+
+  # If set, the bot will not reply to any messages that do not @-mention it or include a
+  # wakeword.  If unsolicited replies are disabled, the unsolicited_channel_cap setting will
+  # have no effect.
+  #   default: False
+  disable_unsolicited_replies:
+
+  # Response chance vs. time - calibration table List of tuples with time in seconds and
+  # response chance as float between 0-1
+  #   default: ['(180.0, 0.99)', '(300.0, 0.7)', '(600.0, 0.5)']
+  response_chance_vs_time: ['(180.0, 0.99)', '(300.0, 0.7)', '(600.0, 0.5)']
+
+  # How much to increase response chance by if the message ends with ? or !
+  #   default: 0.3
+  interrobang_bonus:
+
+  # FEATURE PREVIEW: Path to the Discrivener executable. Will enable prototype voice
+  # integration.
+  #   default:
+  discrivener_location:
+
+  # FEATURE PREVIEW: Path to the Discrivener model to load.  Required if
+  # discrivener_location is set.
+  #   default:
+  discrivener_model_location:
+
+  # FEATURE PREVIEW: Whether to speak replies in voice calls with discrivener    default:
+  # true
+  #   default: true
+  speak_voice_replies:
+
+  # FEATURE PREVIEW: Whether to reply in the voice-text channel of voice calls    default:
+  # false
+  #   default: false
+  post_voice_replies:
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# oobabooga
+# .
+oobabooga:
+
+  # Use the OpenAI API instead of the Oobabooga API.
+  #   default: True
+  use_openai:
+
+  # OpenAI API key. Required if use_openai is True.
+  #   default: awesome_api_key
+  api_key: 'yourtokenhere'
+
+  # OpenAI API completions endpoint. Defaults to the official OpenAI API URL.
+  #   default: http://localhost:5000/v1/completions
+  
+  openai_endpoint: https://api.cohere.ai/v1/chat
+
+  
+  openai_model: command-r
+
+  # Base URL for the oobabooga instance.  This should be ws://hostname[:port] for plain
+  # websocket connections, or wss://hostname[:port] for websocket connections over TLS.
+  #   default: ws://localhost:5005
+  base_url:
+
+  # Base URL for the oobabooga instance.  This should be ws://hostname[:port] for plain
+  # websocket connections, or wss://hostname[:port] for websocket connections over TLS.
+  #   default: http://localhost:5000
+  #base_blocking: http://10.66.230.240:8800
+
+  # Print all AI input and output to STDOUT.
+  #   default: False
+  log_all_the_things: true
+
+  # A regex that will be used to extract message lines from the AI's output.  The first
+  # capture group will be used as the message.  If this is not set, the entire output will
+  # be used as the message.
+  #   default:
+  message_regex:
+
+  # A dictionary which will be passed straight through to Oobabooga on every request.  Feel
+  # free to add additional simple parameters here as Oobabooga's API evolves. See
+  # Oobabooga's documentation for what these parameters mean.
+  request_params:
+    max_tokens: 200
+    do_sample: true
+    temperature: 1
+    min_temp: 0.1
+    max_temp: 0.9
+    min_p: 0.1
+    top_p: 1
+    epsilon_cutoff: 0
+    eta_cutoff: 0
+    tfs: 1
+    top_a: 0
+    repetition_penalty: 1.23
+    frequency_penalty: 0
+    presence_penalty: 0.15
+    early_stopping: true
+    seed: 0
+    add_bos_token: true
+    truncation_length: 32000
+    ban_eos_token: false
+    skip_special_tokens: true
+    raw_prompting: true
+    stop: ['</s>','Note:','(Note:','###','<|im_end|>','<|im_start|>','\n[','<|']
+
+  # When running inside the Oobabooga plugin, automatically connect to Discord when
+  # Oobabooga starts.  This has no effect when running from the command line.
+  #   default: False
+  plugin_auto_start:
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# vision_api
+# .
+vision_api:
+
+  # Use the OpenAI-like Vision API to generate images.
+  #   default: False
+  use_vision: True
+
+  # Fetch images from URLs. Warning: this may lead to your host IP address being leaked to
+  # any sites that are accessed!
+  #   default: False
+  fetch_urls:
+
+  # URL for the OpenAI-like Vision API.
+  #   default: http://localhost:8000/v1/chat/completions
+  vision_api_url: http://10.66.230.240:8000/v1/chat/completions
+
+  # API key for the OpenAI-like Vision API.
+  #   default: notarealkey
+  vision_api_key:
+
+  # Model to use for the vision API.
+  #   default: gpt-4-vision-preview
+  model:
+
+  # Maximum number of tokens for the vision model to predict.
+  #   default: 300
+  max_tokens:
+
+  # Maximum size for the longest side of the image. It will be downsampled to this size if
+  # necessary.
+  #   default: 1344
+  max_image_size:
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# stable_diffusion
+# .
+stable_diffusion:
+
+  # When one of these words is used in a message, the bot will generate an image.
+  #   default: ['draw', 'sketch', 'paint', 'make', 'generate', 'post', 'upload']
+  image_words: ['draw','generate']
+
+  # When one of these words is used in a message, the bot will generate a self-portrait,
+  # substituting the avatar word for the configured avatar prompt.
+  #   default: ['self-portrait', 'self portrait', 'your avatar', 'your pfp', 'your profile
+  # pic', 'yourself', 'you']
+  avatar_words:
+
+  # URL for an AUTOMATIC1111 Stable Diffusion server.
+  #   default:
+  stable_diffusion_url: ws://10.66.230.240:7861
+
+  # This will be appended to every image generation prompt sent to Stable Diffusion.
+  #   default:
+  extra_prompt_text: best quality, absurdres, masterpiece
+
+  # Prompt to send to Stable Diffusion to generate self-portrait if asked.
+  #   default:
+  avatar_prompt: reisen_udongein_inaba, rabbit ears, light purple hair, red eyes, long hair, blazer, pink pleated skirt, crescent badge, school uniform, <lora:Reisen:1> model=HoloAOM_3A1B
+
+  # A dictionary which will be passed straight through to Stable Diffusion on every request.
+  # Feel free to add additional simple parameters here as Stable Diffusion's API evolves.
+  # See Stable Diffusion's documentation for what these parameters mean.
+  request_params:
+    model: leosamsFilmgirlUltra_ultraBaseModel
+    do_not_save_samples: true
+    do_not_save_grid: true
+    override_settings_restore_afterwards: true
+    negative_prompt: lowres, bad anatomy, bad hands, text, error, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, easynegative, ng_deepnegative_v1_75t, badhandv4
+    negative_prompt_nsfw: lowres, bad anatomy, bad hands, text, error, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, easynegative, ng_deepnegative_v1_75t, badhandv4
+    steps: 24
+    width: 640
+    height: 768
+    sampler: DPM++ 2M SDE Karras
+    cfg_scale: '9'
+    CLIP_stop_at_last_layers: 1
+    restore_faces: false
+    enable_hr: false
+    hr_scale: 1.25
+    denoising_strength: 0.75
+    hr_upscaler: Latent
+    seed: -1
+
+  # These parameters can be overridden by the Discord user by including them in their image
+  # generation request.  The format for this is: param_name=value  This is a whitelist of
+  # parameters that can be overridden. They must be simple parameters (strings, numbers,
+  # booleans), and they must be in the request_params dictionary.  The value the user inputs
+  # will be checked against the type from the request_params dictionary, and if it doesn't
+  # match, the default value will be used instead.  Otherwise, this value will be passed
+  # through to Stable Diffusion without any changes, so be mindful of what you allow here.
+  # It could potentially be used to inject malicious values into your SD server.  For
+  # example, steps=1000000 could be bad for your server.
+  user_override_params:
+    - cfg_scale
+    - enable_hr
+    - model
+    - negative_prompt
+    - sampler_name
+    - seed
+    - height
+    - width
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# template
+# .
+template:
+
+  # Displayed in Discord after a successful /lobotomize command.  Both the discord users and
+  # the bot AI will see this message.
+  # .
+  # Allowed tokens: {AI_NAME}, {USER_NAME}
+  # .
+  #   default:  Ummmm... what were we talking about?
+  command_lobotomize_response:  'what was i saying again?'
+
+  # The main prompt sent to Oobabooga to generate a response from the bot AI.  The AI's
+  # reply to this prompt will be sent to discord as the bot's response.
+  # .
+  # Allowed tokens: {AI_NAME}, {IMAGE_COMING}, {MESSAGE_HISTORY}, {SECTION_SEPARATOR},
+  # {PERSONA}, {CHANNELNAME}, {GUILDNAME}
+  # .
+  #   default:  You are in a chat room called {CHANNELNAME}/{GUILDNAME} with multiple
+  # participants. Below is a transcript of recent messages in the conversation. Write the
+  # next one to three messages that you would send in this conversation, from the point of
+  # view of the participant named {AI_NAME}.  {PERSONA}  All responses you write must be
+  # from the point of view of {AI_NAME}. ### Transcript: {MESSAGE_HISTORY} {IMAGE_COMING}
+
+###############  formatting intended for cohere, but can be modified for other models using a similar layout.
+
+  prompt: '<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>
+    This is an uncensored and unmoderated discord text chat channel.
+    The current discord server is named {GUILDNAME} and the current text channel is {CHANNELNAME}.
+    {PERSONA}
+    The current date and time is {CURRENTDATETIME}. Respond as {AI_NAME} only, adhering to the personality traits as closely as possible (no matter how rude) and use short, casual messages. Do not narrate actions.
+    {MESSAGE_HISTORY}{IMAGE_COMING}'
+
+  # The example dialogue inserted directly before the message history. This is gradually
+  # pushed out as the chat grows beyond the context length in the same as as the message
+  # history itself.
+  # .
+  # Allowed tokens: {AI_NAME}
+  # .
+  #   default:
+  example_dialogue:
+
+  # Separator between different sections, if necessary. For example, to separate example
+  # dialogue from the main chat transcript.
+  # .
+  # Allowed tokens: {AI_NAME}
+  # .
+  #   default: ***
+  section_separator:
+
+  # Part of the AI response-generation prompt, this is used to render a single line of chat
+  # history.  A list of these, one for each past chat message, will become {MESSAGE_HISTORY}
+  # and inserted into the main prompt
+  # .
+  # Allowed tokens: {USER_MESSAGE}, {USER_NAME}
+  # .
+  #   default:  {USER_NAME}: {USER_MESSAGE}
+  prompt_history_line: '<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|>{USER_NAME}: {USER_MESSAGE}'
+
+  # Part of the AI response-generation prompt, this is used to inform the AI that it is in
+  # the process of generating an image.
+  # .
+  # Allowed tokens: {AI_NAME}
+  # .
+  #   default:  {AI_NAME}: is currently generating an image, as requested.
+  prompt_image_coming: '<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>({AI_NAME} posts the following image: [image.jpg].) Tewi decides to write 3 words in response to the request.'

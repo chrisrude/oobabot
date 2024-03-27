@@ -37,6 +37,7 @@ class BotCommands:
         self.persona = persona
         self.reply_in_thread = discord_settings["reply_in_thread"]
         self.template_store = template_store
+        self.ooba_client = ooba_client
 
         (
             self.discrivener_location,
@@ -45,6 +46,8 @@ class BotCommands:
             discord_settings["discrivener_location"],
             discord_settings["discrivener_model_location"],
         )
+        self.speak_voice_replies = discord_settings["speak_voice_replies"]
+        self.post_voice_replies = discord_settings["post_voice_replies"]
 
         if (
             discord_settings["discrivener_location"]
@@ -75,6 +78,8 @@ class BotCommands:
                 prompt_generator,
                 self.discrivener_location,
                 self.discrivener_model_location,
+                self.speak_voice_replies,
+                self.post_voice_replies,
             )
 
     async def on_ready(self, client: discord.Client):
@@ -109,6 +114,20 @@ class BotCommands:
                     if isinstance(channel, discord.GroupChannel):
                         return channel
             return None
+
+
+        @discord.app_commands.command(
+            name="stop",
+            description=f"Force {self.persona.ai_name} to stop typing the current message.",
+        )
+        async def stop(interaction: discord.Interaction):
+            if interaction.channel_id is None:
+                await discord_utils.fail_interaction(interaction)
+                return
+            response = await self.ooba_client.stop()
+            str_response = response if response is not None else "No response from server."
+            await interaction.response.send_message(str_response)
+            return
 
         @discord.app_commands.command(
             name="say",
@@ -195,6 +214,7 @@ class BotCommands:
         tree = discord.app_commands.CommandTree(client)
         tree.add_command(lobotomize)
         tree.add_command(say)
+        tree.add_command(stop)
 
         if self.audio_commands is not None:
             self.audio_commands.add_commands(tree)
