@@ -695,12 +695,24 @@ class DiscordBot(discord.Client):
 
                 # hack: abort response if it looks like the AI is
                 # continuing the conversation as someone else
-                if self.prompt_finder.match(sentence):
-                    fancy_logger.get().warning(
-                        'Filtered out "%s" from response, aborting', sentence
-                    )
-                    abort_response = True
-                    break
+                username_pattern = re.compile(r'\[(.*?)\]:\s*(.*)')
+                match = username_pattern.match(sentence)
+                if match:
+                    username, remaining_text = match.groups()
+
+                    if username.strip() == self.persona.ai_name:
+                        # If the username matches the bot's name, trim the username portion and keep the remaining text
+                        fancy_logger.get().warning(
+                            "Filtered out %s from response, continuing", sentence
+                        )
+                        sentence = remaining_text  # Trim and keep the rest of the sentence
+                    else:
+                        # If the username is not the bot's username, abort the response for breaking immersion
+                        fancy_logger.get().warning(
+                            'Filtered out "%s" from response, aborting', sentence
+                        )
+                        abort_response = True
+                        break  # Break out of the for-loop processing sentences
 
                 # look for partial stop markers within a sentence
                 for marker in self.stop_markers:
@@ -719,10 +731,8 @@ class DiscordBot(discord.Client):
                     break
 
                 # filter out sentences that are entirely made of whitespace
-                if not sentence.strip():
-                    continue
-
-                good_sentences.append(sentence)
+                if sentence.strip():
+                    good_sentences.append(sentence)
 
             if abort_response:
                 break
