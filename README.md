@@ -66,7 +66,7 @@ If you're on windows, you should use `python3 -m oobabot (args here)`
 
 There are a **LOT** of settings in the config.yaml, and it can be tough to figure out what works best.
 I've included my very own (partially redacted) config here:
-[config.yml file (sample)](./docs/config.sample.yml) here.
+[config.yml file (sample)](./docs/example-config.yml) here.
 
 
 ## Optional settings
