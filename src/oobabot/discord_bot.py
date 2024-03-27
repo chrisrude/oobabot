@@ -74,7 +74,7 @@ class DiscordBot(discord.Client):
 
         self.prompt_prefix = discord_settings["prompt_prefix"]
         self.prompt_suffix = discord_settings["prompt_suffix"]
-        self.prompt_finder = re.compile(r"^" + re.escape(self.prompt_prefix) + r"\S+" + re.escape(self.prompt_suffix) + r":")
+        self.prompt_finder = re.compile(r"\[.+?\]+:")
 
         # add stopping_strings to stop_markers
         self.stop_markers.extend(self.ooba_client.get_stopping_strings())

@@ -70,7 +70,7 @@ class PromptGenerator:
         self.bot_prompt_line = self.template_store.format(
             templates.Templates.PROMPT_HISTORY_LINE,
             {
-                templates.TemplateToken.USER_NAME: self.prompt_prefix + self.persona.ai_name + self.prompt_suffix,
+                templates.TemplateToken.USER_NAME: self.prompt_prefix + "[" + self.persona.ai_name + "]" + self.prompt_suffix,
                 templates.TemplateToken.USER_MESSAGE: "",
             },
         ).strip()
@@ -161,7 +161,7 @@ class PromptGenerator:
             line = self.template_store.format(
                 templates.Templates.PROMPT_HISTORY_LINE,
                 {
-                    templates.TemplateToken.USER_NAME: self.prompt_prefix + message.author_name + self.prompt_suffix,
+                    templates.TemplateToken.USER_NAME: self.prompt_prefix + "[" + message.author_name + "]" + self.prompt_suffix,
                     templates.TemplateToken.USER_MESSAGE: message.body_text,
                 },
             )
